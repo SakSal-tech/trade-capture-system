@@ -14,7 +14,7 @@ The challenge consists of **7 progressive steps**, each testing different aspect
 2. **Test Case Fixes** - Debugging and fixing failing tests
 3. **Missing Functionality** - Implementing advanced search, validation, and dashboard features
 4. **Bug Investigation** - Root cause analysis and bug fixing
-5. **Full-Stack Feature** - Settlement instructions implementation (STRETCH GOAL)
+5. **Full-Stack Feature** - Settlement instructions implementation
 6. **Containerization** - Docker and DevOps (OPTIONAL)
 7. **Cloud Architecture** - Azure design documentation (OPTIONAL - MAGNIFICENT ACHIEVEMENT)
 
