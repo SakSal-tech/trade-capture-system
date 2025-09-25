@@ -643,11 +643,8 @@ Design architecture supporting:
 ## Resources and Templates
 
 ### Documentation Templates
-- `test-fixes-template.md` - For documenting test case fixes
 - `git-commit-standards.md` - Git commit message format
 - `test-fix-checklist.md` - Self-assessment checklist
-- `missing-functionality-guide.md` - Detailed Step 3 requirements
-- `step4-bug-investigation-guide.md` - Bug investigation methodology
 
 ### Assessment Materials
 - Project setup verification checklist
