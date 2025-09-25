@@ -36,10 +36,11 @@ Set up the trading application in your local environment and ensure both backend
 
 ### Success Criteria
 - ✅ Backend running at http://localhost:8080
-- ✅ Frontend running at http://localhost:3000
+- ✅ Frontend running (default ports: **npm uses 5173**, **pnpm uses 3000** - check terminal for actual port)
 - ✅ H2 database console accessible at http://localhost:8080/h2-console
 - ✅ Can navigate through the application UI
 - ✅ API endpoints respond correctly
+- ✅ CORS configuration allows frontend-backend communication (backend pre-configured for ports 3000 and 5173)
 
 ### Key Resources
 - **Detailed Setup Guide**: See `PROJECT-SETUP-GUIDE.md`

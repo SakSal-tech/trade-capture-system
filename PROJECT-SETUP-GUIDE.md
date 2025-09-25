@@ -18,10 +18,17 @@ This document provides comprehensive setup instructions for the trading applicat
 - **Download**: [Oracle JDK](https://www.oracle.com/java/technologies/downloads/) or [OpenJDK](https://openjdk.org/)
 - **Verification**: Run `java -version` and `javac -version`
 
-#### 2. Node.js and npm
-- **Version**: Node.js 18.x or higher
+#### 2. Node.js and Package Manager
+- **Node.js Version**: Node.js 18.x or higher
 - **Download**: [Node.js Official Website](https://nodejs.org/)
-- **Verification**: Run `node --version` and `npm --version`
+- **Verification**: Run `node --version`
+
+**Package Manager Options:**
+- **npm** (comes with Node.js): Run `npm --version` to verify
+- **pnpm** (recommended for this project): 
+  - **Installation**: `npm install -g pnpm`
+  - **Verification**: Run `pnpm --version`
+  - **Note**: This project is configured to use pnpm and includes `pnpm-lock.yaml`
 
 #### 3. Maven
 - **Version**: Maven 3.8 or higher
@@ -115,18 +122,59 @@ cd frontend
 ```
 
 #### Install Dependencies
+
+**Option 1: Using pnpm (Recommended - Project is configured for pnpm)**
 ```bash
+# Install pnpm globally if not already installed
+npm install -g pnpm
+
+# Install dependencies
+pnpm install
+```
+
+**Option 2: Using npm (Alternative)**
+```bash
+# Install dependencies
 npm install
+
+# Note: You may need to delete pnpm-lock.yaml first if switching from pnpm
+# rm pnpm-lock.yaml  # Linux/macOS
+# del pnpm-lock.yaml  # Windows
 ```
 
 #### Run Frontend Application
+
+**Using pnpm (Recommended)**
 ```bash
-npm start
+# Development server
+pnpm dev
+
+# Alternative commands
+pnpm build    # Build for production
+pnpm lint     # Run linting
+pnpm test     # Run tests
+pnpm preview  # Preview production build
+```
+
+**Using npm (Alternative)**
+```bash
+# Development server  
+npm run dev
+
+# Alternative commands
+npm run build    # Build for production
+npm run lint     # Run linting
+npm run test     # Run tests
+npm run preview  # Preview production build
 ```
 
 #### Verify Frontend is Running
-- **Application URL**: http://localhost:3000
+- **Application URL**: Check terminal for actual port assignment
+  - **npm (Vite)**: Typically http://localhost:5173 
+  - **pnpm (Vite)**: Typically http://localhost:3000
 - **Should automatically open in browser**
+- **Note**: The frontend uses Vite, which will automatically assign an available port if the default is busy
+- **CORS Configuration**: Backend is pre-configured to accept requests from both ports (3000 and 5173)
 
 ### Step 4: Verify Full Application
 
@@ -234,11 +282,40 @@ rm -rf node_modules package-lock.json
 npm install
 ```
 
-**Issue**: `Port 3000 already in use`
-**Solution**: Kill the process using port 3000 or start on different port:
+**Issue**: `pnpm install fails`
+**Solution**: 
 ```bash
-PORT=3001 npm start  # Linux/macOS
-set PORT=3001 && npm start  # Windows
+# Clear pnpm cache
+pnpm store prune
+
+# Delete node_modules and reinstall
+rm -rf node_modules pnpm-lock.yaml  # Linux/macOS
+del node_modules pnpm-lock.yaml     # Windows (remove directories manually)
+pnpm install
+```
+
+**Issue**: `Package manager conflicts`
+**Solution**: 
+```bash
+# If switching from npm to pnpm
+rm -rf node_modules package-lock.json
+pnpm install
+
+# If switching from pnpm to npm
+rm -rf node_modules pnpm-lock.yaml
+npm install
+```
+
+**Issue**: `Port 3000 already in use`
+**Solution**: Kill the process using port 3000 or Vite will automatically use the next available port:
+```bash
+# For npm
+PORT=3001 npm run dev  # Linux/macOS
+set PORT=3001 && npm run dev  # Windows
+
+# For pnpm  
+PORT=3001 pnpm dev  # Linux/macOS
+set PORT=3001 && pnpm dev  # Windows
 ```
 
 #### Database Issues
@@ -269,6 +346,18 @@ set PORT=3001 && npm start  # Windows
 2. Check firewall settings
 3. Ensure CORS is properly configured
 4. Verify API base URL in frontend configuration
+
+**Issue**: CORS errors in browser console
+**Solutions**:
+1. **Default Configuration**: Backend is pre-configured for both common Vite ports
+   - Supports `http://localhost:3000` (typical pnpm default)
+   - Supports `http://localhost:5173` (typical npm default)
+2. **Custom Port Usage**: If using a different port, update CORS configuration in `backend/src/main/java/com/technicalchallenge/config/WebConfig.java`
+3. **Configuration Location**: 
+   ```java
+   // In WebConfig.java
+   .allowedOrigins("http://localhost:3000", "http://localhost:5173")
+   ```
 
 ## Testing the Setup
 
