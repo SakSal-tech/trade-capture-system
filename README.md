@@ -57,7 +57,7 @@ Set up the trading application in your local environment and ensure both backend
 Identify and fix failing test cases in the backend application while documenting your debugging process and understanding of the fixes.
 
 ### Background
-The application has several failing test cases that need to be fixed. Your task is to systematically identify, debug, and fix these issues while demonstrating your understanding of the business logic.
+The application has several failing test cases that need to to be fixed. Your task is to systematically identify, debug, and fix these issues while demonstrating your understanding of the business logic.
 
 ### Tasks
 1. **Run Tests**: Execute the test suite and identify failing tests
@@ -333,23 +333,35 @@ Integrate settlement instructions directly into the trade capture process, allow
 ### **Technical Implementation Options**
 
 #### **Option A: Direct Trade Table Extension (Standard Implementation)**
-```sql
--- Add settlement_instructions column to existing Trade table
-ALTER TABLE trade ADD COLUMN settlement_instructions TEXT;
+**Approach**: Extend the existing Trade entity and database schema
+```java
+// Example: Add new field to Trade entity
+// Consider how to modify the existing Trade table structure
+// Think about JPA annotations and entity relationships
 ```
 
-**Pros**: Simple, direct implementation  
+**Pros**: Simple, direct implementation with existing trade data  
 **Cons**: Less flexible for future settlement instruction types
 
 #### **Option B: Extensible AdditionalInfo Architecture (Bonus +15 points)**
+**Approach**: Use existing AdditionalInfo table for key-value storage
 ```java
 // Use existing AdditionalInfo table for key-value storage
 // Key: "SETTLEMENT_INSTRUCTIONS" 
 // Value: The settlement instruction text
+// Consider the existing AdditionalInfo entity and service layer
 ```
 
-**Pros**: Extensible design, follows enterprise patterns  
+**Pros**: Extensible design, follows enterprise patterns, leverages existing infrastructure  
 **Cons**: More complex implementation requiring additional info service integration
+
+#### **Implementation Guidance**
+- **Database Schema**: Since this is an H2 database that recreates on startup, you have options:
+  - Modify the existing JPA entity definitions
+  - Update the `data.sql` initialization script if needed
+  - Consider how the existing database initialization works
+- **Entity Design**: Think about JPA relationships, validation annotations, and mapping strategies
+- **Service Layer**: Leverage existing patterns in the codebase for data access and business logic
 
 ### **Required API Endpoints**
 ```java
