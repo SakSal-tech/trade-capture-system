@@ -35,9 +35,11 @@ Set up the trading application in your local environment and ensure both backend
 5. **Verification**: Ensure both applications communicate correctly
 
 ### Success Criteria
-- ✅ Backend running at http://localhost:8080
+- ✅ Backend health verified at http://localhost:8080/actuator/health
 - ✅ Frontend running (default ports: **npm uses 5173**, **pnpm uses 3000** - check terminal for actual port)
 - ✅ H2 database console accessible at http://localhost:8080/h2-console
+- ✅ Swagger UI accessible at http://localhost:8080/swagger-ui/index.html
+- ✅ Actuator endpoints accessible at http://localhost:8080/actuator/health
 - ✅ Can navigate through the application UI
 - ✅ API endpoints respond correctly
 - ✅ CORS configuration allows frontend-backend communication (backend pre-configured for ports 3000 and 5173)

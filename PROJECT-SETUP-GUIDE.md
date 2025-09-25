@@ -34,7 +34,7 @@ This document provides comprehensive setup instructions for the trading applicat
 - **Version**: Maven 3.8 or higher
 - **Download**: [Apache Maven](https://maven.apache.org/download.cgi)
 - **Verification**: Run `mvn --version`
-- **Alternative**: Use Maven wrapper (mvnw) included in the project
+- **Installation Required**: Candidates must install Maven directly (Maven wrapper not supported for this challenge)
 
 #### 4. Git
 - **Version**: Latest stable version
@@ -85,22 +85,14 @@ cd backend
 
 #### Install Dependencies and Build
 ```bash
-# Using Maven (if installed)
+# Using Maven (required - must be installed)
 mvn clean install
-
-# OR using Maven wrapper (if Maven not installed)
-./mvnw clean install    # Linux/macOS
-mvnw.cmd clean install  # Windows
 ```
 
 #### Run Backend Application
 ```bash
 # Using Maven
 mvn spring-boot:run
-
-# OR using Maven wrapper
-./mvnw spring-boot:run    # Linux/macOS
-mvnw.cmd spring-boot:run  # Windows
 
 # OR run the built JAR
 java -jar target/*.jar
@@ -113,6 +105,13 @@ java -jar target/*.jar
   - **JDBC URL**: `jdbc:h2:file:./data/tradingdb`
   - **Username**: `sa`
   - **Password**: (leave empty)
+
+#### Verify API Documentation and Monitoring
+- **Swagger UI**: http://localhost:8080/swagger-ui/index.html
+- **OpenAPI JSON**: http://localhost:8080/api-docs
+- **Actuator Endpoints**: http://localhost:8080/actuator/
+- **Application Metrics**: http://localhost:8080/actuator/metrics
+- **Application Info**: http://localhost:8080/actuator/info
 
 ### Step 3: Frontend Setup
 
@@ -364,51 +363,37 @@ set PORT=3001 && pnpm dev  # Windows
 ### Quick Verification Checklist
 - [ ] Backend starts without errors
 - [ ] Frontend starts without errors
-- [ ] Can access H2 database console
-- [ ] Can create and view trades through the UI
+- [ ] Can access H2 database console at http://localhost:8080/h2-console
+- [ ] **Swagger UI accessible at http://localhost:8080/swagger-ui/index.html**
+- [ ] **Actuator health endpoint responds at http://localhost:8080/actuator/health**
+- [ ] **Actuator metrics available at http://localhost:8080/actuator/metrics**
+- [ ] **Actuator info endpoint accessible at http://localhost:8080/actuator/info**
+- [ ] Can navigate through the application UI
 - [ ] API endpoints respond correctly
 - [ ] No console errors in browser developer tools
 
-### Sample API Test
+### Required Verification Steps
+
+#### 1. Backend API Verification
 ```bash
 # Test health endpoint
 curl http://localhost:8080/actuator/health
+
+# Test API documentation accessibility
+curl http://localhost:8080/api-docs
 
 # Test trades endpoint (may require authentication)
 curl http://localhost:8080/api/trades
 ```
 
-## Development Tips
+#### 2. Swagger UI Verification
+1. Navigate to http://localhost:8080/swagger-ui/index.html
+2. Verify all API endpoints are documented
+3. Confirm you can expand endpoint sections
+4. Test at least one GET endpoint using "Try it out" feature
 
-### Hot Reloading
-- **Backend**: Use `mvn spring-boot:run` with Spring Boot DevTools
-- **Frontend**: `npm start` automatically reloads on file changes
-
-### Debugging
-- **Backend**: Use IDE debugging or add `--debug` flag
-- **Frontend**: Use browser developer tools and React DevTools extension
-
-### Code Changes
-- **Backend**: Changes require restart unless using DevTools
-- **Frontend**: Changes automatically reload in development mode
-
-## Next Steps
-
-Once you have the application running successfully:
-
-1. **Explore the Codebase**: Familiarize yourself with the project structure
-2. **Review Documentation**: Read through the technical challenge steps
-3. **Test Functionality**: Create trades, explore features, understand the business domain
-4. **Prepare for Development**: Set up your preferred IDE and development tools
-
-For the technical challenge, you'll be working with this application to fix issues, implement new features, and demonstrate your software development skills.
-
-## Support
-
-If you encounter issues during setup:
-1. Check the troubleshooting section above
-2. Review application logs for error messages
-3. Ensure all prerequisites are properly installed
-4. Verify network connectivity and port availability
-
-The application should be fully functional once properly set up, providing a solid foundation for the technical challenge ahead.
+#### 3. Actuator Monitoring Verification
+1. **Health Check**: http://localhost:8080/actuator/health should return status "UP"
+2. **Application Info**: http://localhost:8080/actuator/info should show build and environment details
+3. **Metrics**: http://localhost:8080/actuator/metrics should list available metrics
+4. **All Endpoints**: http://localhost:8080/actuator/ should show all available actuator endpoints
