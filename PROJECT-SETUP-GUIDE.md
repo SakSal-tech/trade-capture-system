@@ -70,10 +70,19 @@ trading-application/
 
 ## Setup Instructions
 
-### Step 1: Clone the Repository
+### Step 1: Fork and Clone the Repository
+
+#### Fork the Repository
+1. **Navigate to the Repository**: Go to the provided repository URL in your web browser
+2. **Fork the Repository**: Click the "Fork" button in the top-right corner of the repository page
+3. **Create Your Fork**: This creates a copy of the repository under your GitHub account
+4. **Note Your Fork URL**: Your forked repository will be at `https://github.com/YOUR_USERNAME/trade-capture-system`
+
+#### Clone Your Forked Repository
 ```bash
-git clone <repository-url>
-cd trading-application
+# Clone your forked repository (replace YOUR_USERNAME with your actual GitHub username)
+git clone https://github.com/YOUR_USERNAME/trade-capture-system.git
+cd trade-capture-system
 ```
 
 ### Step 2: Backend Setup

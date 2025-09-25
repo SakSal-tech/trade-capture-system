@@ -29,10 +29,11 @@ Set up the trading application in your local environment and ensure both backend
 
 ### Tasks
 1. **Environment Setup**: Install all required prerequisites (Java 17+, Node.js 18+, Maven)
-2. **Clone Repository**: Get the codebase from the provided repository
-3. **Backend Setup**: Start the Spring Boot application on port 8080
-4. **Frontend Setup**: Start the React application on port 3000
-5. **Verification**: Ensure both applications communicate correctly
+2. **Fork Repository**: Fork the repository to your GitHub account
+3. **Clone Repository**: Clone your forked repository to local machine
+4. **Backend Setup**: Start the Spring Boot application on port 8080
+5. **Frontend Setup**: Start the React application (Vite will assign available port, typically 5173)
+6. **Verification**: Ensure both applications communicate correctly
 
 ### Success Criteria
 - ✅ Backend health verified at http://localhost:8080/actuator/health
