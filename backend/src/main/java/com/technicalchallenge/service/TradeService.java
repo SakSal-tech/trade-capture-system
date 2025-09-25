@@ -468,7 +468,7 @@ public class TradeService {
     /**
      * FIXED: Generate cashflows based on schedule and maturity date
      */
-    private void generateCashflows(TradeLeg leg, LocalDate startDate, LocalDate maturityDate) {
+    public void generateCashflows(TradeLeg leg, LocalDate startDate, LocalDate maturityDate) {
         logger.info("Generating cashflows for leg {} from {} to {}", leg.getLegId(), startDate, maturityDate);
 
         // Use default schedule if not set

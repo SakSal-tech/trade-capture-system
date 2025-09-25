@@ -20,7 +20,14 @@ import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Optional;
 
+import com.technicalchallenge.model.Cashflow;
+// Added import for CalculationPeriodSchedule
+import com.technicalchallenge.model.Schedule;
+import com.technicalchallenge.service.TradeService;
+
+
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -165,19 +172,29 @@ class TradeServiceTest {
         assertTrue(exception.getMessage().contains("Trade not found"));
     }
 
-    // This test has a deliberate bug for candidates to find and fix
     @Test
     void testCashflowGeneration_MonthlySchedule() {
-        // This test method is incomplete and has logical errors
-        // Candidates need to implement proper cashflow testing
 
-        // Given - setup is incomplete
+        // creating a new object 
         TradeLeg leg = new TradeLeg();
-        leg.setNotional(BigDecimal.valueOf(1000000));
+        leg.setNotional(BigDecimal.valueOf(1000000));// setting up test data by assigning value to the notional field of the TradeLeg object
+        leg.setRate(0.5);
 
-        // When - method call is missing
+        /* Set schedule to monthly. By creating a Schedule object and assigning it to the leg, ensures that the generateCashflows method knows to generate cashflows according to the schedule (in this case, monthly). Otherwise it will use the default quartely 3M */ 
+        
+        Schedule schedule = new Schedule();
+        schedule.setSchedule("Monthly");
+        leg.setCalculationPeriodSchedule(schedule);
+        LocalDate starDate = LocalDate.of(2025,1,1);
+        LocalDate maturityDate = LocalDate.of(2026, 1,1);
 
-        // Then - assertions are wrong/missing
-        assertEquals(1, 12); // This will always fail - candidates need to fix
+        // when 
+        // When this method is called, it uses Monthly and generates 12 cashflows for 1 year period
+        tradeService.generateCashflows(leg, starDate, maturityDate);
+
+        //then
+        // Using Mockito to verify the expected number of cashflows. This tells Mockito to expect that method is called 12 times to generate cashflow
+        verify(cashflowRepository, times(12)).save(any(Cashflow.class));// Cashflow.class any instance of the Cashflow type
+
     }
 }
