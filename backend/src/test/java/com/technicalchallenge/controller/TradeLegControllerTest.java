@@ -159,8 +159,10 @@ public class TradeLegControllerTest {
         tradeLegDTO.setNotional(BigDecimal.valueOf(-1000000.0));
 
         // When/Then
+        // mockMvc is a Spring test utility for simulating HTTP requests to  controller. perform(post(...)) sends a POST request to  API endpoint. andExpect(...) checks the response status and content. It does not call the real HTTP server, but simulates the request/response cycle in-memory.
         mockMvc.perform(post("/api/tradeLegs")
                 .contentType(MediaType.APPLICATION_JSON)
+                // objectMapper.writeValueAsString(tradeLegDTO) converts the DTO object to a JSON string by calling the method in objectmapper class writeValueAsString because the API expects JSON input.  it uses Jackson serialization (with SegmentStringWriter, JsonFactory, etc.) to turn Java objects into JSON.
                 .content(objectMapper.writeValueAsString(tradeLegDTO)))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("Notional must be positive"));

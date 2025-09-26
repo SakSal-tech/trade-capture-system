@@ -22,6 +22,7 @@ fix(test): TradeControllerTest - Fixed createTrade endpoint validation
 ## Commit Message Examples
 
 ### Backend Test Fixes
+
 ```
 fix(test): BookServiceTest - Fixed book creation with invalid cost center
 fix(test): CashflowServiceTest - Resolved NPE in cashflow calculation
@@ -29,11 +30,13 @@ fix(test): UserControllerTest - Fixed authentication token validation
 ```
 
 ### Integration Test Fixes
+
 ```
 fix(integration): Trade booking flow - Fixed end-to-end trade creation
 fix(integration): User authentication - Resolved login redirection issue
 ```
 
 ## Branch Naming Convention
+
 - Use: `fix/test-[test-class-name]` or `fix/tests-batch-[number]`
 - Example: `fix/test-trade-controller` or `fix/tests-batch-1`

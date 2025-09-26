@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.stream.Collectors;
 
+// Mapper class converting data between DTOs and entities. Putting mapping code inside the controller works for small projects, but it quickly becomes messy and hard to maintain as your application grows
 @Component
 public class TradeMapper {
 
