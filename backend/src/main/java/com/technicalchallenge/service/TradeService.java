@@ -7,6 +7,7 @@ import com.technicalchallenge.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.modelmapper.internal.bytebuddy.agent.builder.AgentBuilder.InitializationStrategy.SelfInjection.Split;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,6 +20,7 @@ import java.util.Optional;
 
 @Service
 @Transactional
+/*The service receives a DTO (from the controller), uses the mapper to convert it to an entity, and then processes or saves the entity. When returning data, the service uses the mapper to convert entities back to DTOs for the controller to send as a response. */
 public class TradeService {
     private static final Logger logger = LoggerFactory.getLogger(TradeService.class);
 
@@ -66,7 +68,7 @@ public class TradeService {
         logger.debug("Retrieving trade by id: {}", tradeId);
         return tradeRepository.findByTradeIdAndActiveTrue(tradeId);
     }
-
+ 
     @Transactional
     public Trade createTrade(TradeDTO tradeDTO) {
         logger.info("Creating new trade with ID: {}", tradeDTO.getTradeId());
@@ -162,6 +164,7 @@ public class TradeService {
         // Handle trader user by name or ID with enhanced logging
         if (tradeDTO.getTraderUserName() != null) {
             logger.debug("Looking up trader user by name: {}", tradeDTO.getTraderUserName());
+            /* trim(): Remove any leading or trailing spaces from the username.split("\\s+")Split the username into parts using whitespace (spaces, tabs, etc.) as the separator. radeDTO.getTraderUserName() returns "  John   Smith  ". .trim() removes leading/trailing spaces: "John   Smith" .split("\\s+") splits by one or more spaces: ["John", "Smith"] */
             String[] nameParts = tradeDTO.getTraderUserName().trim().split("\\s+");
             if (nameParts.length >= 1) {
                 String firstName = nameParts[0];
@@ -476,10 +479,12 @@ public class TradeService {
         if (leg.getCalculationPeriodSchedule() != null) {
             schedule = leg.getCalculationPeriodSchedule().getSchedule();
         }
-
+        // Converts the schedule string into a numeric interval (months between payments).
         int monthsInterval = parseSchedule(schedule);
+        //calculatePaymentDates Calculates all payment dates between the start and maturity dates using this interval.
         List<LocalDate> paymentDates = calculatePaymentDates(startDate, maturityDate, monthsInterval);
 
+            /*For each payment date, creates a new Cashflow object. Sets its properties (leg, paymentdate, rate). Calculates the payment value using the leg type and interval. Saves the cashflow to the database. */
         for (LocalDate paymentDate : paymentDates) {
             Cashflow cashflow = new Cashflow();
             cashflow.setTradeLeg(leg); // Fixed field name
@@ -524,7 +529,7 @@ public class TradeService {
             default:
                 // Parse "1M", "3M", "12M" format
                 if (schedule.endsWith("M") || schedule.endsWith("m")) {
-                    try {
+                    try { // e.g 12M" becomes 12 (months interval), and the "M" is removed.
                         return Integer.parseInt(schedule.substring(0, schedule.length() - 1));
                     } catch (NumberFormatException e) {
                         throw new RuntimeException("Invalid schedule format: " + schedule);
@@ -540,19 +545,20 @@ public class TradeService {
 
         while (!currentDate.isAfter(maturityDate)) {
             dates.add(currentDate);
+            // plusMonths is from built in java LocalDate.class
             currentDate = currentDate.plusMonths(monthsInterval);
         }
 
         return dates;
     }
-
+    /* Calculates the payment value for a cashflow, based on the properties of a trade leg and the payment interval (in months). */
     private BigDecimal calculateCashflowValue(TradeLeg leg, int monthsInterval) {
-        if (leg.getLegRateType() == null) {
+        if (leg.getLegRateType() == null) { // If the leg’s rate type is not set, the method returns zero, prevents calculation errors and signals missing data.
             return BigDecimal.ZERO;
         }
 
         String legType = leg.getLegRateType().getType();
-
+        // Notional is the principal amount or face value on which interest payments are calculated in a financial contract (like a loan, bond, or swap). For "Fixed" legs, the cashflow value is calculated as:Cashflow = Notional * Rate * Months /12. This formula annualises the rate and scales it by the payment interval(This ensures the payment matches the correct portion of the annual interest for the interval.To calculate the payment for a period shorter than a year, you multiply the notional by the annual rate, then adjust for the fraction of the year covered by the payment interval (e.g., for a quarterly payment, you use 3/12 of the annual rate). The result is wrapped in a BigDecimal for precision.
         if ("Fixed".equals(legType)) {
             double notional = leg.getNotional().doubleValue();
             double rate = leg.getRate();
@@ -561,7 +567,7 @@ public class TradeService {
             double result = (notional * rate * months) / 12;
 
             return BigDecimal.valueOf(result);
-        } else if ("Floating".equals(legType)) {
+        } else if ("Floating".equals(legType)) { //For "Floating" legs, the method currently returns zero. 
             return BigDecimal.ZERO;
         }
 
