@@ -58,6 +58,24 @@ UPDATE application_user SET email='stuart@example.com' WHERE login_id='stuart';
 
 Filter only failed tests, run: mvn clean test | grep '\[ERROR\]'
 
+TradeControllerTest
+
+testCreateTrade
+testCreateTradeValidationFailure_MissingBook
+testDeleteTrade
+testUpdateTrade
+testUpdateTradeIdMismatch
+TradeServiceTest
+
+testCreateTrade_InvalidDates_ShouldFail
+BookServiceTest
+
+testFindBookById
+testFindBookByNonExistentId
+testSaveBook
+testAmendTrade_Success
+testCreateTrade_Success
+
 ## Test Failure 1
 
 ### Problem Description: What was failing and why
