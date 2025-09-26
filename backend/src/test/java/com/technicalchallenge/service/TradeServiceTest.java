@@ -185,6 +185,7 @@ class TradeServiceTest {
         Schedule schedule = new Schedule();
         schedule.setSchedule("Monthly");
         leg.setCalculationPeriodSchedule(schedule);
+        //It creates a new LocalDate object for a specific year, month, and day.
         LocalDate starDate = LocalDate.of(2025,1,1);
         LocalDate maturityDate = LocalDate.of(2026, 1,1);
 
