@@ -340,6 +340,7 @@ public class TradeService {
         // Validate dates - Fixed to use consistent field names
         if (tradeDTO.getTradeStartDate() != null && tradeDTO.getTradeDate() != null) {
             if (tradeDTO.getTradeStartDate().isBefore(tradeDTO.getTradeDate())) {
+                // 
                 throw new RuntimeException("Start date cannot be before trade date");
             }
         }
