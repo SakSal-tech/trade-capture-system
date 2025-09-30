@@ -92,13 +92,13 @@ public class TradeController {
         try {
             tradeService.deleteTrade(id);
 
-            // FIX: Return 204 NO CONTENT → matches REST convention + test
+            // FIX: Return 204 NO CONTENT to match REST convention + test
             return ResponseEntity.noContent().build();
 
         } catch (Exception e) {
             logger.error("Error deleting trade: {}", e.getMessage(), e);
 
-            // FIX: Changed from returning 200 → 400 to properly reflect error
+            // FIX: Changed from returning 200 to 400 to properly reflect error
             return ResponseEntity.badRequest().build();
         }
     }
