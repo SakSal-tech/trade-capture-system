@@ -6,6 +6,8 @@ import com.technicalchallenge.dto.CashflowDTO;
 import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.model.TradeLeg;
 import com.technicalchallenge.model.Cashflow;
+import com.technicalchallenge.model.Book;
+import com.technicalchallenge.model.Counterparty;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -13,7 +15,8 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.stream.Collectors;
 
-// Mapper class converting data between DTOs and entities. Putting mapping code inside the controller works for small projects, but it quickly becomes messy and hard to maintain as your application grows
+// Mapper class converting data between DTOs and entities. Putting mapping code inside the controller works for small projects, 
+// but it quickly becomes messy and hard to maintain as your application grows
 @Component
 public class TradeMapper {
 
@@ -40,7 +43,6 @@ public class TradeMapper {
         dto.setActive(trade.getActive());
         dto.setCreatedDate(trade.getCreatedDate());
 
-
         if (trade.getBook() != null) {
             dto.setBookId(trade.getBook().getId());
             dto.setBookName(trade.getBook().getBookName());
@@ -58,7 +60,8 @@ public class TradeMapper {
 
         if (trade.getTradeInputterUser() != null) { // Fixed field name
             dto.setTradeInputterUserId(trade.getTradeInputterUser().getId());
-            dto.setInputterUserName(trade.getTradeInputterUser().getFirstName() + " " + trade.getTradeInputterUser().getLastName());
+            dto.setInputterUserName(
+                    trade.getTradeInputterUser().getFirstName() + " " + trade.getTradeInputterUser().getLastName());
         }
 
         if (trade.getTradeType() != null) {
@@ -106,6 +109,21 @@ public class TradeMapper {
         trade.setValidityEndDate(dto.getValidityEndDate());
         trade.setActive(dto.getActive());
         trade.setCreatedDate(dto.getCreatedDate());
+
+        // FIX: Add lightweight placeholder objects for Book and Counterparty
+        // This ensures to not lose bookName/counterpartyName when mapping.
+        // The service (populateReferenceDataByName) will replace them with managed
+        // entities.
+        if (dto.getBookName() != null) {
+            Book book = new Book();
+            book.setBookName(dto.getBookName());
+            trade.setBook(book);
+        }
+        if (dto.getCounterpartyName() != null) {
+            Counterparty cp = new Counterparty();
+            cp.setName(dto.getCounterpartyName());
+            trade.setCounterparty(cp);
+        }
 
         return trade;
     }
@@ -181,7 +199,6 @@ public class TradeMapper {
         leg.setNotional(dto.getNotional());
         leg.setRate(dto.getRate());
 
-
         return leg;
     }
 
@@ -198,8 +215,9 @@ public class TradeMapper {
         dto.setRate(cashflow.getRate());
         dto.setPayRec(cashflow.getPayRec() != null ? cashflow.getPayRec().getPayRec() : null);
         dto.setPaymentType(cashflow.getPaymentType() != null ? cashflow.getPaymentType().getType() : null);
-        dto.setPaymentBusinessDayConvention(cashflow.getPaymentBusinessDayConvention() != null ?
-            cashflow.getPaymentBusinessDayConvention().getBdc() : null);
+        dto.setPaymentBusinessDayConvention(
+                cashflow.getPaymentBusinessDayConvention() != null ? cashflow.getPaymentBusinessDayConvention().getBdc()
+                        : null);
         dto.setCreatedDate(cashflow.getCreatedDate());
         dto.setActive(cashflow.getActive());
 
