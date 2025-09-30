@@ -168,22 +168,8 @@ public class TradeService {
             String[] nameParts = tradeDTO.getTraderUserName().trim().split("\\s+");
             if (nameParts.length >= 1) {
                 String firstName = nameParts[0];
-                logger.debug("Searching for user with firstName: {}", firstName);
                 Optional<ApplicationUser> userOpt = applicationUserRepository.findByFirstName(firstName);
-                if (userOpt.isPresent()) {
-                    trade.setTraderUser(userOpt.get());
-                    logger.debug("Found trader user: {} {}", userOpt.get().getFirstName(), userOpt.get().getLastName());
-                } else {
-                    logger.warn("Trader user not found with firstName: {}", firstName);
-                    // Try with loginId as fallback
-                    Optional<ApplicationUser> byLoginId = applicationUserRepository.findByLoginId(tradeDTO.getTraderUserName().toLowerCase());
-                    if (byLoginId.isPresent()) {
-                        trade.setTraderUser(byLoginId.get());
-                        logger.debug("Found trader user by loginId: {}", tradeDTO.getTraderUserName());
-                    } else {
-                        logger.warn("Trader user not found by loginId either: {}", tradeDTO.getTraderUserName());
-                    }
-                }
+                userOpt.ifPresent(trade::setTraderUser);
             }
         } else if (tradeDTO.getTraderUserId() != null) {
             applicationUserRepository.findById(tradeDTO.getTraderUserId())
@@ -196,22 +182,8 @@ public class TradeService {
             String[] nameParts = tradeDTO.getInputterUserName().trim().split("\\s+");
             if (nameParts.length >= 1) {
                 String firstName = nameParts[0];
-                logger.debug("Searching for inputter with firstName: {}", firstName);
                 Optional<ApplicationUser> userOpt = applicationUserRepository.findByFirstName(firstName);
-                if (userOpt.isPresent()) {
-                    trade.setTradeInputterUser(userOpt.get());
-                    logger.debug("Found inputter user: {} {}", userOpt.get().getFirstName(), userOpt.get().getLastName());
-                } else {
-                    logger.warn("Inputter user not found with firstName: {}", firstName);
-                    // Try with loginId as fallback
-                    Optional<ApplicationUser> byLoginId = applicationUserRepository.findByLoginId(tradeDTO.getInputterUserName().toLowerCase());
-                    if (byLoginId.isPresent()) {
-                        trade.setTradeInputterUser(byLoginId.get());
-                        logger.debug("Found inputter user by loginId: {}", tradeDTO.getInputterUserName());
-                    } else {
-                        logger.warn("Inputter user not found by loginId either: {}", tradeDTO.getInputterUserName());
-                    }
-                }
+                userOpt.ifPresent(trade::setTradeInputterUser);
             }
         } else if (tradeDTO.getTradeInputterUserId() != null) {
             applicationUserRepository.findById(tradeDTO.getTradeInputterUserId())
@@ -221,32 +193,16 @@ public class TradeService {
 
     private void populateTradeTypeReferences(Trade trade, TradeDTO tradeDTO) {
         if (tradeDTO.getTradeType() != null) {
-            logger.debug("Looking up trade type: {}", tradeDTO.getTradeType());
-            Optional<TradeType> tradeTypeOpt = tradeTypeRepository.findByTradeType(tradeDTO.getTradeType());
-            if (tradeTypeOpt.isPresent()) {
-                trade.setTradeType(tradeTypeOpt.get());
-                logger.debug("Found trade type: {} with ID: {}", tradeTypeOpt.get().getTradeType(), tradeTypeOpt.get().getId());
-            } else {
-                logger.warn("Trade type not found: {}", tradeDTO.getTradeType());
-            }
+            tradeTypeRepository.findByTradeType(tradeDTO.getTradeType())
+                    .ifPresent(trade::setTradeType);
         } else if (tradeDTO.getTradeTypeId() != null) {
             tradeTypeRepository.findById(tradeDTO.getTradeTypeId())
                     .ifPresent(trade::setTradeType);
         }
 
         if (tradeDTO.getTradeSubType() != null) {
-            Optional<TradeSubType> tradeSubTypeOpt = tradeSubTypeRepository.findByTradeSubType(tradeDTO.getTradeSubType());
-            if (tradeSubTypeOpt.isPresent()) {
-                trade.setTradeSubType(tradeSubTypeOpt.get());
-            } else {
-                List<TradeSubType> allSubTypes = tradeSubTypeRepository.findAll();
-                for (TradeSubType subType : allSubTypes) {
-                    if (subType.getTradeSubType().equalsIgnoreCase(tradeDTO.getTradeSubType())) {
-                        trade.setTradeSubType(subType);
-                        break;
-                    }
-                }
-            }
+            tradeSubTypeRepository.findByTradeSubType(tradeDTO.getTradeSubType())
+                    .ifPresent(trade::setTradeSubType);
         } else if (tradeDTO.getTradeSubTypeId() != null) {
             tradeSubTypeRepository.findById(tradeDTO.getTradeSubTypeId())
                     .ifPresent(trade::setTradeSubType);
@@ -279,7 +235,12 @@ public class TradeService {
         // Create new version
         Trade amendedTrade = mapDTOToEntity(tradeDTO);
         amendedTrade.setTradeId(tradeId);
-        amendedTrade.setVersion(existingTrade.getVersion() + 1);
+
+        // FIX: null-safe version increment to avoid NPE in tests (and production edge
+        // cases)
+        Integer prevVersion = existingTrade.getVersion();
+        amendedTrade.setVersion((prevVersion == null ? 1 : prevVersion) + 1);
+
         amendedTrade.setActive(true);
         amendedTrade.setCreatedDate(LocalDateTime.now());
         amendedTrade.setLastTouchTimestamp(LocalDateTime.now());
@@ -375,6 +336,12 @@ public class TradeService {
         for (int i = 0; i < tradeDTO.getTradeLegs().size(); i++) {
             var legDTO = tradeDTO.getTradeLegs().get(i);
 
+            if (legDTO == null) {
+                // FIX: Added null check to prevent NPE during tests and in production
+                logger.warn("Skipping null TradeLegDTO while creating legs for trade {}", savedTrade.getTradeId());
+                continue;
+            }
+
             TradeLeg tradeLeg = new TradeLeg();
             tradeLeg.setTrade(savedTrade);
             tradeLeg.setNotional(legDTO.getNotional());
@@ -395,7 +362,6 @@ public class TradeService {
     }
 
     private void populateLegReferenceData(TradeLeg leg, TradeLegDTO legDTO) {
-        // Populate currency by name or ID
         if (legDTO.getCurrency() != null) {
             currencyRepository.findByCurrency(legDTO.getCurrency())
                     .ifPresent(leg::setCurrency);
@@ -404,7 +370,6 @@ public class TradeService {
                     .ifPresent(leg::setCurrency);
         }
 
-        // Populate leg type by name or ID
         if (legDTO.getLegType() != null) {
             legTypeRepository.findByType(legDTO.getLegType())
                     .ifPresent(leg::setLegRateType);
@@ -413,7 +378,6 @@ public class TradeService {
                     .ifPresent(leg::setLegRateType);
         }
 
-        // Populate index by name or ID
         if (legDTO.getIndexName() != null) {
             indexRepository.findByIndex(legDTO.getIndexName())
                     .ifPresent(leg::setIndex);
@@ -422,7 +386,6 @@ public class TradeService {
                     .ifPresent(leg::setIndex);
         }
 
-        // Populate holiday calendar by name or ID
         if (legDTO.getHolidayCalendar() != null) {
             holidayCalendarRepository.findByHolidayCalendar(legDTO.getHolidayCalendar())
                     .ifPresent(leg::setHolidayCalendar);
@@ -431,7 +394,6 @@ public class TradeService {
                     .ifPresent(leg::setHolidayCalendar);
         }
 
-        // Populate schedule by name or ID
         if (legDTO.getCalculationPeriodSchedule() != null) {
             scheduleRepository.findBySchedule(legDTO.getCalculationPeriodSchedule())
                     .ifPresent(leg::setCalculationPeriodSchedule);
@@ -440,7 +402,6 @@ public class TradeService {
                     .ifPresent(leg::setCalculationPeriodSchedule);
         }
 
-        // Populate payment business day convention by name or ID
         if (legDTO.getPaymentBusinessDayConvention() != null) {
             businessDayConventionRepository.findByBdc(legDTO.getPaymentBusinessDayConvention())
                     .ifPresent(leg::setPaymentBusinessDayConvention);
@@ -449,7 +410,6 @@ public class TradeService {
                     .ifPresent(leg::setPaymentBusinessDayConvention);
         }
 
-        // Populate fixing business day convention by name or ID
         if (legDTO.getFixingBusinessDayConvention() != null) {
             businessDayConventionRepository.findByBdc(legDTO.getFixingBusinessDayConvention())
                     .ifPresent(leg::setFixingBusinessDayConvention);
@@ -458,7 +418,6 @@ public class TradeService {
                     .ifPresent(leg::setFixingBusinessDayConvention);
         }
 
-        // Populate pay/receive flag by name or ID
         if (legDTO.getPayReceiveFlag() != null) {
             payRecRepository.findByPayRec(legDTO.getPayReceiveFlag())
                     .ifPresent(leg::setPayReceiveFlag);
@@ -472,9 +431,14 @@ public class TradeService {
      * FIXED: Generate cashflows based on schedule and maturity date
      */
     public void generateCashflows(TradeLeg leg, LocalDate startDate, LocalDate maturityDate) {
+        if (leg == null) {
+            // FIX: Guard clause for null legs to avoid NPEs
+            logger.error("Attempted to generate cashflows for a null TradeLeg - skipping");
+            return;
+        }
+
         logger.info("Generating cashflows for leg {} from {} to {}", leg.getLegId(), startDate, maturityDate);
 
-        // Use default schedule if not set
         String schedule = "3M"; // Default to quarterly
         if (leg.getCalculationPeriodSchedule() != null) {
             schedule = leg.getCalculationPeriodSchedule().getSchedule();
@@ -487,11 +451,10 @@ public class TradeService {
             /*For each payment date, creates a new Cashflow object. Sets its properties (leg, paymentdate, rate). Calculates the payment value using the leg type and interval. Saves the cashflow to the database. */
         for (LocalDate paymentDate : paymentDates) {
             Cashflow cashflow = new Cashflow();
-            cashflow.setTradeLeg(leg); // Fixed field name
+            cashflow.setTradeLeg(leg);
             cashflow.setValueDate(paymentDate);
             cashflow.setRate(leg.getRate());
 
-            // Calculate value based on leg type
             BigDecimal cashflowValue = calculateCashflowValue(leg, monthsInterval);
             cashflow.setPaymentValue(cashflowValue);
 
@@ -513,7 +476,6 @@ public class TradeService {
 
         schedule = schedule.trim();
 
-        // Handle common schedule names
         switch (schedule.toLowerCase()) {
             case "monthly":
                 return 1;
@@ -527,7 +489,6 @@ public class TradeService {
             case "yearly":
                 return 12;
             default:
-                // Parse "1M", "3M", "12M" format
                 if (schedule.endsWith("M") || schedule.endsWith("m")) {
                     try { // e.g 12M" becomes 12 (months interval), and the "M" is removed.
                         return Integer.parseInt(schedule.substring(0, schedule.length() - 1));
@@ -535,7 +496,7 @@ public class TradeService {
                         throw new RuntimeException("Invalid schedule format: " + schedule);
                     }
                 }
-                throw new RuntimeException("Invalid schedule format: " + schedule + ". Supported formats: Monthly, Quarterly, Semi-annually, Annually, or 1M, 3M, 6M, 12M");
+                throw new RuntimeException("Invalid schedule format: " + schedule);
         }
     }
 
@@ -575,7 +536,6 @@ public class TradeService {
     }
 
     private void validateReferenceData(Trade trade) {
-        // Validate essential reference data is populated
         if (trade.getBook() == null) {
             throw new RuntimeException("Book not found or not set");
         }
@@ -585,13 +545,10 @@ public class TradeService {
         if (trade.getTradeStatus() == null) {
             throw new RuntimeException("Trade status not found or not set");
         }
-
-        logger.debug("Reference data validation passed for trade");
     }
 
     // NEW METHOD: Generate the next trade ID (sequential)
     private Long generateNextTradeId() {
-        // For simplicity, using a static variable. In real scenario, this should be atomic and thread-safe.
         return 10000L + tradeRepository.count();
     }
 }
