@@ -1,4 +1,4 @@
-FrontEnd is not running on port 3000
+`FrontEnd is not running on port 3000
 
 saksa@Work-Sak MINGW64 ~/cbfacademy/trade-capture-system/frontend (main)
 $ npm run dev
@@ -57,6 +57,24 @@ UPDATE application_user SET email='stuart@example.com' WHERE login_id='stuart';
 [ERROR] Tests run: 61, Failures: 9, Errors: 5, Skipped: 0
 
 Filter only failed tests, run: mvn clean test | grep '\[ERROR\]'
+
+TradeControllerTest
+
+testCreateTrade
+testCreateTradeValidationFailure_MissingBook
+testDeleteTrade
+testUpdateTrade
+testUpdateTradeIdMismatch
+TradeServiceTest
+
+testCreateTrade_InvalidDates_ShouldFail
+BookServiceTest
+
+testFindBookById
+testFindBookByNonExistentId
+testSaveBook
+testAmendTrade_Success
+testCreateTrade_Success
 
 ## Test Failure 1
 
@@ -122,7 +140,7 @@ still fail and showed [ERROR] TradeLegControllerTest.testCreateTradeLegValidatio
 I used Java debugger and the debug output shown that the request is mapped to TradeLegController#createTradeLeg(TradeLegDTO). The TradeLegDTO is deserialized with a negative notional. Spring’s bean validation triggers before the manual validation code in the controller. Spring’s default behavior for validation errors is to return a 400 status with an empty body. The exception MethodArgumentNotValidException is thrown because the @Positive annotation on notional fails. The error message is "Notional must be positive", but the response body is empty and the content type is null.
 
 Why the test fails:
-When a negative notional is sent in the test, Spring’s validation detects that it violates the @Positive constraint and throws a MethodArgumentNotValidException before your controller logic runs.The test failed because Spring’s default validation handling returned a 400 with an empty body, instead of your expected error message.
+When a negative notional is sent in the test, Spring’s validation detects that it violates the @Positive constraint and throws a MethodArgumentNotValidException before the controller logic runs.The test failed because Spring’s default validation handling returned a 400 with an empty body, instead of the expected error message.
 The test expects the error message in the response body.
 Spring returns an empty body for validation errors by default.
 
@@ -143,3 +161,181 @@ https://medium.com/javaguides/spring-boot-restcontrolleradvice-annotation-comple
 
 I added a custom exception handler to return the error message in the response body for validation errors, to ensure that when validation fails, the error message (e.g., "Notional must be positive") is returned in the response body, and the test will pass.
 After added a ValidationExceptionHandler class with @RestControllerAdvice and an @ExceptionHandler(MethodArgumentNotValidException.class) method. This intercepted validation exceptions, extracted the message (e.g., “Notional must be positive”), and returned it in the response body. This fixed the issue by making the response include the validation error message, so the test passed.
+
+### Test failure 3
+
+testAmendTrade_Success: NullPointerException
+
+Cannot invoke "java.lang.Integer.intValue()" because the return value of "com.technicalchallenge.model.Trade.getVersion()" is null
+testCreateTrade_Success: RuntimeException
+Book not found or not set
+
+### Problem Description: What was failing and why:
+
+#### Error 1: NullPointerException in testAmendTrade_Success
+
+The test calls the service method, which calls getVersion() on the test's mock Trade object. If the mock's version field is not set, getVersion() returns null. The service then tries to increment the version: existingTrade.getVersion() + 1. Adding 1 to null causes a NullPointerException.
+
+Following the problem through:
+The test method testAmendTrade_Success, calls tradeService.amendTrade inside amendTrade, the service calls getTradeById(tradeId) to fetch the existing trade. The returned Trade object is assigned to existingTrade.The service then calls existingTrade.getVersion() to get the current version.
+If the test did not set the version field on the mock Trade object, getVersion() returns null. The service tries to increment the version: existingTrade.getVersion() + 1. Adding 1 to null causes a NullPointerException.
+
+#### Root cause:
+
+The test calls the service method, which calls getVersion() on the test's mock object. If the mock's version is not set, this leads to a NullPointerException when the service tries to increment it. The root cause is missing test data initialisation.
+
+### Solution:
+
+In the test setup, Iset the version field for the mock Trade object:
+
+````java
+trade.setVersion(1);```
+
+This ensures that getVersion() returns a valid integer, so the service can safely increment it.
+
+#### Error 2: RuntimeException 'Book not found or not set' in testCreateTrade_Success
+
+### Root Cause:
+The service expects a Book to be set on the Trade, but the test data does not provide one, and the repository mock does not return a Book. When the service calls bookRepository.findByBookName(tradeDTO.getBookName()), it gets Optional.empty(), so it throws a RuntimeException.
+
+###Solution:
+In the test setup, I set a book name in the DTO and mock the repository to return a Book:
+```java
+tradeDTO.setBookName("TestBook");
+when(bookRepository.findByBookName("TestBook")).thenReturn(Optional.of(new Book()));
+````
+
+This ensures the service finds a Book and does not throw the error.
+
+### Problem Description
+
+The test for trade creation (testCreateTrade_Success) was failing with a RuntimeException: Counterparty not found or not set. This error occurred when the service attempted to validate reference data for a new trade, but could not find a valid counterparty.
+
+### Root Cause:
+
+The test data (tradeDTO) included a counterparty name, but the mock repository (counterpartyRepository) was not set up to return a valid Counterparty object for that name. As a result, when the service called counterpartyRepository.findByName("TestCounterparty"), it received an empty result (Optional.empty()), causing the service to throw an exception during validation.
+
+### Solution
+
+To resolve the error, I updated the test setup to ensure the service could find a valid counterparty:
+-Set the Counterparty Name in Test Data:
+I assigned "TestCounterparty" to the counterpartyName field of the tradeDTO object. This matches what the service expects when looking up a counterparty.
+
+- Mocked the Repository to Return a Valid Counterparty:
+  I used Mockito to configure the mock repository: `java when(counterpartyRepository.findByName("TestCounterparty")).thenReturn(Optional.of(new Counterparty()));  `. This tells the mock repository to return a valid Counterparty object whenever the service looks up "TestCounterparty" by name.
+
+### Impact
+
+By properly setting up the mock to return a valid counterparty, the test now simulates a successful database lookup. This enables the service to validate and process trades as expected, ensuring that trade creation logic is correctly tested and validated in isolation from the database.
+
+### Problem Description
+
+Book not found or not set in testCreateTrade in TradeServiceTest
+
+Explanation for moving the tradeStatusRepository mock to @BeforeEach:
+
+The when(tradeStatusRepository.findByTradeStatus("NEW")) mock was originally defined inside the testCreateTrade_Success method. This meant that only this specific test had the mock in place. Any other test that called createTrade or amendTrade would throw a NullPointerException when the service tried to fetch the trade status, because the repository wasn’t mocked there.
+
+By moving this mock to the @BeforeEach setup method, we ensure that:
+
+Consistency across all tests – Every test now automatically has a valid mock for tradeStatusRepository.findByTradeStatus("NEW").
+
+Elimination of redundancy – There’s no need to repeat the same when(...) statement in multiple test methods.
+
+Reduced risk of NullPointerException – Any test that calls createTrade or amendTrade can safely assume that the required trade status reference data is available.
+
+Cleaner and more maintainable test code – Centralizing common mock setups in @BeforeEach improves readability and maintainability.
+
+In short, this change makes the tests more robust, DRY, and easier to manage.
+
+Problem: Cannot invoke "com.technicalchallenge.repository.CurrencyRepository.findByCurrency(String)"
+because "this.currencyRepository" is null
+
+Root cause: The TradeService calls currencyRepository.findByCurrency(legDTO.getCurrency()) when creating trade legs.
+
+## Test Failures and Fixes
+
+### testCreateTrade_Success
+
+**Problem Description:**  
+This test was failing with a `NullPointerException` inside the `TradeService.createTrade()` call. The exception was raised when the service attempted to generate cashflows for the trade legs. Specifically, it crashed at `leg.getLegId()` inside `generateCashflows`.
+
+**Root Cause Analysis:**  
+In the `TradeService`, after saving a `Trade`, the method `createTradeLegsWithCashflows()` is invoked. This method saves each `TradeLeg` via `tradeLegRepository.save(leg)` and then immediately calls `generateCashflows` with the returned `TradeLeg`.  
+However, in the test setup, there was no stub for `tradeLegRepository.save()`. By default, Mockito returns `null` for unstubbed calls. That meant the returned `TradeLeg` was `null`, and when the service tried to access `leg.getLegId()`, it threw a `NullPointerException`.
+
+**Solution:**  
+Added a stub for `tradeLegRepository.save(any())` in the test setup:
+
+```java
+when(tradeLegRepository.save(any(TradeLeg.class))).thenAnswer(invocation -> {
+    TradeLeg saved = invocation.getArgument(0);
+    if (saved.getLegId() == null) {
+        saved.setLegId(999L); // Synthetic ID for test stability
+    }
+    return saved;
+});
+```
+
+# Unnecessary Stubbing Problems and Fixes
+
+## Overview
+
+Several of the failing tests were not due to logic errors, but because of **Mockito’s strict stubbing mode**.  
+Mockito requires that every stubbed method (`when(...).thenReturn(...)`) is actually invoked during a test run.  
+If a test does not reach the code that calls those stubs (e.g., it fails early in validation), Mockito throws an `UnnecessaryStubbingException`.
+
+This section explains the specific cases where this happened, why, and how we fixed them.
+
+---
+
+## Tests Affected by Unnecessary Stubbing
+
+- **testCreateTrade_InvalidDates_ShouldFail**
+- **testCreateTrade_InvalidLegCount_ShouldFail**
+- **testGetTradeById_Found**
+- **testGetTradeById_NotFound**
+- **testAmendTrade_TradeNotFound**
+- **testCashflowGeneration_MonthlySchedule**
+
+---
+
+## Example Problem
+
+**Problem Description:**  
+In `testCreateTrade_InvalidDates_ShouldFail`, the test only checks the validation rule that the trade start date must not be before the trade date.  
+Because the validation fails immediately, the service never calls repository methods like `bookRepository.findByBookName` or `currencyRepository.findByCurrency`.
+
+**Root Cause Analysis:**  
+These stubs, defined in `@BeforeEach`, were marked by Mockito as "unused". Since strict stubbing is the default, Mockito fails the test with `UnnecessaryStubbingException`.
+
+---
+
+## Root Cause Pattern Across Tests
+
+- Some tests only validate business rules (e.g., invalid dates, missing legs). They never reach repository logic.
+- Some tests bypass the service flow (e.g., direct `generateCashflows` call), so repositories are irrelevant.
+- In these cases, global stubs created in `setUp()` are unused, triggering the failure.
+
+---
+
+## Solution
+
+Use lenient stubbing at the class level so that **unused stubs don’t break tests**.
+
+### Change Applied
+
+```java
+import org.mockito.quality.Strictness;
+import org.mockito.junit.jupiter.MockitoSettings;
+
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)  // Added
+class TradeServiceTest {
+    ...
+}
+
+
+WhY I used lenient:
+I had a shared @BeforeEach setup with stubs that are needed in some tests but not in others. I was trying to to avoid duplicating stubs in every single test so I moved Mocks that more than one test is using in the @Beforeeach method but introduced new errors regarding unnecessary stubbing. That is why I used lenient to tell Mockito that it is OK some repositories mocks are not used in all test methods.
+```
