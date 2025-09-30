@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 // Mapper class converting data between DTOs and entities. Putting mapping code inside the controller works for small projects, 
-// but it quickly becomes messy and hard to maintain as your application grows
+// but it quickly becomes messy and hard to maintain as application grows
 @Component
 public class TradeMapper {
 
