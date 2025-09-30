@@ -1,4 +1,5 @@
 package com.technicalchallenge.service;
+
 import com.technicalchallenge.model.Currency;
 import com.technicalchallenge.model.LegType;
 import com.technicalchallenge.model.Trade;
