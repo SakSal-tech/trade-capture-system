@@ -93,7 +93,7 @@ The assertion does not verify the number of cashflows
 2. Missing the call of the method under test:generateCashflows method to test the cashflow generation logic.
 3. Test was incomplete also as only TradeLeg is created by setting up test data by assigning value to the notional field of the TradeLeg object, I need to set all fields that generateCashflows uses, otherwise it may not work or may use defaults.
 
-### Solution Implemented: How you fixed the issue and why this approach was chosen
+### Solution Implemented: How it is fixed the issue and why this approach was chosen
 
 1. created a TradeLeg and Added athe other Other required fields: schedule, rate
 2. Called to the generateCashflows(leg, startDate, maturityDate) with appropriate dates. When I tried to call the method generateCashflows, it was not visible as it was defined as private. I had to change it to public.
@@ -107,7 +107,7 @@ The assertion does not verify the number of cashflows
    But was 11 times:
    The code generated cashflows for each month from January to December, but the end date is exclusive, it will only create 11 cashflows. I had to change maturity date instead of 31 December to 1 JAN 2026.LocalDate maturityDate = LocalDate.of(2026, 1, 1);
 
-### Verification: How you confirmed the fix works
+### Verification: How I confirmed the fix works
 
 I ran the tests again mvn targeting only this test mvn -Dtest=TradeServiceTest#testCashflowGeneration_MonthlySchedule test
 and it passed and correctly shows the cashflow generation for a monthly schedule
@@ -387,7 +387,7 @@ Status expected:<204> but was:<200> in testDeleteTrade
 
 Deletion endpoints usually return 204 No Content. But, the controller currently returns ResponseEntity.ok().
 I checked the controller and it does this:
-`java return ResponseEntity.ok().body("Trade cancelled successfully"); ` which returns 200 OK + a message body, while your test expects: `java .andExpect(status().isNoContent());`
+`java return ResponseEntity.ok().body("Trade cancelled successfully"); ` which returns 200 OK + a message body, while the test expects: `java .andExpect(status().isNoContent());`
 To to follow REST best practices, the controller should return 204 No Content for a successful delete.
 
 ### Solution
@@ -412,7 +412,7 @@ Status expected:<400> but was:<200>
 
 ### Root Cause
 
-The test expected the controller to reject the request with a 400 Bad Request. But the controller processed it and returned 200 OK. Because nowhere in the controller were you checking if the tradeId in the URL path matched the tradeId in the JSON body.The test intentionally passes a mismatching tradeId (URL param vs body). Controller currently ignores mismatch and processes update.
+The test expected the controller to reject the request with a 400 Bad Request. But the controller processed it and returned 200 OK. Because nowhere in the controller wis checking if the tradeId in the URL path matched the tradeId in the JSON body.The test intentionally passes a mismatching tradeId (URL param vs body). Controller currently ignores mismatch and processes update.
 
 ### Solution
 
@@ -425,8 +425,8 @@ Added a check in controller:
 If the caller tries to update /api/trades/1 but the body says "tradeId": 2 that’s invalid. Instead of trying to process it, the controller immediately responds with 400 Bad Request.
 
 ### Impact
-Your test expected 400 because it simulated exactly that mismatch case.
-But your controller wasn’t enforcing it. Now, with the check, the controller enforces the rule , the test sees 400 and  test passes.
+The test expected 400 because it simulated exactly that mismatch case.
+But the controller wasn’t enforcing it. Now, with the check, the controller enforces the rule , the test sees 400 and  test passes.
 
 
 # TradeControllerTest – Failures and Fixes
@@ -481,3 +481,82 @@ if (tradeDTO.getTradeId() != null && !id.equals(tradeDTO.getTradeId())) {
 }
 
 ````
+
+# Fix Log: Trade Module Tests
+
+## TradeServiceTest
+
+### Problem: UnnecessaryStubbingException
+
+- Several tests in `TradeServiceTest` failed with `UnnecessaryStubbingException`.
+- The failures pointed to multiple stubbings in `@BeforeEach` that were not used in every test.
+
+### Root Cause: DRY setup with stubbing
+
+- To follow DRY principles, all repository stubbings were placed inside `@BeforeEach`.
+- Mockito’s **strict mode** flagged any unused stubs as errors.
+- Example: stubbing `bookRepository.findByBookName(...)` was only needed in `testCreateTrade_Success` but existed for all tests.
+
+### Solution: Switch to lenient stubbing
+
+- Applied `@MockitoSettings(strictness = Strictness.LENIENT)` at the class level.
+- This allowed common stubbings to remain in `@BeforeEach` without breaking tests that didn’t use them.
+
+### Impact: Flexible test setup
+
+- Shared stubbing logic could be preserved without duplication.
+- DRY principles were maintained while preventing strict stubbing failures.
+
+---
+
+### Problem: NullPointerException in `amendTrade`
+
+- `testAmendTrade_Success` failed with an NPE inside `generateCashflows`.
+- Error message: `Cannot invoke "TradeLeg.getLegId()" because "leg" is null`.
+
+### Root Cause: Null legs during cashflow generation
+
+- `createTradeLegsWithCashflows` iterated over `trade.getTradeLegs()`.
+- When legs were `null` or incomplete, the loop crashed.
+
+### Solution: Add null safety
+
+- Introduced guard clauses:
+  ```java
+  if (leg == null) {
+      logger.warn("Skipping null TradeLeg while creating cashflows");
+      continue;
+  }
+  ```
+
+## fix(test): BookServiceTest - Fixed NullPointerException from missing mapper dependency
+
+### Problem
+
+Several tests in `BookServiceTest` were failing with `NullPointerException`.  
+The failures appeared in:
+
+- `testFindBookById`
+- `testSaveBook`
+- `testFindBookByNonExistentId`
+
+The error messages pointed to calls like `bookMapper.toDto(...)` or `bookMapper.toEntity(...)` on a `null` reference.
+
+### Root Cause
+
+The `BookService` depends on `BookMapper`, which in turn requires `CostCenterRepository`.  
+In the unit tests, only `BookRepository` was mocked. The `BookMapper` dependency was never provided, leaving it as `null` when `BookService` tried to use it. This caused every test that called `bookMapper` to fail with `NullPointerException`.
+
+### Solution
+
+- Added a `@Mock` for `BookMapper` in `BookServiceTest`.
+- Injected it into `BookService` using `@InjectMocks`.
+- Stubbed mapper calls where necessary (e.g., `when(bookMapper.toDto(any(Book.class))).thenReturn(bookDTO)` and `when(bookMapper.toEntity(any(BookDTO.class))).thenReturn(book)`).
+
+This ensured that `BookService` could safely use its mapping logic during tests without throwing exceptions.
+
+### Impact
+
+- All failing tests in `BookServiceTest` (`testFindBookById`, `testSaveBook`, and `testFindBookByNonExistentId`) now pass.
+- Existing tests that did not rely on the mapper (`testDeleteBook` and `testBookCreationWithNullNameThrowsException`) continued to pass.
+- The test suite now fully validates `BookService` without runtime errors, confirming that book retrieval, saving, and non-existent lookups behave as expected.
