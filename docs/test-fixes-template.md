@@ -1,4 +1,4 @@
-`FrontEnd is not running on port 3000
+FrontEnd is not running on port 3000
 
 saksa@Work-Sak MINGW64 ~/cbfacademy/trade-capture-system/frontend (main)
 $ npm run dev
@@ -338,4 +338,146 @@ class TradeServiceTest {
 
 WhY I used lenient:
 I had a shared @BeforeEach setup with stubs that are needed in some tests but not in others. I was trying to to avoid duplicating stubs in every single test so I moved Mocks that more than one test is using in the @Beforeeach method but introduced new errors regarding unnecessary stubbing. That is why I used lenient to tell Mockito that it is OK some repositories mocks are not used in all test methods.
+
+
+#### Problem
+TradeControllerTest testCreateTrade Status expected:<200> but was:<201>
+
+### Root Cause:
+
+The test expects 200 OK, but the controller/service actually returns 201 CREATED (Spring’s default when creating new entities).
+
+### Root Cause:
+
+POST (create new resource) → the most “REST-correct” response is 201 Created. It signals: “A new resource was successfully created.”
 ```
+
+### Solution:
+
+changed isOK to isCreated. `java .andExpect(status().isCreated()) `
+
+### Impact:
+
+The test returns 201 instead of 200
+
+### Problem: method testCreateTradeValidationFailure_MissingBook
+
+Status expected:<400> but was:<201>
+
+### Root Cause:
+
+The controller is still returning 201 Created even when the request body is missing required fields (book).
+
+Because validation annotations (@Valid, @NotNull) are missing on TradeDTO fields or the controller parameter.
+
+### Solution
+
+I Added validation annotations in DTO `Java @NotBlank(message = "Book name is required")`
+I have also checked if controller uses @Valid on the Post request body and it does, so no change there.
+
+### Impact
+
+The test should see 400 Bad Request in the testDeleteTrade
+
+### Problem
+
+Status expected:<204> but was:<200> in testDeleteTrade
+
+### Root Cause
+
+Deletion endpoints usually return 204 No Content. But, the controller currently returns ResponseEntity.ok().
+I checked the controller and it does this:
+`java return ResponseEntity.ok().body("Trade cancelled successfully"); ` which returns 200 OK + a message body, while your test expects: `java .andExpect(status().isNoContent());`
+To to follow REST best practices, the controller should return 204 No Content for a successful delete.
+
+### Solution
+
+I changed it so if successful to return 204 and nobody message return ResponseEntity.noContent().build(); // Changed to 204, no body. Also, if not successful, to return 400 with no body `java return ResponseEntity.badRequest().build();`
+
+### Impact
+
+### Problem
+
+No value at JSON path "$.tradeId" inside testUpdateTrade
+
+### Root cause
+
+### Solution
+
+The JSON response doesn’t contain tradeId.
+
+#### Problem
+
+Status expected:<400> but was:<200>
+
+### Root Cause
+
+The test expected the controller to reject the request with a 400 Bad Request. But the controller processed it and returned 200 OK. Because nowhere in the controller were you checking if the tradeId in the URL path matched the tradeId in the JSON body.The test intentionally passes a mismatching tradeId (URL param vs body). Controller currently ignores mismatch and processes update.
+
+### Solution
+
+Added a check in controller:
+
+````Java
+ if (tradeDTO.getTradeId() != null && !id.equals(tradeDTO.getTradeId())) {
+     return ResponseEntity.badRequest().body("Trade ID mismatch");
+ } ```
+If the caller tries to update /api/trades/1 but the body says "tradeId": 2 that’s invalid. Instead of trying to process it, the controller immediately responds with 400 Bad Request.
+
+### Impact
+Your test expected 400 because it simulated exactly that mismatch case.
+But your controller wasn’t enforcing it. Now, with the check, the controller enforces the rule , the test sees 400 and  test passes.
+
+
+# TradeControllerTest – Failures and Fixes
+
+## testCreateTrade
+### Problem
+The test expected HTTP 200 (`status().isOk()`), but the controller was returning HTTP 201 (`status().isCreated()`).
+Additionally, the JSON response sometimes didn’t contain `"tradeId"`, which caused assertion failures.
+
+### Root Cause
+1. By REST conventions, `@PostMapping` for creating a resource should return **201 Created**, not 200 OK. The test was incorrectly written to expect 200.
+2. The missing `"tradeId"` happened because the stubbed `Trade` entity (`trade`) in the test didn’t have its `tradeId` set, even though the `tradeDTO` did. The mapper converts from the `Trade` entity to DTO, so if `trade.getTradeId()` was `null`, the JSON response had no `tradeId`.
+
+### Solution
+1. Updated the test to use `.andExpect(status().isCreated())` instead of `.isOk()`.
+2. Set `trade.setTradeId(1001L);` in the test setup to ensure that the entity has the expected ID before being mapped back to a DTO.
+
+### Impact
+- The test now correctly reflects RESTful behavior by expecting **201 Created** for resource creation.
+- Ensures that the response payload always contains `tradeId`, making the test stable.
+- Improves consistency between the controller, service, and test expectations.
+
+
+## testUpdateTrade
+### Problem
+The JSON response didn’t contain `"tradeId"`, causing the assertion `.andExpect(jsonPath("$.tradeId", is(1001)))` to fail.
+
+### Root Cause
+The stubbed `Trade` entity (`trade`) used in the test didn’t have its `tradeId` set. Even though `tradeDTO.setTradeId(1001L)` was called, the controller maps **from the entity**, not directly from the DTO. Since the `Trade` entity had `null` for `tradeId`, the mapper produced a DTO without `tradeId` in the response.
+
+### Solution
+Explicitly set `trade.setTradeId(1001L);` in the test setup to keep the entity in sync with the DTO.
+
+### Impact
+- Guarantees that the JSON response always includes `tradeId`.
+- Aligns test expectations with actual controller output.
+- Prevents confusion where DTO values exist but entity values are `null`.
+
+
+## testUpdateTradeIdMismatch
+### Problem
+The test expected a `400 Bad Request` when the path ID and body `tradeId` don’t match, but originally the controller didn’t perform this validation and returned `200 OK`.
+
+### Root Cause
+The controller’s `updateTrade` method didn’t check for mismatched IDs. It always attempted to update using the `pathVariable`, ignoring inconsistencies in the request body.
+
+### Solution
+Added validation logic in the controller:
+```java
+if (tradeDTO.getTradeId() != null && !id.equals(tradeDTO.getTradeId())) {
+    return ResponseEntity.badRequest().body("Trade ID mismatch");
+}
+
+````
