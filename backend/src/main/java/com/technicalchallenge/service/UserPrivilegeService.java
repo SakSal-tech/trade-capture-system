@@ -1,6 +1,7 @@
 package com.technicalchallenge.service;
 
 import com.technicalchallenge.model.UserPrivilege;
+import com.technicalchallenge.model.UserPrivilegeId;
 import com.technicalchallenge.repository.UserPrivilegeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -23,7 +24,7 @@ public class UserPrivilegeService {
         return userPrivilegeRepository.findAll();
     }
 
-    public Optional<UserPrivilege> getUserPrivilegeById(Long id) {
+    public Optional<UserPrivilege> getUserPrivilegeById(UserPrivilegeId id) {
         logger.debug("Retrieving user privilege by id: {}", id);
         return userPrivilegeRepository.findById(id);
     }
@@ -33,7 +34,7 @@ public class UserPrivilegeService {
         return userPrivilegeRepository.save(userPrivilege);
     }
 
-    public void deleteUserPrivilege(Long id) {
+    public void deleteUserPrivilege(UserPrivilegeId id) {
         logger.warn("Deleting user privilege with id: {}", id);
         userPrivilegeRepository.deleteById(id);
     }
