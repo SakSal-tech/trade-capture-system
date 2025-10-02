@@ -208,19 +208,31 @@ class TradeServiceTest {
         existing.setTradeId(100001L);
         existing.setVersion(1); // FIX: set non-null version to avoid NPE in version increment
         existing.setActive(true);
-
+        // Mocks the repository call so that looking up trade ID 100001, returns
+        // Optional.of(existing) instead of hitting the DB.
         when(tradeRepository.findByTradeIdAndActiveTrue(100001L)).thenReturn(Optional.of(existing));
-
+        // Creates a new, empty TradeStatus object you'll use as a stubbed return value
         TradeStatus amended = new TradeStatus();
+        // Sets a fake primary key (long 40) on that status, simulating a persisted row.
         amended.setId(40L);
+        // Sets the status text to "AMENDED"
         amended.setTradeStatus("AMENDED");
-        when(tradeStatusRepository.findByTradeStatus("AMENDED")).thenReturn(Optional.of(amended)); // FIX: provide
-                                                                                                   // status
+        // Stubs the status lookup so asking for "AMENDED" returns the amended object
+        // (wrapped in Optional) every time. The // FIX: is just a note to future
+        // readers.
+        when(tradeStatusRepository.findByTradeStatus("AMENDED")).thenReturn(Optional.of(amended));
 
-        // Return whatever is being saved (deactivate + amended save happen here)
-        when(tradeRepository.save(any(Trade.class))).thenAnswer(inv -> inv.getArgument(0)); // FIX: simple passthrough
+        // Begins a stub for saving TradeLeg entities using thenAnswer to customise the
+        // return value.Return whatever is being saved (deactivate old trade + amended
+        // trade
+        // save happen
+        // here). Grabs the TradeLeg argument passed to save
+        when(tradeRepository.save(any(Trade.class))).thenAnswer(inv -> inv.getArgument(0));// 0 because of first
+                                                                                           // argument
 
-        // FIX: prevent NPE inside createTradeLegsWithCashflows by stubbing leg save
+        // FIX: prevent NPE inside createTradeLegsWithCashflows by stubbing leg save.
+        // thenAnswer. Its real type is InvocationOnMock (from Mockito).
+        // InvocationOnMock represents the method call that was intercepted by Mockito.
         when(tradeLegRepository.save(any(TradeLeg.class))).thenAnswer(inv -> {
             TradeLeg saved = inv.getArgument(0);
             if (saved.getLegId() == null)

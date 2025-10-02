@@ -1,3 +1,5 @@
+## Project Setup problems
+
 FrontEnd is not running on port 3000
 
 saksa@Work-Sak MINGW64 ~/cbfacademy/trade-capture-system/frontend (main)
@@ -35,48 +37,7 @@ UPDATE application_user SET email='ashley@example.com' WHERE login_id='ashley';
 Update application_user Set email='joey@example.com' WHERE login_id='joey';
 UPDATE application_user SET email='stuart@example.com' WHERE login_id='stuart';
 
-# Fix Failing Test Cases
-
-[ERROR] Failures:
-[ERROR] TradeControllerTest.testCreateTrade:138 Status expected:<200> but was:<201>
-[ERROR] TradeControllerTest.testCreateTradeValidationFailure_MissingBook:175 Status expected:<400> but was:<201>
-[ERROR] TradeControllerTest.testCreateTradeValidationFailure_MissingTradeDate:158 Response content expected:<Trade date is required> but was:<>
-[ERROR] TradeControllerTest.testDeleteTrade:223 Status expected:<204> but was:<200>
-[ERROR] TradeControllerTest.testUpdateTrade:194 No value at JSON path "$.tradeId"
-[ERROR] TradeControllerTest.testUpdateTradeIdMismatch:209 Status expected:<400> but was:<200>
-[ERROR] TradeLegControllerTest.testCreateTradeLegValidationFailure_NegativeNotional:166 Response content expected:<Notional must be positive> but was:<>
-[ERROR] TradeServiceTest.testCashflowGeneration_MonthlySchedule:181 expected: <1> but was: <12>
-[ERROR] TradeServiceTest.testCreateTrade_InvalidDates_ShouldFail:99 expected: <Wrong error message> but was: <Start date cannot be before trade date>
-[ERROR] Errors:
-[ERROR] BookServiceTest.testFindBookById:29 » NullPointer
-[ERROR] BookServiceTest.testFindBookByNonExistentId:58 » NullPointer
-[ERROR] BookServiceTest.testSaveBook:42 » NullPointer Cannot invoke "com.technicalchallenge.mapper.BookMapper.toEntity(com.technicalchallenge.dto.BookDTO)" because "<local3>.bookMapper" is null
-[ERROR] TradeServiceTest.testAmendTrade_Success:148 » NullPointer Cannot invoke "java.lang.Integer.intValue()" because the return value of "com.technicalchallenge.model.Trade.getVersion()" is null
-[ERROR] TradeServiceTest.testCreateTrade_Success:80 » Runtime Book not found or not set
-[INFO]
-[ERROR] Tests run: 61, Failures: 9, Errors: 5, Skipped: 0
-
-Filter only failed tests, run: mvn clean test | grep '\[ERROR\]'
-
-TradeControllerTest
-
-testCreateTrade
-testCreateTradeValidationFailure_MissingBook
-testDeleteTrade
-testUpdateTrade
-testUpdateTradeIdMismatch
-TradeServiceTest
-
-testCreateTrade_InvalidDates_ShouldFail
-BookServiceTest
-
-testFindBookById
-testFindBookByNonExistentId
-testSaveBook
-testAmendTrade_Success
-testCreateTrade_Success
-
-## Test Failure 1
+## Test Failure testCashflowGeneration_MonthlySchedule , TradeServiceTest
 
 ### Problem Description: What was failing and why
 
@@ -95,24 +56,32 @@ The assertion does not verify the number of cashflows
 
 ### Solution Implemented: How it is fixed the issue and why this approach was chosen
 
-1. created a TradeLeg and Added athe other Other required fields: schedule, rate
+1. created a TradeLeg and Added the other Other required fields: schedule, rate
 2. Called to the generateCashflows(leg, startDate, maturityDate) with appropriate dates. When I tried to call the method generateCashflows, it was not visible as it was defined as private. I had to change it to public.
 3. Changed the assertion so the returned cashflows match the expected monthly schedule
 4. Tested the correct number of cashflows are generated and if their values/dates are correct. Used Mockito to verify that cashflowRepository.save() was called 12 times matching the expected number of monthly cashflows for 1 year period.
-5. I changed from AssertEquals to verify method, as I do not know the number of generated cashflows, I could get them from a list or create a method that returns a list of chashflows repository, I needed to count them by using list size. This is a long process to capture saved chashflows
+5. I replaced assertEquals with verify() in Mockito, as I do not know the number of generated cashflows, I could get them from a list or create a method that returns a list of chashflows repository, I needed to count them by using list size. This is a long process to capture saved chashflows
    Tested the dates and values.
-6. Doing all of the above the test still failed as the cashflowRepository.save(...) only called3 times as in service class generateCashflows method, calls getSchedule() from Schedule class and parseSceduleand that the default Schedule is '3M' quarterly. I had to sett the schedule string to "Monthly" by passing this to setSchedule for test to generate monthly cashflows.
-7. Then I discovered another problem When I fixed everything in that method, I encountered another problem that it was generating 11 months instead 12 LocalDate
-   -> at com.technicalchallenge.service.TradeServiceTest.testCashflowGeneration_MonthlySchedule(TradeServiceTest.java:197)
-   But was 11 times:
-   The code generated cashflows for each month from January to December, but the end date is exclusive, it will only create 11 cashflows. I had to change maturity date instead of 31 December to 1 JAN 2026.LocalDate maturityDate = LocalDate.of(2026, 1, 1);
+6. Doing all of the above the test still failed as the cashflowRepository.save(...) only called3 times as in service class generateCashflows method, calls getSchedule() from Schedule class and parse Schedule and that the default Schedule is '3M' quarterly. I had to set the schedule string to "Monthly" by passing this to setSchedule for test to generate monthly cashflows.
+7. Then I discovered another problem When I fixed everything in that method,
 
-### Verification: How I confirmed the fix works
+### I encountered another problem:
+
+It was generating 11 months instead 12 LocalDate
+-> at com.technicalchallenge.service.TradeServiceTest.testCashflowGeneration_MonthlySchedule(TradeServiceTest.java:197)
+But was 11 times:
+The code generated cashflows for each month from January to December, but the end date is exclusive, it will only create 11 cashflows.
+
+### Solution to the new problem
+
+I had to change maturity date instead of 31 December to 1 JAN 2026.LocalDate `java maturityDate = LocalDate.of(2026, 1, 1);` This works for now but I believe I need to think about Febraury Month and next month to it, especially if start date and maturity dates are both middle of the month.
+
+### Impact Verification: How I confirmed the fix works:
 
 I ran the tests again mvn targeting only this test mvn -Dtest=TradeServiceTest#testCashflowGeneration_MonthlySchedule test
 and it passed and correctly shows the cashflow generation for a monthly schedule
 
-## Test Failure 2
+## Test Failure testCreateTradeLegValidationFailure_NegativeNotional , TradeLegControllerTest
 
 ### Problem Description: What was failing and why
 
@@ -127,17 +96,17 @@ Since this class is testing the TradeLegController, I checked the reason why emp
 
 #### Root cause assumption 1:
 
-Firstly, I though that there is that there is no validation in the controller but I found that in the createTradeLeg method does validate the notional in the controller. If the notional is negative or zero, it will return a bad request with the message. I checked all other classes if there was any logic or validation that adjusts the Notional value. I found annoatations @NotNull and @Positive which should get Spring’s bean validation kicked in.The controller has @Valid which is making the annotations in the DTO to work.
+Firstly, I though that there was that there is no validation in the controller but I found that in the createTradeLeg method the controller does validate the notional value. If the notional is negative or zero, it will return a bad request with the message. I checked all other classes if there was any logic or validation that adjusts the Notional value. I found annotations @NotNull and @Positive which should get Spring’s bean validation kicked in.The controller has @Valid which is making the annotations in the DTO to work.
 
 #### Root cause assumption2:
 
 The test was expecting "Notional must be positive" but by default Spring returns JSON format not a plain string but the test expects a string andExpect(content().string("Notional must be positive")): This asserts that the response body contains the expected error message. I thought that Spring Boot response may be wrapped in quotes, or returned as JSON, or with extra whitespace and Jackson may serialize the string as "Notional must be positive" with quotes. I changed the test method to expect "\"Notional must be positive\"" backslash is just for escaping quotes with quotes to deal with a possible mismatch between the expected and actual response format due to Spring’s JSON message conversion.
-I tested the method and still was not working mvn -Dtest=TradeLegControllerTest#testCreateTradeLegValidationFailure_NegativeNotional test.
+I tested the method and The test still failed after this change mvn -Dtest=TradeLegControllerTest#testCreateTradeLegValidationFailure_NegativeNotional test.
 still fail and showed [ERROR] TradeLegControllerTest.testCreateTradeLegValidationFailure_NegativeNotional:168 Response content expected:<"Notional must be positive"> but was:<>
 
 #### Actual Root cause:
 
-I used Java debugger and the debug output shown that the request is mapped to TradeLegController#createTradeLeg(TradeLegDTO). The TradeLegDTO is deserialized with a negative notional. Spring’s bean validation triggers before the manual validation code in the controller. Spring’s default behavior for validation errors is to return a 400 status with an empty body. The exception MethodArgumentNotValidException is thrown because the @Positive annotation on notional fails. The error message is "Notional must be positive", but the response body is empty and the content type is null.
+I used Java debugger and the debug output shown that the request is mapped to TradeLegController#createTradeLeg(TradeLegDTO). The TradeLegDTO is deserialized with a negative notional. Spring’s bean validation triggers before the manual validation code in the controller. Spring’s default behaviour for validation errors is to return a 400 status with an empty body. The exception MethodArgumentNotValidException is thrown because the @Positive annotation on notional fails. The error message is "Notional must be positive", but the response body is empty and the content type is null.
 
 Why the test fails:
 When a negative notional is sent in the test, Spring’s validation detects that it violates the @Positive constraint and throws a MethodArgumentNotValidException before the controller logic runs.The test failed because Spring’s default validation handling returned a 400 with an empty body, instead of the expected error message.
@@ -162,50 +131,109 @@ https://medium.com/javaguides/spring-boot-restcontrolleradvice-annotation-comple
 I added a custom exception handler to return the error message in the response body for validation errors, to ensure that when validation fails, the error message (e.g., "Notional must be positive") is returned in the response body, and the test will pass.
 After added a ValidationExceptionHandler class with @RestControllerAdvice and an @ExceptionHandler(MethodArgumentNotValidException.class) method. This intercepted validation exceptions, extracted the message (e.g., “Notional must be positive”), and returned it in the response body. This fixed the issue by making the response include the validation error message, so the test passed.
 
-### Test failure 3
+### Impact
 
-testAmendTrade_Success: NullPointerException
+With the custom `ValidationExceptionHandler` in place, any validation errors (such as a negative notional) now return a proper `400 Bad Request` along with the specific validation message in the response body. This ensures tests expecting `"Notional must be positive"` pass, improves API usability for clients by providing clear error feedback, and standardises validation error handling across controllers.
 
-Cannot invoke "java.lang.Integer.intValue()" because the return value of "com.technicalchallenge.model.Trade.getVersion()" is null
-testCreateTrade_Success: RuntimeException
-Book not found or not set
+## Test Failure ## TradeServiceTest.testAmendTrade_Success – NullPointerException due to unstubbed repository.
+
+I am not sure if this was in the original test failures or introduced after I fixed another test
+
+### Problem
+
+[ERROR] TradeServiceTest.testAmendTrade_Success:216 » NullPointer Cannot invoke "com.technicalchallenge.model.TradeLeg.getLegId()" because "leg" is null.
+The test testAmendTrade_Success was failing:
+NullPointerException: Cannot invoke "com.technicalchallenge.model.TradeLeg.getLegId()" because "leg" is null.
+This happened when the service called generateCashflows(savedLeg, ...) inside the amend path.
+
+### Root cause
+
+Mockito returns null for unstubbed methods. I did not stub tradeLegRepository.save, so the savedLeg was null. When generateCashflows ran, it immediately accessed leg.getLegId(), causing the NullPointerException (NPE).
+Additionally, the amended status was not guaranteed to exist unless unless I stubbed tradeStatusRepository.findByTradeStatus("AMENDED"), which could lead to “status not found” errors in other runs.
+
+### Solution
+
+The amend path, which runs inside TradeService.amendTrade(...), needed explicit stubbing. Without proper stubbing, Mockito returns null for repository calls that aren’t explicitly mocked. That’s what caused the NullPointerException. To make the amend path stable and predictable, I stubbed the repository calls explicitly, so they always return a valid object instead of null.
+
+```java when(tradeStatusRepository.findByTradeStatus("AMENDED"))
+    .thenReturn(Optional.of(amended));
+```
+
+I ensured tradeRepository.findByTradeIdAndActiveTrue(100001L) returns an existing trade with a non-null version so the service can increment it. I made tradeRepository.save(...) return the same object that was passed in, so I can verify both saves (deactivate old + save amended) without over-constraining the test:
+Then I fixed the TradeLeg save to never return null and to have a non-null legId, which generateCashflows(...) needs. I then exercised the amend flow and asserted version bump and the two saves.
+
+## TradeServiceTest.testCreateTrade_InvalidCurrencyCode – IllegalArgumentException: Unknown currency code 'UK'
+
+### Problem:
+
+The test failed with  
+ `java.util.IllegalArgumentException: Unknown currency code: UK`  
+ when creating a TradeLeg with `leg2.setCurrency("UK")`.
+
+- Root Cause:  
+  in Java, the class `java.util.Currency` only accepts **valid ISO 4217 currency codes** such as `"USD"`, `"EUR"`, `"GBP"`. `"UK"` is a country code, not a currency code, so the `Currency.getInstance("UK")` call failed. Because the test data was using `"UK"`, the mapping layer or validation logic in the service could not create a valid `Currency` object.
+
+### Solution
+
+I corrected the test setup to use `"GBP"` (the proper ISO currency code for British Pounds) instead of `"UK"`.
+
+`````java
+leg2.setCurrency("GBP");``` // FIX: replaced invalid "UK" with correct ISO code
+
+### Impact:
+With a valid code, the trade legs are now correctly created, mapped, and passed into the service.
+This removes the IllegalArgumentException, allows the tests to run through the TradeService methods, and ensures that downstream processes such as cashflow generation can execute successfully.
+
+## Test failure testAmendTrade_Success: NullPointerException
 
 ### Problem Description: What was failing and why:
 
-#### Error 1: NullPointerException in testAmendTrade_Success
+Cannot invoke "java.lang.Integer.intValue()" because the return value of "com.technicalchallenge.model.Trade.getVersion()" is null
 
 The test calls the service method, which calls getVersion() on the test's mock Trade object. If the mock's version field is not set, getVersion() returns null. The service then tries to increment the version: existingTrade.getVersion() + 1. Adding 1 to null causes a NullPointerException.
 
-Following the problem through:
+### Root cause:
+
+The test calls the service method, which calls getVersion() on the test's mock object. If the mock's version is not set, this leads to a NullPointerException when the service tries to increment it. The root cause is missing test data initialisation. Following the problem through:
 The test method testAmendTrade_Success, calls tradeService.amendTrade inside amendTrade, the service calls getTradeById(tradeId) to fetch the existing trade. The returned Trade object is assigned to existingTrade.The service then calls existingTrade.getVersion() to get the current version.
 If the test did not set the version field on the mock Trade object, getVersion() returns null. The service tries to increment the version: existingTrade.getVersion() + 1. Adding 1 to null causes a NullPointerException.
 
-#### Root cause:
-
-The test calls the service method, which calls getVersion() on the test's mock object. If the mock's version is not set, this leads to a NullPointerException when the service tries to increment it. The root cause is missing test data initialisation.
-
 ### Solution:
 
-In the test setup, Iset the version field for the mock Trade object:
+In the test setup, I set the version field for the mock Trade object:
 
 ````java
 trade.setVersion(1);```
+I also ensured the stub is in that test testCreateTrade_Success and not only in @BeforeEach ```java when(bookRepository.findByBookName("TestBook"))
+.thenReturn(Optional.of(new Book()));
+
+`````
+
+### Impact
 
 This ensures that getVersion() returns a valid integer, so the service can safely increment it.
 
-#### Error 2: RuntimeException 'Book not found or not set' in testCreateTrade_Success
+## Test Failure RuntimeException 'Book not found or not set' in testCreateTrade_Success
+
+Even though I had lenient().when(bookRepository.findByBookName("TestBook")), the DTO has bookName = "TestBook", but the service expects a book and fails if Optional.empty(). The stub was not guaranteed to be in effect for this specific test. The service requires bookRepository.findByBookName(dto.getBookName()) to return a Book, otherwise it throws an exception. Since the repository returned Optional.empty(), the test failed.
 
 ### Root Cause:
+
 The service expects a Book to be set on the Trade, but the test data does not provide one, and the repository mock does not return a Book. When the service calls bookRepository.findByBookName(tradeDTO.getBookName()), it gets Optional.empty(), so it throws a RuntimeException.
 
 ###Solution:
-In the test setup, I set a book name in the DTO and mock the repository to return a Book:
+In the test setup, I set a book name in the DTO and mock the repository to return a Book. I ensured also the stub is in that test and not only in @BeforeEach::-------
+
 ```java
 tradeDTO.setBookName("TestBook");
 when(bookRepository.findByBookName("TestBook")).thenReturn(Optional.of(new Book()));
-````
+```
+
+### Impact
 
 This ensures the service finds a Book and does not throw the error.
+
+## Test Failure in TradeServiceTest.testCreateTrade_Success – Counterparty Not Found
 
 ### Problem Description
 
@@ -228,66 +256,81 @@ I assigned "TestCounterparty" to the counterpartyName field of the tradeDTO obje
 
 By properly setting up the mock to return a valid counterparty, the test now simulates a successful database lookup. This enables the service to validate and process trades as expected, ensuring that trade creation logic is correctly tested and validated in isolation from the database.
 
-### Problem Description
+### ## Test Failure Recurring Problem in TradeServiceTest.testCreateTrade_Success – Trade Status Not Found
 
-Book not found or not set in testCreateTrade in TradeServiceTest
+testCreateTrade_Success:121 » Runtime Trade status not found or not set
 
 Explanation for moving the tradeStatusRepository mock to @BeforeEach:
 
-The when(tradeStatusRepository.findByTradeStatus("NEW")) mock was originally defined inside the testCreateTrade_Success method. This meant that only this specific test had the mock in place. Any other test that called createTrade or amendTrade would throw a NullPointerException when the service tried to fetch the trade status, because the repository wasn’t mocked there.
+### Root Cause previously
 
-By moving this mock to the @BeforeEach setup method, we ensure that:
+TradeService code is expecting a Trade status when to create a trade. The test was failing because no status has been set, or the status is null. It seemed that I am calling tradeService.createTrade(trade) without properly mocking or setting the status
 
-Consistency across all tests – Every test now automatically has a valid mock for tradeStatusRepository.findByTradeStatus("NEW").
+##### Previous solution
 
-Elimination of redundancy – There’s no need to repeat the same when(...) statement in multiple test methods.
+``````java Trade trade = new Trade();
+trade.setStatus(TradeStatus.NEW); ``` and also mocked it inside the method under test.
 
-Reduced risk of NullPointerException – Any test that calls createTrade or amendTrade can safely assume that the required trade status reference data is available.
+### Root Cause Now The problem reoccurred
+The when(tradeStatusRepository.findByTradeStatus("NEW")) mock was originally defined only inside the testCreateTrade_Success method. As a result, other tests such as amendTrade did not have this stub available, leading to a NullPointerException when the service tried to fetch the trade status.
 
-Cleaner and more maintainable test code – Centralizing common mock setups in @BeforeEach improves readability and maintainability.
+### Solution
 
-In short, this change makes the tests more robust, DRY, and easier to manage.
+By moving this mock to the @BeforeEach setup method, we ensure that: Consistency across all tests
 
-Problem: Cannot invoke "com.technicalchallenge.repository.CurrencyRepository.findByCurrency(String)"
-because "this.currencyRepository" is null
+### Impact
 
-Root cause: The TradeService calls currencyRepository.findByCurrency(legDTO.getCurrency()) when creating trade legs.
+– Every test now automatically has a valid mock for tradeStatusRepository.findByTradeStatus("NEW").-Elimination of redundancy – There’s no need to repeat the same when(...) statement in multiple test methods.
+-Reduced risk of NullPointerException – Any test that calls createTrade or amendTrade can safely assume that the required trade status reference data is available.
+-Cleaner and more maintainable test code – Centralizing common mock setups in @BeforeEach improves readability and maintainability. This change makes the tests more robust, DRY, and easier to manage.
 
-## Test Failures and Fixes
+## Test Failure in TradeServiceTest.testCreateTrade_Success – NullPointerException on Currency/Leg Handling
 
-### testCreateTrade_Success
+### Problem
 
-**Problem Description:**  
-This test was failing with a `NullPointerException` inside the `TradeService.createTrade()` call. The exception was raised when the service attempted to generate cashflows for the trade legs. Specifically, it crashed at `leg.getLegId()` inside `generateCashflows`.
+`Cannot invoke "com.technicalchallenge.repository.CurrencyRepository.findByCurrency(String)"
+because "this.currencyRepository" is null.`
 
-**Root Cause Analysis:**  
-In the `TradeService`, after saving a `Trade`, the method `createTradeLegsWithCashflows()` is invoked. This method saves each `TradeLeg` via `tradeLegRepository.save(leg)` and then immediately calls `generateCashflows` with the returned `TradeLeg`.  
-However, in the test setup, there was no stub for `tradeLegRepository.save()`. By default, Mockito returns `null` for unstubbed calls. That meant the returned `TradeLeg` was `null`, and when the service tried to access `leg.getLegId()`, it threw a `NullPointerException`.
+Additionally, the test was failing with a `NullPointerException` inside `TradeService.createTrade()`.
+The crash occurred during cashflow generation when the service attempted to call `leg.getLegId()` on a `null` object.
 
-**Solution:**  
-Added a stub for `tradeLegRepository.save(any())` in the test setup:
+### Root Cause
+
+In the `TradeService`, after saving a `Trade`, the method `createTradeLegsWithCashflows()` is invoked.
+This method saves each `TradeLeg` via `tradeLegRepository.save(leg)` and then immediately calls `generateCashflows` with the returned object.
+
+However:
+- `currencyRepository` was not injected or mocked in the test setup, causing `currencyRepository.findByCurrency()` to throw a `NullPointerException`.
+- `tradeLegRepository.save()` was not stubbed in the test setup. By default, Mockito returns `null` for unstubbed calls. That meant the returned `TradeLeg` was `null`, and when the service attempted to call `leg.getLegId()`, it failed.
+
+### Solution
+
+1. Ensured that `currencyRepository` was correctly mocked and injected in the test context.
+2. Stubbed the `tradeLegRepository.save(any())` call to return a non-null `TradeLeg` with a synthetic ID for test stability:
 
 ```java
 when(tradeLegRepository.save(any(TradeLeg.class))).thenAnswer(invocation -> {
     TradeLeg saved = invocation.getArgument(0);
     if (saved.getLegId() == null) {
-        saved.setLegId(999L); // Synthetic ID for test stability
+        saved.setLegId(999L); // Synthetic ID for stability in tests
     }
     return saved;
 });
-```
+### Impact
+
+Prevents NullPointerException by ensuring required repository dependencies are mocked.
+Guarantees that every saved TradeLeg in tests has a valid legId, allowing generateCashflows to run successfully.
+Provides more realistic behaviour in unit tests, simulating how a real database would assign IDs to entities.
+Improves test reliability and stability across the service layer.
+
 
 # Unnecessary Stubbing Problems and Fixes
 
 ## Overview
 
-Several of the failing tests were not due to logic errors, but because of **Mockito’s strict stubbing mode**.  
-Mockito requires that every stubbed method (`when(...).thenReturn(...)`) is actually invoked during a test run.  
+Several of the failing tests were not due to logic errors, but because of **Mockito’s strict stubbing mode**.
+Mockito requires that every stubbed method (`when(...).thenReturn(...)`) is invoked during a test run. for example i stubbed this when in the setup, but not all tests use this. `java when(bookRepository.findByBookName("TestBook")).thenReturn(Optional.of(new Book()));`
 If a test does not reach the code that calls those stubs (e.g., it fails early in validation), Mockito throws an `UnnecessaryStubbingException`.
-
-This section explains the specific cases where this happened, why, and how we fixed them.
-
----
 
 ## Tests Affected by Unnecessary Stubbing
 
@@ -302,11 +345,14 @@ This section explains the specific cases where this happened, why, and how we fi
 
 ## Example Problem
 
-**Problem Description:**  
-In `testCreateTrade_InvalidDates_ShouldFail`, the test only checks the validation rule that the trade start date must not be before the trade date.  
+**Problem Description:
+In `testCreateTrade_InvalidDates_ShouldFail`, the test only checks the validation rule that the trade start date must not be before the trade date.
 Because the validation fails immediately, the service never calls repository methods like `bookRepository.findByBookName` or `currencyRepository.findByCurrency`.
 
-**Root Cause Analysis:**  
+**Root Cause:
+- To follow DRY principles, all repository stubbings were placed inside `@BeforeEach`.
+- Mockito’s **strict mode** flagged any unused stubs as errors.
+- Example: stubbing `bookRepository.findByBookName(...)` was only needed in `testCreateTrade_Success` but existed for all tests.
 These stubs, defined in `@BeforeEach`, were marked by Mockito as "unused". Since strict stubbing is the default, Mockito fails the test with `UnnecessaryStubbingException`.
 
 ---
@@ -321,11 +367,12 @@ These stubs, defined in `@BeforeEach`, were marked by Mockito as "unused". Since
 
 ## Solution
 
-Use lenient stubbing at the class level so that **unused stubs don’t break tests**.
+Use lenient stubbing at the class level so that unused stubs don’t break tests.  `@MockitoSettings(strictness = Strictness.LENIENT)` at the class level. This allowed common stubbings to remain in `@BeforeEach` without breaking tests that didn’t use them.
+
 
 ### Change Applied
 
-```java
+`````java
 import org.mockito.quality.Strictness;
 import org.mockito.junit.jupiter.MockitoSettings;
 
@@ -335,49 +382,48 @@ class TradeServiceTest {
     ...
 }
 
+### Impact
+- Shared stubbing logic could be preserved without duplication.
+- DRY principles were maintained while preventing strict stubbing failures.
 
 WhY I used lenient:
 I had a shared @BeforeEach setup with stubs that are needed in some tests but not in others. I was trying to to avoid duplicating stubs in every single test so I moved Mocks that more than one test is using in the @Beforeeach method but introduced new errors regarding unnecessary stubbing. That is why I used lenient to tell Mockito that it is OK some repositories mocks are not used in all test methods.
 
 
+### Test Failure in TradeControllerTest.testCreateTrade – Status expected:<200> but was:<201>
+
 #### Problem
-TradeControllerTest testCreateTrade Status expected:<200> but was:<201>
+TradeControllerTest testCreateTrade Status expected:<200> but was:<201>. The controller  returns ResponseEntity.created(...).and  Test expects ok().
+### Solution: Decide if the controller is correct (201 Created for POST) and update the test to expect
 
 ### Root Cause:
 
 The test expects 200 OK, but the controller/service actually returns 201 CREATED (Spring’s default when creating new entities).
 
-### Root Cause:
-
-POST (create new resource) → the most “REST-correct” response is 201 Created. It signals: “A new resource was successfully created.”
-```
-
 ### Solution:
-
-changed isOK to isCreated. `java .andExpect(status().isCreated()) `
+I had to decide if the controller is correct (201 Created for POST) and update the test to expect 201, or change controller to return 200. I changed isOK to isCreated. `java .andExpect(status().isCreated()) ` as POST (create new resource), the most REST-correct response is 201 Created which signals: A new resource was successfully created.
 
 ### Impact:
-
 The test returns 201 instead of 200
+
+### Test Failure in TradeControllerTest.testCreateTradeValidationFailure_MissingBook – Status expected:<400> but was:<201>
 
 ### Problem: method testCreateTradeValidationFailure_MissingBook
 
 Status expected:<400> but was:<201>
 
 ### Root Cause:
-
-The controller is still returning 201 Created even when the request body is missing required fields (book).
-
-Because validation annotations (@Valid, @NotNull) are missing on TradeDTO fields or the controller parameter.
+The controller is  returning 201 Created even when the request body is missing required fields (book).Because validation annotations (@Valid, @NotNull) are missing on TradeDTO fields or the controller parameter.
 
 ### Solution
-
 I Added validation annotations in DTO `Java @NotBlank(message = "Book name is required")`
 I have also checked if controller uses @Valid on the Post request body and it does, so no change there.
 
 ### Impact
+The test see 400 Bad Request in the testDeleteTrade
 
-The test should see 400 Bad Request in the testDeleteTrade
+
+### Test Failure in TradeControllerTest.testDeleteTrade – Status expected:<204> but was:<200>
 
 ### Problem
 
@@ -385,26 +431,76 @@ Status expected:<204> but was:<200> in testDeleteTrade
 
 ### Root Cause
 
-Deletion endpoints usually return 204 No Content. But, the controller currently returns ResponseEntity.ok().
+Deletion endpoints usually return 204 No Content. But, the controller currently returns 200 ResponseEntity.ok().
 I checked the controller and it does this:
 `java return ResponseEntity.ok().body("Trade cancelled successfully"); ` which returns 200 OK + a message body, while the test expects: `java .andExpect(status().isNoContent());`
 To to follow REST best practices, the controller should return 204 No Content for a successful delete.
 
 ### Solution
-
-I changed it so if successful to return 204 and nobody message return ResponseEntity.noContent().build(); // Changed to 204, no body. Also, if not successful, to return 400 with no body `java return ResponseEntity.badRequest().build();`
+I changed it inside the delete method in the controller so if successful to return 204 and nobody message return ResponseEntity.noContent().build(); /Changed to 204, no body. Also, if not successful, to return 400 with no body ```java return ResponseEntity.badRequest().build();````
 
 ### Impact
+The controller now returns 204 which os the correct http response for delete
+
+
+### Test Failure in TradeControllerTest.testCreateTradeValidationFailure_MissingTradeDate – Response content expected:<Trade date is required> but was:<>
 
 ### Problem
 
-No value at JSON path "$.tradeId" inside testUpdateTrade
+The test expected the response body to contain "Trade date is required", but the actual response body was empty.
+
+### Root Cause:
+The tradeDate field in TradeDTO did not have any validation annotations (@NotNull or @NotBlank). The controller method had @Valid, but without field-level constraints, Spring’s validation framework never triggered. As a result, the request was accepted silently and returned an empty response body instead of the validation error message.
+
+### Solution:
+Added field-level validation to the DTO:
+```java
+@NotNull(message = "Trade date is required")
+private LocalDate tradeDate;```
+
+Kept @Valid in the controller so the constraint is enforced.
+
+### Impact
+
+Validation now fails correctly when tradeDate is missing, and the error message "Trade date is required" is returned in the response body.
+The test passes.
+
+
+## Test Failure in TradeControllerTest.testUpdateTrade – No value at JSON path "$.tradeId"
+
+### Problem
+No value at JSON path "$.tradeId" inside testUpdateTrade. The JSON response doesn’t contain tradeId.
 
 ### Root cause
+The update endpoint isn’t returning the saved trade as JSON.comes from a Spring MockMvc test checking the JSON body after calling the update (amend) endpoint. The test expected the response JSON but  controller was returning nothing empty body.
 
 ### Solution
+Either test should expect empty response, or controller should return DTO with tradeId.I have chosen to fix controller to return the updated Trade (or DTO) as JSON
+```java             // FIX: Ensures JSON includes tradeId
+            return ResponseEntity.ok(responseDTO);
+```
+### Impact
+The update endpoint now returns the amended trade details as JSON, including the tradeId.
+This aligns the API response with the test expectations and ensures clients receive confirmation of the updated trade, improving both correctness and usability.
 
-The JSON response doesn’t contain tradeId.
+
+## Test Failure in TradeControllerTest.testCreateTradeValidationFailure_MissingTradeDate – Response content expected:<Trade date is required> but was:<>
+
+### Problem
+Response content expected:<Trade date is required> but was:<>. The test expected the response body to contain "Trade date is required". Instead, the response body was empty ("").
+
+### Root Cause
+Missing validation. Validation isn’t bubbling the error message.It seems the controller doesn’t return field validation messages. The tradeDate field in the TradeDTO (or equivalent request object) was not annotated with validation constraints like @NotNull or @NotBlank.
+
+I firstly checked if method is using @Valid and @ExceptionHandler(MethodArgumentNotValidException) in the controller. As if not, test will always get an empty body. Although the controller had @Valid on the request parameter, without field-level validation annotations, Spring’s validation framework had nothing to trigger.As a result, the request passed silently, and the controller returned an empty body instead of the expected error message.
+
+### Solution
+Added a @NotNull(message = "Trade date is required") annotation to the tradeDate field in TradeDTO.
+
+### Impact
+This ensures that validation fails if the trade date is missing, and the error message "Trade date is required" is returned in the response body so the test passes.
+
+## Test Failure in TradeControllerTest.testUpdateTradeIdMismatch – Expected 400 but was 200
 
 #### Problem
 
@@ -431,9 +527,10 @@ But the controller wasn’t enforcing it. Now, with the check, the controller en
 
 # TradeControllerTest – Failures and Fixes
 
-## testCreateTrade
+## Test Failure in TradeControllerTest.testCreateTrade – Wrong Status Code and Missing tradeId
 ### Problem
 The test expected HTTP 200 (`status().isOk()`), but the controller was returning HTTP 201 (`status().isCreated()`).
+
 Additionally, the JSON response sometimes didn’t contain `"tradeId"`, which caused assertion failures.
 
 ### Root Cause
@@ -449,8 +546,7 @@ Additionally, the JSON response sometimes didn’t contain `"tradeId"`, which ca
 - Ensures that the response payload always contains `tradeId`, making the test stable.
 - Improves consistency between the controller, service, and test expectations.
 
-
-## testUpdateTrade
+# Test Failure in TradeControllerTest.testUpdateTrade – Missing tradeId in JSON Response
 ### Problem
 The JSON response didn’t contain `"tradeId"`, causing the assertion `.andExpect(jsonPath("$.tradeId", is(1001)))` to fail.
 
@@ -465,8 +561,8 @@ Explicitly set `trade.setTradeId(1001L);` in the test setup to keep the entity i
 - Aligns test expectations with actual controller output.
 - Prevents confusion where DTO values exist but entity values are `null`.
 
+## Test Failure in TradeControllerTest.testUpdateTradeIdMismatch – Path ID and Body ID mismatch not validated
 
-## testUpdateTradeIdMismatch
 ### Problem
 The test expected a `400 Bad Request` when the path ID and body `tradeId` don’t match, but originally the controller didn’t perform this validation and returned `200 OK`.
 
@@ -480,34 +576,14 @@ if (tradeDTO.getTradeId() != null && !id.equals(tradeDTO.getTradeId())) {
     return ResponseEntity.badRequest().body("Trade ID mismatch");
 }
 
-````
+``````
 
-# Fix Log: Trade Module Tests
+### Impact
 
-## TradeServiceTest
+With the new validation logic, the controller now enforces consistency between the path variable and the body field.  
+This prevents accidental or malicious updates to the wrong trade, improves data integrity, and ensures the test correctly passes with a `400 Bad Request` when IDs do not match.
 
-### Problem: UnnecessaryStubbingException
-
-- Several tests in `TradeServiceTest` failed with `UnnecessaryStubbingException`.
-- The failures pointed to multiple stubbings in `@BeforeEach` that were not used in every test.
-
-### Root Cause: DRY setup with stubbing
-
-- To follow DRY principles, all repository stubbings were placed inside `@BeforeEach`.
-- Mockito’s **strict mode** flagged any unused stubs as errors.
-- Example: stubbing `bookRepository.findByBookName(...)` was only needed in `testCreateTrade_Success` but existed for all tests.
-
-### Solution: Switch to lenient stubbing
-
-- Applied `@MockitoSettings(strictness = Strictness.LENIENT)` at the class level.
-- This allowed common stubbings to remain in `@BeforeEach` without breaking tests that didn’t use them.
-
-### Impact: Flexible test setup
-
-- Shared stubbing logic could be preserved without duplication.
-- DRY principles were maintained while preventing strict stubbing failures.
-
----
+## Additional Failure in TradeServiceTest.testAmendTrade_Success – NullPointerException caused by null TradeLeg during cashflow generation
 
 ### Problem: NullPointerException in `amendTrade`
 
@@ -516,24 +592,37 @@ if (tradeDTO.getTradeId() != null && !id.equals(tradeDTO.getTradeId())) {
 
 ### Root Cause: Null legs during cashflow generation
 
+That means the trade object doesn’t have legs when the service tries to copy/amend them.
+
 - `createTradeLegsWithCashflows` iterated over `trade.getTradeLegs()`.
 - When legs were `null` or incomplete, the loop crashed.
 
 ### Solution: Add null safety
 
-- Introduced guard clauses:
-  ```java
-  if (leg == null) {
-      logger.warn("Skipping null TradeLeg while creating cashflows");
-      continue;
-  }
-  ```
+Firstly I introduced guard clauses:
 
-## fix(test): BookServiceTest - Fixed NullPointerException from missing mapper dependency
+```java
+if (leg == null) {
+    logger.warn("Skipping null TradeLeg while creating cashflows");
+    continue;
+}
+```
+
+Finally I added legs to trade before amendment in the test class setup
+
+````java eg = new TradeLeg();
+leg.setLegId(1L);
+trade.setTradeLegs(Arrays.asList(leg)); ```
+
+### Impact
+Now trade object had a leg which shows the null issue
+
+## BookServiceTest – NullPointerException due to missing BookMapper dependency
 
 ### Problem
 
-Several tests in `BookServiceTest` were failing with `NullPointerException`.  
+Cannot invoke "BookMapper.toEntity(BookDTO)" because "bookMapper" is null
+Several tests in `BookServiceTest` were failing with `NullPointerException`.
 The failures appeared in:
 
 - `testFindBookById`
@@ -544,19 +633,114 @@ The error messages pointed to calls like `bookMapper.toDto(...)` or `bookMapper.
 
 ### Root Cause
 
-The `BookService` depends on `BookMapper`, which in turn requires `CostCenterRepository`.  
+The `BookService` depends on `BookMapper`, which in turn requires `CostCenterRepository`.
 In the unit tests, only `BookRepository` was mocked. The `BookMapper` dependency was never provided, leaving it as `null` when `BookService` tried to use it. This caused every test that called `bookMapper` to fail with `NullPointerException`.
 
 ### Solution
 
-- Added a `@Mock` for `BookMapper` in `BookServiceTest`.
-- Injected it into `BookService` using `@InjectMocks`.
-- Stubbed mapper calls where necessary (e.g., `when(bookMapper.toDto(any(Book.class))).thenReturn(bookDTO)` and `when(bookMapper.toEntity(any(BookDTO.class))).thenReturn(book)`).
+- Added a `@Mock` for `BookMapper` in `BookServiceTest`. ```java
+  @Mock
+  private BookMapper bookMapper;
+  @InjectMocks
+  private BookService bookService;
 
-This ensured that `BookService` could safely use its mapping logic during tests without throwing exceptions.
+- Injected it into BookService using @InjectMocks.
+- Stubbed mapper calls where necessary (e.g.,
+  ``java when(bookMapper.toDto(any(Book.class))).thenReturn(bookDTO) and when(bookMapper.toEntity(any(BookDTO.class))).thenReturn(book))`.
+
+This ensured that BookService`could safely use its mapping logic during tests without throwing exceptions.
 
 ### Impact
 
 - All failing tests in `BookServiceTest` (`testFindBookById`, `testSaveBook`, and `testFindBookByNonExistentId`) now pass.
 - Existing tests that did not rely on the mapper (`testDeleteBook` and `testBookCreationWithNullNameThrowsException`) continued to pass.
 - The test suite now fully validates `BookService` without runtime errors, confirming that book retrieval, saving, and non-existent lookups behave as expected.
+
+## Actuator Health Check – Missing spring-boot-starter-actuator dependency
+### Problem
+
+return 404 — the actuator endpoints simply aren’t registered
+
+### Root cause
+Backend API won't start after fixing all errors there is no spring-boot-starter-actuator dependency in the dependencies list. That’s why requests to /actuator/health .
+
+### Solution
+
+I had to add this dependency to pass the health check to the POM file
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+
+#### Impact
+
+http://localhost:8080/actuator → show a JSON with all endpoints.
+
+http://localhost:8080/actuator/health → show {"status":"UP"}.
+
+````
+
+```
+
+```
+
+### Impact
+
+- The application now exposes standard Spring Boot Actuator endpoints.
+- `/actuator/health` correctly returns `{"status":"UP"}`, confirming that the backend is running.
+- Provides visibility into application health, which is useful for monitoring, integration tests, and deployment checks.
+- Resolves the 404 errors previously seen when accessing `/actuator/*` endpoints.
+
+### all tests now pass and I merged all branches to main and tested mvn clean test
+
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.481 s -- in com.technicalchallenge.service.TradeServiceTest
+[INFO] Running com.technicalchallenge.service.UserServiceTest
+2025-10-02T11:12:05.144+01:00 WARN 13448 --- [ main] c.t.service.ApplicationUserService : Deleting user with id: 3
+2025-10-02T11:12:05.147+01:00 INFO 13448 --- [ main] c.t.service.ApplicationUserService : Saving user: com.technicalchallenge.model.ApplicationUser@5fc82de5
+2025-10-02T11:12:05.150+01:00 DEBUG 13448 --- [ main] c.t.service.ApplicationUserService : Retrieving user by id: 99
+2025-10-02T11:12:05.152+01:00 DEBUG 13448 --- [ main] c.t.service.ApplicationUserService : Retrieving user by id: 1
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.018 s -- in com.technicalchallenge.service.UserServiceTest
+[INFO]
+[INFO] Results:
+[INFO]
+[INFO] Tests run: 58, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 29.757 s
+[INFO] Finished at: 2025-10-02T11:12:05+01:00
+[INFO] -------------------------------------
+
+## Problems after all tests passed and api is not starting.
+
+I have problems that I need to fix. Mostly warnings but some are stopping the api to run
+
+## Main serious issue is `java Expected Domain ID type is 'com.technicalchallenge.model.UserPrivilegeId' ` from UserPrivilegeRepository.
+
+### Root cause
+
+I clicked the error and The UserPrivilegeRepository is declared with the wrong ID type, Spring Data JPA is failing to start the application context (which means your API won't run).
+public interface UserPrivilegeRepository extends JpaRepository<UserPrivilege, Long> {}
+
+I then checked the UserPrivilege. java class to check the type of the UserPrivilege is and it seems that it is marked by @IdClass. It seems that primary key is not just a Long, but a composite key class called UserPrivilegeId.
+Because UserPrivilege is annotated with @IdClass(UserPrivilegeId.class), this tells JPA the primary key type is UserPrivilegeId. The second generic in JpaRepository<Entity, ID> must always match that ID type.
+
+```java @IdClass(UserPrivilegeId.class)
+public class UserPrivilege {
+    @Id
+    private Long userId;
+
+    @Id
+    private Long privilegeId;
+}
+```
+
+### Solution
+
+The repository must declare that composite ID type, not `Long. I changed the repository interface to use the composite key type instead of Long.
+More errors appeared from userPrivilege service and controller and I had to change the type in those methods which had ID as a parameter.
+
+```java public interface UserPrivilegeRepository extends JpaRepository<UserPrivilege, UserPrivilegeId> {
+}
+```
