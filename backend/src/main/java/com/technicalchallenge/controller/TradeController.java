@@ -10,6 +10,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import jakarta.validation.Valid;
 import java.util.List;
 
@@ -19,6 +27,7 @@ import org.slf4j.LoggerFactory;
 @RestController
 @RequestMapping("/api/trades")
 @Validated
+@Tag(name = "Trades", description = "Trade management operations including booking, searching, and lifecycle management")
 public class TradeController {
     private static final Logger logger = LoggerFactory.getLogger(TradeController.class);
 
@@ -63,8 +72,16 @@ public class TradeController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateTrade(@PathVariable Long id, @Valid @RequestBody TradeDTO tradeDTO) {
-
+    @Operation(summary = "Update existing trade", description = "Updates an existing trade with new information. Subject to business rule validation and user privileges.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Trade updated successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = TradeDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Trade not found"),
+            @ApiResponse(responseCode = "400", description = "Invalid trade data or business rule violation"),
+            @ApiResponse(responseCode = "403", description = "Insufficient privileges to update trade")
+    })
+    public ResponseEntity<?> updateTrade(
+            @Parameter(description = "Unique identifier of the trade to update", required = true) @PathVariable Long id,
+            @Parameter(description = "Updated trade details", required = true) @Valid @RequestBody TradeDTO tradeDTO) {
         // Checking for tradeId mismatch
         if (tradeDTO.getTradeId() != null && !id.equals(tradeDTO.getTradeId())) {
             // FIX: Updated error message to match test expectation
