@@ -18,16 +18,23 @@ This document provides comprehensive setup instructions for the trading applicat
 - **Download**: [Oracle JDK](https://www.oracle.com/java/technologies/downloads/) or [OpenJDK](https://openjdk.org/)
 - **Verification**: Run `java -version` and `javac -version`
 
-#### 2. Node.js and npm
-- **Version**: Node.js 18.x or higher
+#### 2. Node.js and Package Manager
+- **Node.js Version**: Node.js 18.x or higher
 - **Download**: [Node.js Official Website](https://nodejs.org/)
-- **Verification**: Run `node --version` and `npm --version`
+- **Verification**: Run `node --version`
+
+**Package Manager Options:**
+- **npm** (comes with Node.js): Run `npm --version` to verify
+- **pnpm** (recommended for this project): 
+  - **Installation**: `npm install -g pnpm`
+  - **Verification**: Run `pnpm --version`
+  - **Note**: This project is configured to use pnpm and includes `pnpm-lock.yaml`
 
 #### 3. Maven
 - **Version**: Maven 3.8 or higher
 - **Download**: [Apache Maven](https://maven.apache.org/download.cgi)
 - **Verification**: Run `mvn --version`
-- **Alternative**: Use Maven wrapper (mvnw) included in the project
+- **Installation Required**: Candidates must install Maven directly (Maven wrapper not supported for this challenge)
 
 #### 4. Git
 - **Version**: Latest stable version
@@ -63,10 +70,19 @@ trading-application/
 
 ## Setup Instructions
 
-### Step 1: Clone the Repository
+### Step 1: Fork and Clone the Repository
+
+#### Fork the Repository
+1. **Navigate to the Repository**: Go to the provided repository URL in your web browser
+2. **Fork the Repository**: Click the "Fork" button in the top-right corner of the repository page
+3. **Create Your Fork**: This creates a copy of the repository under your GitHub account
+4. **Note Your Fork URL**: Your forked repository will be at `https://github.com/YOUR_USERNAME/trade-capture-system`
+
+#### Clone Your Forked Repository
 ```bash
-git clone <repository-url>
-cd trading-application
+# Clone your forked repository (replace YOUR_USERNAME with your actual GitHub username)
+git clone https://github.com/YOUR_USERNAME/trade-capture-system.git
+cd trade-capture-system
 ```
 
 ### Step 2: Backend Setup
@@ -78,12 +94,8 @@ cd backend
 
 #### Install Dependencies and Build
 ```bash
-# Using Maven (if installed)
+# Using Maven (required - must be installed)
 mvn clean install
-
-# OR using Maven wrapper (if Maven not installed)
-./mvnw clean install    # Linux/macOS
-mvnw.cmd clean install  # Windows
 ```
 
 #### Run Backend Application
@@ -91,21 +103,24 @@ mvnw.cmd clean install  # Windows
 # Using Maven
 mvn spring-boot:run
 
-# OR using Maven wrapper
-./mvnw spring-boot:run    # Linux/macOS
-mvnw.cmd spring-boot:run  # Windows
-
 # OR run the built JAR
 java -jar target/*.jar
 ```
 
 #### Verify Backend is Running
-- **Application URL**: http://localhost:8080
+- **Application URL (swagger)**: http://localhost:8080/swagger-ui/index.html
 - **Health Check**: http://localhost:8080/actuator/health
 - **H2 Database Console**: http://localhost:8080/h2-console
   - **JDBC URL**: `jdbc:h2:file:./data/tradingdb`
   - **Username**: `sa`
   - **Password**: (leave empty)
+
+#### Verify API Documentation and Monitoring
+- **Swagger UI**: http://localhost:8080/swagger-ui/index.html
+- **OpenAPI JSON**: http://localhost:8080/api-docs
+- **Actuator Endpoints**: http://localhost:8080/actuator/
+- **Application Metrics**: http://localhost:8080/actuator/metrics
+- **Application Info**: http://localhost:8080/actuator/info
 
 ### Step 3: Frontend Setup
 
@@ -115,18 +130,59 @@ cd frontend
 ```
 
 #### Install Dependencies
+
+**Option 1: Using pnpm (Recommended - Project is configured for pnpm)**
 ```bash
+# Install pnpm globally if not already installed
+npm install -g pnpm
+
+# Install dependencies
+pnpm install
+```
+
+**Option 2: Using npm (Alternative)**
+```bash
+# Install dependencies
 npm install
+
+# Note: You may need to delete pnpm-lock.yaml first if switching from pnpm
+# rm pnpm-lock.yaml  # Linux/macOS
+# del pnpm-lock.yaml  # Windows
 ```
 
 #### Run Frontend Application
+
+**Using pnpm (Recommended)**
 ```bash
-npm start
+# Development server
+pnpm dev
+
+# Alternative commands
+pnpm build    # Build for production
+pnpm lint     # Run linting
+pnpm test     # Run tests
+pnpm preview  # Preview production build
+```
+
+**Using npm (Alternative)**
+```bash
+# Development server  
+npm run dev
+
+# Alternative commands
+npm run build    # Build for production
+npm run lint     # Run linting
+npm run test     # Run tests
+npm run preview  # Preview production build
 ```
 
 #### Verify Frontend is Running
-- **Application URL**: http://localhost:3000
+- **Application URL**: Check terminal for actual port assignment
+  - **npm (Vite)**: Typically http://localhost:5173 
+  - **pnpm (Vite)**: Typically http://localhost:3000
 - **Should automatically open in browser**
+- **Note**: The frontend uses Vite, which will automatically assign an available port if the default is busy
+- **CORS Configuration**: Backend is pre-configured to accept requests from both ports (3000 and 5173)
 
 ### Step 4: Verify Full Application
 
@@ -234,11 +290,40 @@ rm -rf node_modules package-lock.json
 npm install
 ```
 
-**Issue**: `Port 3000 already in use`
-**Solution**: Kill the process using port 3000 or start on different port:
+**Issue**: `pnpm install fails`
+**Solution**: 
 ```bash
-PORT=3001 npm start  # Linux/macOS
-set PORT=3001 && npm start  # Windows
+# Clear pnpm cache
+pnpm store prune
+
+# Delete node_modules and reinstall
+rm -rf node_modules pnpm-lock.yaml  # Linux/macOS
+del node_modules pnpm-lock.yaml     # Windows (remove directories manually)
+pnpm install
+```
+
+**Issue**: `Package manager conflicts`
+**Solution**: 
+```bash
+# If switching from npm to pnpm
+rm -rf node_modules package-lock.json
+pnpm install
+
+# If switching from pnpm to npm
+rm -rf node_modules pnpm-lock.yaml
+npm install
+```
+
+**Issue**: `Port 3000 already in use`
+**Solution**: Kill the process using port 3000 or Vite will automatically use the next available port:
+```bash
+# For npm
+PORT=3001 npm run dev  # Linux/macOS
+set PORT=3001 && npm run dev  # Windows
+
+# For pnpm  
+PORT=3001 pnpm dev  # Linux/macOS
+set PORT=3001 && pnpm dev  # Windows
 ```
 
 #### Database Issues
@@ -270,56 +355,54 @@ set PORT=3001 && npm start  # Windows
 3. Ensure CORS is properly configured
 4. Verify API base URL in frontend configuration
 
+**Issue**: CORS errors in browser console
+**Solutions**:
+1. **Default Configuration**: Backend is pre-configured for both common Vite ports
+   - Supports `http://localhost:3000` (typical pnpm default)
+   - Supports `http://localhost:5173` (typical npm default)
+2. **Custom Port Usage**: If using a different port, update CORS configuration in `backend/src/main/java/com/technicalchallenge/config/WebConfig.java`
+3. **Configuration Location**: 
+   ```java
+   // In WebConfig.java
+   .allowedOrigins("http://localhost:3000", "http://localhost:5173")
+   ```
+
 ## Testing the Setup
 
 ### Quick Verification Checklist
 - [ ] Backend starts without errors
 - [ ] Frontend starts without errors
-- [ ] Can access H2 database console
-- [ ] Can create and view trades through the UI
+- [ ] Can access H2 database console at http://localhost:8080/h2-console
+- [ ] **Swagger UI accessible at http://localhost:8080/swagger-ui/index.html**
+- [ ] **Actuator health endpoint responds at http://localhost:8080/actuator/health**
+- [ ] **Actuator metrics available at http://localhost:8080/actuator/metrics**
+- [ ] **Actuator info endpoint accessible at http://localhost:8080/actuator/info**
+- [ ] Can navigate through the application UI
 - [ ] API endpoints respond correctly
 - [ ] No console errors in browser developer tools
 
-### Sample API Test
+### Required Verification Steps
+
+#### 1. Backend API Verification
 ```bash
 # Test health endpoint
 curl http://localhost:8080/actuator/health
+
+# Test API documentation accessibility
+curl http://localhost:8080/api-docs
 
 # Test trades endpoint (may require authentication)
 curl http://localhost:8080/api/trades
 ```
 
-## Development Tips
+#### 2. Swagger UI Verification
+1. Navigate to http://localhost:8080/swagger-ui/index.html
+2. Verify all API endpoints are documented
+3. Confirm you can expand endpoint sections
+4. Test at least one GET endpoint using "Try it out" feature
 
-### Hot Reloading
-- **Backend**: Use `mvn spring-boot:run` with Spring Boot DevTools
-- **Frontend**: `npm start` automatically reloads on file changes
-
-### Debugging
-- **Backend**: Use IDE debugging or add `--debug` flag
-- **Frontend**: Use browser developer tools and React DevTools extension
-
-### Code Changes
-- **Backend**: Changes require restart unless using DevTools
-- **Frontend**: Changes automatically reload in development mode
-
-## Next Steps
-
-Once you have the application running successfully:
-
-1. **Explore the Codebase**: Familiarize yourself with the project structure
-2. **Review Documentation**: Read through the technical challenge steps
-3. **Test Functionality**: Create trades, explore features, understand the business domain
-4. **Prepare for Development**: Set up your preferred IDE and development tools
-
-For the technical challenge, you'll be working with this application to fix issues, implement new features, and demonstrate your software development skills.
-
-## Support
-
-If you encounter issues during setup:
-1. Check the troubleshooting section above
-2. Review application logs for error messages
-3. Ensure all prerequisites are properly installed
-4. Verify network connectivity and port availability
-
-The application should be fully functional once properly set up, providing a solid foundation for the technical challenge ahead.
+#### 3. Actuator Monitoring Verification
+1. **Health Check**: http://localhost:8080/actuator/health should return status "UP"
+2. **Application Info**: http://localhost:8080/actuator/info should show build and environment details
+3. **Metrics**: http://localhost:8080/actuator/metrics should list available metrics
+4. **All Endpoints**: http://localhost:8080/actuator/ should show all available actuator endpoints
