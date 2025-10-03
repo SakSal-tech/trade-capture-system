@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net">
+  <diagram id="uml-backend" name="Backend UML Class Diagram">
+    <mxGraphModel dx="1000" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="2000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <!-- Trade Entity -->
+        <mxCell id="Trade" value="Trade" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="60" width="160" height="120" as="geometry" />
+        </mxCell>
+        <!-- TradeLeg Entity -->
+        <mxCell id="TradeLeg" value="TradeLeg" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="60" width="160" height="100" as="geometry" />
+        </mxCell>
+        <!-- User Entity -->
+        <mxCell id="User" value="User" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="220" width="160" height="80" as="geometry" />
+        </mxCell>
+        <!-- Book Entity -->
+        <mxCell id="Book" value="Book" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="220" width="160" height="80" as="geometry" />
+        </mxCell>
+        <!-- Cashflow Entity -->
+        <mxCell id="Cashflow" value="Cashflow" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="540" y="60" width="160" height="80" as="geometry" />
+        </mxCell>
+        <!-- AdditionalInfo Entity -->
+        <mxCell id="AdditionalInfo" value="AdditionalInfo" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="540" y="220" width="160" height="80" as="geometry" />
+        </mxCell>
+        <!-- TradeDTO -->
+        <mxCell id="TradeDTO" value="TradeDTO" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;" vertex="1" parent="1">
+          <mxGeometry x="60" y="360" width="160" height="80" as="geometry" />
+        </mxCell>
+        <!-- TradeLegDTO -->
+        <mxCell id="TradeLegDTO" value="TradeLegDTO" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;" vertex="1" parent="1">
+          <mxGeometry x="300" y="360" width="160" height="80" as="geometry" />
+        </mxCell>
+        <!-- UserDTO -->
+        <mxCell id="UserDTO" value="UserDTO" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;" vertex="1" parent="1">
+          <mxGeometry x="540" y="360" width="160" height="80" as="geometry" />
+        </mxCell>
+        <!-- BookDTO -->
+        <mxCell id="BookDTO" value="BookDTO" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;" vertex="1" parent="1">
+          <mxGeometry x="780" y="360" width="160" height="80" as="geometry" />
+        </mxCell>
+        <!-- SearchCriteriaDTO -->
+        <mxCell id="SearchCriteriaDTO" value="SearchCriteriaDTO" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffde7;" vertex="1" parent="1">
+          <mxGeometry x="60" y="480" width="160" height="60" as="geometry" />
+        </mxCell>
+        <!-- FilterCriteriaDTO -->
+        <mxCell id="FilterCriteriaDTO" value="FilterCriteriaDTO" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffde7;" vertex="1" parent="1">
+          <mxGeometry x="300" y="480" width="160" height="60" as="geometry" />
+        </mxCell>
+        <!-- SettlementInstructionsUpdateDTO -->
+        <mxCell id="SettlementInstructionsUpdateDTO" value="SettlementInstructionsUpdateDTO" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffde7;" vertex="1" parent="1">
+          <mxGeometry x="540" y="480" width="200" height="60" as="geometry" />
+        </mxCell>
+        <!-- Associations -->
+        <mxCell id="Trade-TradeLeg" style="endArrow=block;endFill=1;" edge="1" parent="1" source="Trade" target="TradeLeg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Trade-User" style="endArrow=block;endFill=1;" edge="1" parent="1" source="Trade" target="User">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Trade-Book" style="endArrow=block;endFill=1;" edge="1" parent="1" source="Trade" target="Book">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Trade-Cashflow" style="endArrow=block;endFill=1;" edge="1" parent="1" source="Trade" target="Cashflow">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Trade-AdditionalInfo" style="endArrow=block;endFill=1;" edge="1" parent="1" source="Trade" target="AdditionalInfo">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- DTO Associations -->
+        <mxCell id="TradeDTO-TradeLegDTO" style="endArrow=block;endFill=1;dashed=1;" edge="1" parent="1" source="TradeDTO" target="TradeLegDTO">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="TradeDTO-UserDTO" style="endArrow=block;endFill=1;dashed=1;" edge="1" parent="1" source="TradeDTO" target="UserDTO">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="TradeDTO-BookDTO" style="endArrow=block;endFill=1;dashed=1;" edge="1" parent="1" source="TradeDTO" target="BookDTO">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Criteria DTOs and Update DTO -->
+        <!-- No direct associations, shown for completeness -->
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
