@@ -5,8 +5,9 @@ import com.technicalchallenge.mapper.BookMapper;
 import com.technicalchallenge.model.Book;
 import com.technicalchallenge.repository.BookRepository;
 import com.technicalchallenge.repository.CostCenterRepository;
+import com.technicalchallenge.repository.TradeRepository;
+
 import lombok.AllArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import org.slf4j.Logger;
@@ -19,8 +20,6 @@ import java.util.Optional;
 @AllArgsConstructor
 public class BookService {
     private static final Logger logger = LoggerFactory.getLogger(BookService.class);
-
-
     private final BookRepository bookRepository;
     private final CostCenterRepository costCenterRepository;
     private final BookMapper bookMapper;
@@ -40,9 +39,10 @@ public class BookService {
     public void populateReferenceDataByName(Book book, BookDTO dto) {
         if (dto.getCostCenterName() != null && !dto.getCostCenterName().isBlank()) {
             var costCenter = costCenterRepository.findAll().stream()
-                .filter(c -> c.getCostCenterName().equalsIgnoreCase(dto.getCostCenterName()))
-                .findFirst().orElse(null);
-            if (costCenter == null) throw new IllegalArgumentException("CostCenter '" + dto.getCostCenterName() + "' does not exist");
+                    .filter(c -> c.getCostCenterName().equalsIgnoreCase(dto.getCostCenterName()))
+                    .findFirst().orElse(null);
+            if (costCenter == null)
+                throw new IllegalArgumentException("CostCenter '" + dto.getCostCenterName() + "' does not exist");
             book.setCostCenter(costCenter);
         }
         // If costCenterName is null or blank, do not modify the current costCenter
@@ -62,4 +62,5 @@ public class BookService {
         logger.warn("Deleting book with id: {}", id);
         bookRepository.deleteById(id);
     }
+
 }

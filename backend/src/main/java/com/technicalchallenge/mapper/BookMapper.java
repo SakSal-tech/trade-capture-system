@@ -8,8 +8,6 @@ import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
-
 @Component
 public class BookMapper {
     @Autowired
@@ -28,8 +26,8 @@ public class BookMapper {
         Book entity = modelMapper.map(dto, Book.class);
         if (dto.getCostCenterName() != null) {
             CostCenter costCenter = costCenterRepository.findAll().stream()
-                .filter(cc -> dto.getCostCenterName().equals(cc.getCostCenterName()))
-                .findFirst().orElse(null);
+                    .filter(cc -> dto.getCostCenterName().equals(cc.getCostCenterName()))
+                    .findFirst().orElse(null);
             entity.setCostCenter(costCenter);
         }
         return entity;

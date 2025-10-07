@@ -8,12 +8,10 @@ import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.service.TradeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
@@ -22,12 +20,11 @@ import java.util.Optional;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ExtendWith(SpringExtension.class)
 @WebMvcTest(TradeController.class)
 public class TradeControllerTest {
 
@@ -66,6 +63,8 @@ public class TradeControllerTest {
         // Create a sample Trade entity for testing
         trade = new Trade();
         trade.setId(1L);
+        //// Setting the tradeId ensures the entity matches the expected value in the
+        //// response JSON, so test assertions for tradeId will pass.
         trade.setTradeId(1001L);
         trade.setVersion(1);
         trade.setTradeDate(LocalDate.now());
