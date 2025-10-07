@@ -577,7 +577,7 @@ Additionally, the JSON response sometimes didn’t contain `"tradeId"`, which ca
 ### Solution
 
 1. Updated the test to use `.andExpect(status().isCreated())` instead of `.isOk()`.
-2. Set `trade.setTradeId(1001L);` in the test setup to ensure that the entity has the expected ID before being mapped back to a DTO.
+2. Set `trade.setTradeId(1001L);` in the test setup to ensure that the entity has the expected ID before being mapped back to a DTO. The controller maps the Trade entity to a DTO for the response. If tradeId is not set on the entity, the response JSON will be missing tradeId, causing tests that assert on this field to fail. Setting tradeId here guarantees the response includes the correct value for test verification.
 
 ### Impact
 

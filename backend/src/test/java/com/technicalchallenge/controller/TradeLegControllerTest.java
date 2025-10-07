@@ -11,12 +11,10 @@ import com.technicalchallenge.model.TradeLeg;
 import com.technicalchallenge.service.TradeLegService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -30,7 +28,6 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ExtendWith(SpringExtension.class)
 @WebMvcTest(TradeLegController.class)
 public class TradeLegControllerTest {
 
@@ -159,10 +156,16 @@ public class TradeLegControllerTest {
         tradeLegDTO.setNotional(BigDecimal.valueOf(-1000000.0));
 
         // When/Then
-        // mockMvc is a Spring test utility for simulating HTTP requests to  controller. perform(post(...)) sends a POST request to  API endpoint. andExpect(...) checks the response status and content. It does not call the real HTTP server, but simulates the request/response cycle in-memory.
+        // mockMvc is a Spring test utility for simulating HTTP requests to controller.
+        // perform(post(...)) sends a POST request to API endpoint. andExpect(...)
+        // checks the response status and content. It does not call the real HTTP
+        // server, but simulates the request/response cycle in-memory.
         mockMvc.perform(post("/api/tradeLegs")
                 .contentType(MediaType.APPLICATION_JSON)
-                // objectMapper.writeValueAsString(tradeLegDTO) converts the DTO object to a JSON string by calling the method in objectmapper class writeValueAsString because the API expects JSON input.  it uses Jackson serialization (with SegmentStringWriter, JsonFactory, etc.) to turn Java objects into JSON.
+                // objectMapper.writeValueAsString(tradeLegDTO) converts the DTO object to a
+                // JSON string by calling the method in objectmapper class writeValueAsString
+                // because the API expects JSON input. it uses Jackson serialization (with
+                // SegmentStringWriter, JsonFactory, etc.) to turn Java objects into JSON.
                 .content(objectMapper.writeValueAsString(tradeLegDTO)))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("Notional must be positive"));

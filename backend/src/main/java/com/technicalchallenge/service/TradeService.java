@@ -1,15 +1,21 @@
 package com.technicalchallenge.service;
 
+import com.technicalchallenge.dto.SearchCriteriaDTO;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
+import com.technicalchallenge.mapper.TradeMapper;
 import com.technicalchallenge.model.*;
 import com.technicalchallenge.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
+
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.modelmapper.internal.bytebuddy.agent.builder.AgentBuilder.InitializationStrategy.SelfInjection.Split;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -17,47 +23,69 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import jakarta.persistence.criteria.Predicate;
+
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
 
 @Service
 @Transactional
-/*The service receives a DTO (from the controller), uses the mapper to convert it to an entity, and then processes or saves the entity. When returning data, the service uses the mapper to convert entities back to DTOs for the controller to send as a response. */
-public class TradeService {
-    private static final Logger logger = LoggerFactory.getLogger(TradeService.class);
+@AllArgsConstructor
 
-    @Autowired
+/*
+ * The service receives a DTO (from the controller), uses the mapper to convert
+ * it to an entity, and then processes or saves the entity. When returning data,
+ * the service uses the mapper to convert entities back to DTOs for the
+ * controller to send as a response.
+ */
+public class TradeService {
+    /*
+     * FIX: Replaced manual constructor with Lombok @AllArgsConstructor
+     *
+     * - Removed:
+     * TradeService(TradeMapper tradeMapper) { this.tradeMapper = tradeMapper; }
+     * because it only initialized one dependency (tradeMapper),
+     * leaving all other @Autowired repositories null during tests.
+     *
+     * - Added:
+     * 
+     * @AllArgsConstructor
+     * which generates a constructor including ALL dependencies (mapper +
+     * repositories).
+     * This allows both:
+     * 1. Spring Boot to perform constructor-based dependency injection at runtime.
+     * 2. Mockito's @InjectMocks to inject all @Mock fields in unit tests.
+     *
+     * - Also removed @Autowired from individual fields,
+     * since constructor injection via @AllArgsConstructor makes them redundant.
+     *
+     * Result:
+     * Eliminates NullPointerExceptions in unit tests and improves testability +
+     * clarity.
+     */
+
+    private final TradeMapper tradeMapper;
+    private static final Logger logger = LoggerFactory.getLogger(TradeService.class);
     private TradeRepository tradeRepository;
-    @Autowired
     private TradeLegRepository tradeLegRepository;
-    @Autowired
     private CashflowRepository cashflowRepository;
-    @Autowired
     private TradeStatusRepository tradeStatusRepository;
-    @Autowired
     private BookRepository bookRepository;
-    @Autowired
     private CounterpartyRepository counterpartyRepository;
-    @Autowired
     private ApplicationUserRepository applicationUserRepository;
-    @Autowired
     private TradeTypeRepository tradeTypeRepository;
-    @Autowired
     private TradeSubTypeRepository tradeSubTypeRepository;
-    @Autowired
     private CurrencyRepository currencyRepository;
-    @Autowired
+
     private LegTypeRepository legTypeRepository;
-    @Autowired
     private IndexRepository indexRepository;
-    @Autowired
     private HolidayCalendarRepository holidayCalendarRepository;
-    @Autowired
     private ScheduleRepository scheduleRepository;
-    @Autowired
     private BusinessDayConventionRepository businessDayConventionRepository;
-    @Autowired
+
     private PayRecRepository payRecRepository;
-    @Autowired
-    private AdditionalInfoService additionalInfoService;
 
     public List<Trade> getAllTrades() {
         logger.info("Retrieving all trades");
@@ -68,7 +96,7 @@ public class TradeService {
         logger.debug("Retrieving trade by id: {}", tradeId);
         return tradeRepository.findByTradeIdAndActiveTrue(tradeId);
     }
- 
+
     @Transactional
     public Trade createTrade(TradeDTO tradeDTO) {
         logger.info("Creating new trade with ID: {}", tradeDTO.getTradeId());
@@ -164,7 +192,13 @@ public class TradeService {
         // Handle trader user by name or ID with enhanced logging
         if (tradeDTO.getTraderUserName() != null) {
             logger.debug("Looking up trader user by name: {}", tradeDTO.getTraderUserName());
-            /* trim(): Remove any leading or trailing spaces from the username.split("\\s+")Split the username into parts using whitespace (spaces, tabs, etc.) as the separator. radeDTO.getTraderUserName() returns "  John   Smith  ". .trim() removes leading/trailing spaces: "John   Smith" .split("\\s+") splits by one or more spaces: ["John", "Smith"] */
+            /*
+             * trim(): Remove any leading or trailing spaces from the
+             * username.split("\\s+")Split the username into parts using whitespace (spaces,
+             * tabs, etc.) as the separator. radeDTO.getTraderUserName() returns
+             * "  John   Smith  ". .trim() removes leading/trailing spaces: "John   Smith"
+             * .split("\\s+") splits by one or more spaces: ["John", "Smith"]
+             */
             String[] nameParts = tradeDTO.getTraderUserName().trim().split("\\s+");
             if (nameParts.length >= 1) {
                 String firstName = nameParts[0];
@@ -443,12 +477,18 @@ public class TradeService {
         if (leg.getCalculationPeriodSchedule() != null) {
             schedule = leg.getCalculationPeriodSchedule().getSchedule();
         }
-        // Converts the schedule string into a numeric interval (months between payments).
+        // Converts the schedule string into a numeric interval (months between
+        // payments).
         int monthsInterval = parseSchedule(schedule);
-        //calculatePaymentDates Calculates all payment dates between the start and maturity dates using this interval.
+        // calculatePaymentDates Calculates all payment dates between the start and
+        // maturity dates using this interval.
         List<LocalDate> paymentDates = calculatePaymentDates(startDate, maturityDate, monthsInterval);
 
-            /*For each payment date, creates a new Cashflow object. Sets its properties (leg, paymentdate, rate). Calculates the payment value using the leg type and interval. Saves the cashflow to the database. */
+        /*
+         * For each payment date, creates a new Cashflow object. Sets its properties
+         * (leg, paymentdate, rate). Calculates the payment value using the leg type and
+         * interval. Saves the cashflow to the database.
+         */
         for (LocalDate paymentDate : paymentDates) {
             Cashflow cashflow = new Cashflow();
             cashflow.setTradeLeg(leg);
@@ -512,14 +552,28 @@ public class TradeService {
 
         return dates;
     }
-    /* Calculates the payment value for a cashflow, based on the properties of a trade leg and the payment interval (in months). */
+
+    /*
+     * Calculates the payment value for a cashflow, based on the properties of a
+     * trade leg and the payment interval (in months).
+     */
     private BigDecimal calculateCashflowValue(TradeLeg leg, int monthsInterval) {
-        if (leg.getLegRateType() == null) { // If the leg’s rate type is not set, the method returns zero, prevents calculation errors and signals missing data.
+        if (leg.getLegRateType() == null) { // If the leg’s rate type is not set, the method returns zero, prevents
+                                            // calculation errors and signals missing data.
             return BigDecimal.ZERO;
         }
 
         String legType = leg.getLegRateType().getType();
-        // Notional is the principal amount or face value on which interest payments are calculated in a financial contract (like a loan, bond, or swap). For "Fixed" legs, the cashflow value is calculated as:Cashflow = Notional * Rate * Months /12. This formula annualises the rate and scales it by the payment interval(This ensures the payment matches the correct portion of the annual interest for the interval.To calculate the payment for a period shorter than a year, you multiply the notional by the annual rate, then adjust for the fraction of the year covered by the payment interval (e.g., for a quarterly payment, you use 3/12 of the annual rate). The result is wrapped in a BigDecimal for precision.
+        // Notional is the principal amount or face value on which interest payments are
+        // calculated in a financial contract (like a loan, bond, or swap). For "Fixed"
+        // legs, the cashflow value is calculated as:Cashflow = Notional * Rate * Months
+        // /12. This formula annualises the rate and scales it by the payment
+        // interval(This ensures the payment matches the correct portion of the annual
+        // interest for the interval.To calculate the payment for a period shorter than
+        // a year, you multiply the notional by the annual rate, then adjust for the
+        // fraction of the year covered by the payment interval (e.g., for a quarterly
+        // payment, you use 3/12 of the annual rate). The result is wrapped in a
+        // BigDecimal for precision.
         if ("Fixed".equals(legType)) {
             double notional = leg.getNotional().doubleValue();
             double rate = leg.getRate();
@@ -528,7 +582,7 @@ public class TradeService {
             double result = (notional * rate * months) / 12;
 
             return BigDecimal.valueOf(result);
-        } else if ("Floating".equals(legType)) { //For "Floating" legs, the method currently returns zero. 
+        } else if ("Floating".equals(legType)) { // For "Floating" legs, the method currently returns zero.
             return BigDecimal.ZERO;
         }
 
@@ -551,4 +605,321 @@ public class TradeService {
     private Long generateNextTradeId() {
         return 10000L + tradeRepository.count();
     }
+
+    // Identical method to the above one for pagination. Returns paginated list.
+    // Page= page number etc 0, 1. size=How many trades a page
+
+    public List<TradeDTO> searchTrades(SearchCriteriaDTO criteriaDTO) {
+
+        // Specification is an object that represents a single search/filter for the
+        // database query. A blank slate for building up the search query to add
+        // conditions later
+        Specification<Trade> spec = Specification.where(null);
+
+        // Filter by Counterparty. SQL equivalent: WHERE counterparty.name =
+        // "value_from_criteriaDTO.getCounterparty()"
+        // Checking for both null and empty: null means the user didn't provide the
+        // parameter.
+        // empty →means the user sent ?status= with no value. This will be useful for
+        // the frontend
+        // To skip filtering in both cases to avoid errors and invalid queries.
+
+        if (criteriaDTO.getCounterparty() != null && !criteriaDTO.getCounterparty().isEmpty()) {
+            // explain
+            spec = spec.and(new Specification<Trade>() {
+                @Override
+                public Predicate toPredicate(Root<Trade> root, CriteriaQuery<?> query,
+                        CriteriaBuilder criteriaBuilder) {
+                    return criteriaBuilder.equal(criteriaBuilder.lower(root.get("counterparty").get("name")),
+                            criteriaDTO.getCounterparty().toLowerCase());
+                }
+
+            });
+        }
+        // Filter by Book (case-insensitive)
+        // SQL: WHERE LOWER(book.book_name) = LOWER('user_input')
+        if (criteriaDTO.getBook() != null && !criteriaDTO.getBook().isEmpty()) {
+            // explain
+            spec = spec.and(new Specification<Trade>() {
+
+                @Override
+                public Predicate toPredicate(Root<Trade> root, CriteriaQuery<?> query,
+                        CriteriaBuilder criteriaBuilder) {
+                    return criteriaBuilder.equal(criteriaBuilder.lower(root.get("book").get("bookName")),
+                            criteriaDTO.getBook().toLowerCase());
+                }
+
+            });
+        }
+        // filter by Trade
+        // SQL: WHERE LOWER(trader_user.first_name) = LOWER('user_input')
+        if (criteriaDTO.getTrader() != null && !criteriaDTO.getTrader().isEmpty()) {
+            // explain
+            spec = spec.and(new Specification<Trade>() {
+                @Override
+                public Predicate toPredicate(Root<Trade> root, CriteriaQuery<?> query,
+                        CriteriaBuilder criteriaBuilder) {
+                    return criteriaBuilder.equal(criteriaBuilder.lower(root.get("traderUser").get("firstName")),
+                            criteriaDTO.getTrader().toLowerCase());
+                }
+
+            });
+        }
+
+        if (criteriaDTO.getStatus() != null && !criteriaDTO.getStatus().isEmpty()) {
+            // explain
+            spec = spec.and(new Specification<Trade>() {
+                @Override
+                public Predicate toPredicate(Root<Trade> root, CriteriaQuery<?> query,
+                        CriteriaBuilder criteriaBuilder) {
+                    return criteriaBuilder.equal(criteriaBuilder.lower(root.get("tradeStatus").get("tradeStatus")),
+                            criteriaDTO.getStatus().toLowerCase());
+                }
+
+            });
+        }
+        // Filter by Date Range (date comparisons stay as-is, no lowercase needed)
+        // SQL: WHERE trade_date BETWEEN 'start_date' AND 'end_date'
+
+        if (criteriaDTO.getStartDate() != null && criteriaDTO.getEndDate() != null) {
+            // explain
+            spec = spec.and(new Specification<Trade>() {
+                @Override
+                public Predicate toPredicate(Root<Trade> root, CriteriaQuery<?> query,
+                        CriteriaBuilder criteriaBuilder) {
+                    return criteriaBuilder.between(root.get("tradeDate"), criteriaDTO.getStartDate(),
+                            criteriaDTO.getEndDate());
+                }
+
+            });
+        }
+
+        // Filter by Start Date only
+        // SQL: WHERE trade_date >= 'start_date'
+        else if (criteriaDTO.getStartDate() != null) {
+            spec = spec.and(new Specification<Trade>() {
+                @Override
+                public Predicate toPredicate(Root<Trade> root, CriteriaQuery<?> query,
+                        CriteriaBuilder criteriaBuilder) {
+                    return criteriaBuilder.greaterThanOrEqualTo(root.get("tradeDate"), criteriaDTO.getStartDate());
+
+                }
+            });
+
+        }
+
+        // Filter by End Date only
+        // SQL: WHERE trade_date <= 'end_date'
+        else if (criteriaDTO.getEndDate() != null) {
+            spec = spec.and(new Specification<Trade>() {
+                @Override
+                public Predicate toPredicate(Root<Trade> root, CriteriaQuery<?> query, CriteriaBuilder cb) {
+                    return cb.lessThanOrEqualTo(root.get("tradeDate"), criteriaDTO.getEndDate());
+                }
+            });
+        }
+        // Execute the query using all combined filters
+        List<Trade> trades = tradeRepository.findAll(spec);
+        // an empty list is created trades to be added
+        List<TradeDTO> result = new ArrayList<TradeDTO>();
+        for (Trade trade : trades) {
+            // convert the trade into TradeDTO and add the DTO to the result list for API
+            // response
+            result.add((tradeMapper.toDto(trade)));
+        }
+
+        return result;
+
+    }
+
+    public Page<TradeDTO> filterTrades(SearchCriteriaDTO criteriaDTO, int page, int size) {
+        Specification<Trade> spec = Specification.where(null);
+        if (criteriaDTO.getCounterparty() != null) {
+            spec = spec.and(
+                    (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("counterparty").get
+                    // Add filter to the search
+                    ("name"), criteriaDTO.getCounterparty()));
+        }
+
+        if (criteriaDTO.getBook() != null) {
+            spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("book").get("bookName"),
+                    criteriaDTO.getBook()));
+        }
+        if (criteriaDTO.getTrader() != null) {
+            spec = spec.and(
+                    (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("traderUser").get("firstName"),
+                            criteriaDTO.getTrader()));
+        }
+        if (criteriaDTO.getStatus() != null) {
+            spec = spec.and(
+                    (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("tradeStatus").get("tradeStatus"),
+                            criteriaDTO.getStatus()));
+        }
+        if (criteriaDTO.getStartDate() != null && criteriaDTO.getEndDate() != null) {
+            // if user provides both start and end dates, checks the trade date is between
+            // the start and end dates (inclusive)
+            spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.between(root.get("tradeDate"),
+                    criteriaDTO.getStartDate(),
+                    criteriaDTO.getEndDate()));
+            // In case user provides either start or end date, then trade from that date
+            // onwards(>=startDate) or up to that date(<=)
+        } else if (criteriaDTO.getStartDate() != null) {
+            spec = spec
+                    .and((root, query, criteriaBuilder) -> criteriaBuilder.greaterThanOrEqualTo(root.get("tradeDate"),
+                            criteriaDTO.getStartDate()));
+        } else if (criteriaDTO.getEndDate() != null) {
+            spec = spec.and(
+                    (root, query, criteriaBuilder) -> criteriaBuilder.lessThanOrEqualTo(root.get("tradeDate"),
+                            criteriaDTO.getEndDate()));
+        }
+
+        // Creating pageable object
+        PageRequest pageable = PageRequest.of(page, size);
+        Page<Trade> tradePage = tradeRepository.findAll(spec, pageable);
+
+        // Convert each Trade entity to DTO
+        List<TradeDTO> dtoList = tradePage.getContent()// get the result
+                .stream()
+                .map(tradeMapper::toDto)
+                .collect(Collectors.toList());
+
+        // Rebuild a paginated Page<TradeDTO> with the DTO list and same pagination info
+        Page<TradeDTO> dtoPage = new PageImpl<>(dtoList, pageable, tradePage.getTotalElements());
+
+        // Return the final paginated DTO page
+        return dtoPage;
+
+    }
+
+    /*
+     * 1. Take the query, convert/parse it into spec. convert the query into Spring
+     * spec
+     * 2. same steps as search/filter
+     * 
+     */
+
+    public List<TradeDTO> searchTradesRsql(SearchCriteriaDTO criteriaDTO) {
+        Specification<Trade> spec = Specification.where(null);
+        if (criteriaDTO.getCounterparty() != null) {
+            spec = spec.and(
+                    (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("counterparty").get
+                    // Add filter to the search
+                    ("name"), criteriaDTO.getCounterparty()));
+        }
+
+        if (criteriaDTO.getBook() != null) {
+            spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("book").get("bookName"),
+                    criteriaDTO.getBook()));
+        }
+        if (criteriaDTO.getTrader() != null) {
+            spec = spec.and(
+                    (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("traderUser").get("firstName"),
+                            criteriaDTO.getTrader()));
+        }
+        if (criteriaDTO.getStatus() != null) {
+            spec = spec.and(
+                    (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("tradeStatus").get("tradeStatus"),
+                            criteriaDTO.getStatus()));
+        }
+        if (criteriaDTO.getStartDate() != null && criteriaDTO.getEndDate() != null) {
+            spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.between(root.get("tradeDate"),
+                    criteriaDTO.getStartDate(),
+                    criteriaDTO.getEndDate()));
+        } else if (criteriaDTO.getStartDate() != null) {
+            spec = spec
+                    .and((root, query, criteriaBuilder) -> criteriaBuilder.greaterThanOrEqualTo(root.get("tradeDate"),
+                            criteriaDTO.getStartDate()));
+        } else if (criteriaDTO.getEndDate() != null) {
+            spec = spec.and(
+                    (root, query, criteriaBuilder) -> criteriaBuilder.lessThanOrEqualTo(root.get("tradeDate"),
+                            criteriaDTO.getEndDate()));
+        }
+        List<Trade> trades = tradeRepository.findAll(spec);
+        List<TradeDTO> result = new ArrayList<TradeDTO>();
+        for (Trade trade : trades) {
+            result.add((tradeMapper.toDto(trade)));
+        }
+
+        return result;
+
+    }
+
+    /*
+     * Improved version of the searchTRades. Shorter and more efficient but I needed
+     * to practise the specification and toPredicate firstly
+     * public List<TradeDTO> searchTrades(SearchCriteriaDTO criteriaDTO) {
+     * // Specification is an object that represents a single search/filter for the
+     * // database query. A blank slate for building up the search query to add
+     * // conditions later
+     * Specification<Trade> spec = Specification.where(null);
+     * // for each field in SearchCriteriaDTO, check if it is not not null adding a
+     * // filter.
+     * if (criteriaDTO.getCounterparty() != null) {
+     * spec = spec.and(// adds a new condition/filter. root is Trade entity in the
+     * query(FROM in SQL).
+     * 
+     * // criteriaBuilder(WHERE clause). Get the counterparty field from this trade.
+     * // Check if
+     * // counterparty name is the same as the one provided in the search criteria
+     * (root, query, criteriaBuilder) ->
+     * criteriaBuilder.equal(root.get("counterparty").get
+     * // Add filter to the search
+     * ("name"), criteriaDTO.getCounterparty()));
+     * }
+     * 
+     * if (criteriaDTO.getBook() != null) {
+     * spec = spec.and((root, query, criteriaBuilder) ->
+     * criteriaBuilder.equal(root.get("book").get("bookName"),
+     * criteriaDTO.getBook()));
+     * }
+     * if (criteriaDTO.getTrader() != null) {
+     * spec = spec.and(
+     * (root, query, criteriaBuilder) ->
+     * criteriaBuilder.equal(root.get("traderUser").get("firstName"),
+     * criteriaDTO.getTrader()));
+     * }
+     * if (criteriaDTO.getStatus() != null) {
+     * spec = spec.and(
+     * (root, query, criteriaBuilder) ->
+     * criteriaBuilder.equal(root.get("tradeStatus").get("tradeStatus"),
+     * criteriaDTO.getStatus()));
+     * }
+     * if (criteriaDTO.getStartDate() != null && criteriaDTO.getEndDate() != null) {
+     * // if user provides both start and end dates, checks the trade date is
+     * between
+     * // the start and end dates (inclusive)
+     * spec = spec.and((root, query, criteriaBuilder) ->
+     * criteriaBuilder.between(root.get("tradeDate"),
+     * criteriaDTO.getStartDate(),
+     * criteriaDTO.getEndDate()));
+     * // In case user provides either start or end date, then trade from that date
+     * // onwards(>=startDate) or up to that date(<=)
+     * } else if (criteriaDTO.getStartDate() != null) {
+     * spec = spec
+     * .and((root, query, criteriaBuilder) ->
+     * criteriaBuilder.greaterThanOrEqualTo(root.get("tradeDate"),
+     * criteriaDTO.getStartDate()));
+     * } else if (criteriaDTO.getEndDate() != null) {
+     * spec = spec.and(
+     * (root, query, criteriaBuilder) ->
+     * criteriaBuilder.lessThanOrEqualTo(root.get("tradeDate"),
+     * criteriaDTO.getEndDate()));
+     * }
+     * // runs a database query using search criteria(spec)and returns a list of
+     * Trades
+     * // entities
+     * List<Trade> trades = tradeRepository.findAll(spec);
+     * // an empty list is created trades to be added
+     * List<TradeDTO> result = new ArrayList<TradeDTO>();
+     * for (Trade trade : trades) {
+     * // convert the trade into TradeDTO and add the DTO to the result list for API
+     * // response
+     * result.add((tradeMapper.toDto(trade)));
+     * }
+     * 
+     * return result;
+     * 
+     * }
+     */
+
 }

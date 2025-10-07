@@ -1,0 +1,33 @@
+### Search trades by all criteria (names)
+GET http://localhost:8080/api/trades/search?counterparty=BigBank&book=FX-BOOK-1&trader=Simon%King&status=LIVE&startDate=2024-06-01&endDate=2024-06-30
+Accept: application/json
+
+### Search trades by counterparty only
+GET http://localhost:8080/api/trades/search?counterparty=BigBank
+Accept: application/json
+
+### Search trades by book only
+GET http://localhost:8080/api/trades/search?book=FX-BOOK-1
+Accept: application/json
+
+### Search trades by trader only
+GET http://localhost:8080/api/trades/search?trader=Simon%King
+Accept: application/json
+
+### Search trades by status only
+GET http://localhost:8080/api/trades/search?status=LIVE
+Accept: application/json
+
+### Search trades by date range only
+GET http://localhost:8080/api/trades/search?startDate=2024-06-01&endDate=2024-06-30
+Accept: application/json
+
+### Get all trades
+GET http://localhost:8080/api/trades
+Accept: application/json
+
+### Get trade by ID
+GET http://localhost:8080/api/trades/100001
+Accept: application/json
+
+
