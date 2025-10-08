@@ -12,3 +12,17 @@ Ensuring the correct Predicate type is used in the Specification:
 Used jakarta.persistence.criteria.Predicate in the toPredicate method, not java.util.function.Predicate.
 Adding the required @NonNull annotation to the parameters of the toPredicate method:
 Imported org.springframework.lang.NonNull and annotate Root<Trade> root, CriteriaQuery<?> query, and CriteriaBuilder criteriaBuilder in the anonymous inner class.
+
+### Problem
+
+[ERROR] /C:/Users/saksa/cbfacademy/trade-capture-system/backend/src/main/java/com/technicalchallenge/service/TradeRsqlVisitor.java:[22,39] cannot find symbol  
+[ERROR] symbol: class AbstractRSQLVisitor
+
+### Solution
+
+I checked pom file and the dependency is there mvn clean install then
+`mvn dependency:tree 
+`
+to confirm the RSQL dependency is present. I can see the rsql dependency is there [INFO] +- cz.jirutka.rsql:rsql-parser:jar:2.1.0:compile
+
+I found out that the class AbstractRSQLVisitor does not exist in the rsql-parser library version you are using (2.1.0). I changed to RSQLVisitor class.

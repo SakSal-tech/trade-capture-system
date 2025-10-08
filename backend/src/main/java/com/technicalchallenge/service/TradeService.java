@@ -29,6 +29,8 @@ import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Root;
+import cz.jirutka.rsql.parser.RSQLParser;
+import cz.jirutka.rsql.parser.ast.Node;
 
 @Service
 @Transactional
@@ -666,7 +668,9 @@ public class TradeService {
             });
         }
 
-        if (criteriaDTO.getStatus() != null && !criteriaDTO.getStatus().isEmpty()) {
+        if (criteriaDTO.getStatus() != null && !criteriaDTO.getStatus().isEmpty())
+
+        {
             // explain
             spec = spec.and(new Specification<Trade>() {
                 @Override
@@ -798,128 +802,38 @@ public class TradeService {
      * 
      */
 
-    public List<TradeDTO> searchTradesRsql(SearchCriteriaDTO criteriaDTO) {
-        Specification<Trade> spec = Specification.where(null);
-        if (criteriaDTO.getCounterparty() != null) {
-            spec = spec.and(
-                    (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("counterparty").get
-                    // Add filter to the search
-                    ("name"), criteriaDTO.getCounterparty()));
-        }
+    // TODO: Parsing the query
+    // TODO:Converting the AST to a Specification (the “visitor”)
+    // write a visitor that turns the AST into a Specification<Trade>: LogicalNode
+    // (AND/OR) and combine child specs with .and() / .or(). ComparisonNode (like
+    // field==value) → build a spec for that single clause
 
-        if (criteriaDTO.getBook() != null) {
-            spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("book").get("bookName"),
-                    criteriaDTO.getBook()));
-        }
-        if (criteriaDTO.getTrader() != null) {
-            spec = spec.and(
-                    (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("traderUser").get("firstName"),
-                            criteriaDTO.getTrader()));
-        }
-        if (criteriaDTO.getStatus() != null) {
-            spec = spec.and(
-                    (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("tradeStatus").get("tradeStatus"),
-                            criteriaDTO.getStatus()));
-        }
-        if (criteriaDTO.getStartDate() != null && criteriaDTO.getEndDate() != null) {
-            spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.between(root.get("tradeDate"),
-                    criteriaDTO.getStartDate(),
-                    criteriaDTO.getEndDate()));
-        } else if (criteriaDTO.getStartDate() != null) {
-            spec = spec
-                    .and((root, query, criteriaBuilder) -> criteriaBuilder.greaterThanOrEqualTo(root.get("tradeDate"),
-                            criteriaDTO.getStartDate()));
-        } else if (criteriaDTO.getEndDate() != null) {
-            spec = spec.and(
-                    (root, query, criteriaBuilder) -> criteriaBuilder.lessThanOrEqualTo(root.get("tradeDate"),
-                            criteriaDTO.getEndDate()));
-        }
-        List<Trade> trades = tradeRepository.findAll(spec);
-        List<TradeDTO> result = new ArrayList<TradeDTO>();
-        for (Trade trade : trades) {
-            result.add((tradeMapper.toDto(trade)));
-        }
+    // TODO:
+    public List<TradeDTO> searchTradesRsql(String query) {
+        // Parse the raw string into an Abstract Syntax Tree (AST)
+        Node root = new RSQLParser().parse(query);// turns text like counterparty.name==ABC into a tree of nodes
 
-        return result;
+        // convert the tree into Spring data JPA Specification<Trade>
+        Specification<Trade> spec = root.accept(new TradeRsqlVisitor());// asks the visitor class to walk that tree and
+        // build. The spec is the result of the qeury,
+        // root is the object
+        // now a Node (could be AndNode, OrNode, or
+        // ComparisonNode depending on the query)
+        // a Specification<Trade>
+
+        // Run the query. List of entity object(It retrieves a list of Trade entities
+        // which are the database objects)
+        List<Trade> entities = tradeRepository.findAll(spec);
+        // Creates an empty list that will hold the converted results (TradeDTO
+        // objects).
+        List<TradeDTO> dtoList = new ArrayList<>();
+
+        for (Trade trade : entities) {
+            TradeDTO dto = tradeMapper.toDto(trade);// Map the DTO to be suitable for the API
+            dtoList.add(dto);
+        }
+        return dtoList;
 
     }
-
-    /*
-     * Improved version of the searchTRades. Shorter and more efficient but I needed
-     * to practise the specification and toPredicate firstly
-     * public List<TradeDTO> searchTrades(SearchCriteriaDTO criteriaDTO) {
-     * // Specification is an object that represents a single search/filter for the
-     * // database query. A blank slate for building up the search query to add
-     * // conditions later
-     * Specification<Trade> spec = Specification.where(null);
-     * // for each field in SearchCriteriaDTO, check if it is not not null adding a
-     * // filter.
-     * if (criteriaDTO.getCounterparty() != null) {
-     * spec = spec.and(// adds a new condition/filter. root is Trade entity in the
-     * query(FROM in SQL).
-     * 
-     * // criteriaBuilder(WHERE clause). Get the counterparty field from this trade.
-     * // Check if
-     * // counterparty name is the same as the one provided in the search criteria
-     * (root, query, criteriaBuilder) ->
-     * criteriaBuilder.equal(root.get("counterparty").get
-     * // Add filter to the search
-     * ("name"), criteriaDTO.getCounterparty()));
-     * }
-     * 
-     * if (criteriaDTO.getBook() != null) {
-     * spec = spec.and((root, query, criteriaBuilder) ->
-     * criteriaBuilder.equal(root.get("book").get("bookName"),
-     * criteriaDTO.getBook()));
-     * }
-     * if (criteriaDTO.getTrader() != null) {
-     * spec = spec.and(
-     * (root, query, criteriaBuilder) ->
-     * criteriaBuilder.equal(root.get("traderUser").get("firstName"),
-     * criteriaDTO.getTrader()));
-     * }
-     * if (criteriaDTO.getStatus() != null) {
-     * spec = spec.and(
-     * (root, query, criteriaBuilder) ->
-     * criteriaBuilder.equal(root.get("tradeStatus").get("tradeStatus"),
-     * criteriaDTO.getStatus()));
-     * }
-     * if (criteriaDTO.getStartDate() != null && criteriaDTO.getEndDate() != null) {
-     * // if user provides both start and end dates, checks the trade date is
-     * between
-     * // the start and end dates (inclusive)
-     * spec = spec.and((root, query, criteriaBuilder) ->
-     * criteriaBuilder.between(root.get("tradeDate"),
-     * criteriaDTO.getStartDate(),
-     * criteriaDTO.getEndDate()));
-     * // In case user provides either start or end date, then trade from that date
-     * // onwards(>=startDate) or up to that date(<=)
-     * } else if (criteriaDTO.getStartDate() != null) {
-     * spec = spec
-     * .and((root, query, criteriaBuilder) ->
-     * criteriaBuilder.greaterThanOrEqualTo(root.get("tradeDate"),
-     * criteriaDTO.getStartDate()));
-     * } else if (criteriaDTO.getEndDate() != null) {
-     * spec = spec.and(
-     * (root, query, criteriaBuilder) ->
-     * criteriaBuilder.lessThanOrEqualTo(root.get("tradeDate"),
-     * criteriaDTO.getEndDate()));
-     * }
-     * // runs a database query using search criteria(spec)and returns a list of
-     * Trades
-     * // entities
-     * List<Trade> trades = tradeRepository.findAll(spec);
-     * // an empty list is created trades to be added
-     * List<TradeDTO> result = new ArrayList<TradeDTO>();
-     * for (Trade trade : trades) {
-     * // convert the trade into TradeDTO and add the DTO to the result list for API
-     * // response
-     * result.add((tradeMapper.toDto(trade)));
-     * }
-     * 
-     * return result;
-     * 
-     * }
-     */
 
 }
