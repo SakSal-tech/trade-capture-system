@@ -22,6 +22,9 @@ Accept: application/json
 GET http://localhost:8080/api/trades/search?startDate=2024-06-01&endDate=2024-06-30
 Accept: application/json
 
+### RSQL query Search by 
+http://localhost:8080/api/trades/rsql?query=counterparty.name==ABC;tradeStatus.tradeStatus==NEW
+
 ### Get all trades
 GET http://localhost:8080/api/trades
 Accept: application/json

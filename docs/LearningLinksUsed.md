@@ -40,6 +40,27 @@ https://www.baeldung.com/rest-api-search-language-rsql-fiql
 
 https://www.here.com/docs/bundle/data-client-library-developer-guide-java-scala/page/client/rsql.html
 
+### What is Visitor Pattern design
+
+https://www.baeldung.com/java-visitor-pattern
+
+https://en.wikipedia.org/wiki/Visitor_pattern?ref=aboullaite.me
+
+### Visitor class for RSQL Parsing
+
+https://github.com/tennaito/rsql-jpa
+
+### How to create a visitor class
+
+https://www.youtube.com/watch?v=UQP5XqMqtqQ
+https://www.youtube.com/watch?v=SK50E5CAzr0
+
+https://www.youtube.com/watch?v=oqx62PVSM1U
+
+### RSQL Injection
+
+https://jayaramyalla.medium.com/unlocking-the-power-and-risks-of-rsql-a-deep-dive-into-its-real-world-use-and-security-e219b552928e
+
 ## Videos
 
 ### JPA Specifications

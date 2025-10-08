@@ -173,13 +173,12 @@ public class TradeController {
         return ResponseEntity.ok(results);
     }
 
-    // @GetMapping("/rsql")
-    // public ResponseEntity<List<TradeDTO>> searchTradesRsql(@RequestParam String
-    // query) {
+    @GetMapping("/rsql")
+    public ResponseEntity<List<TradeDTO>> searchTradesRsql(@RequestParam String query) {
 
-    // List<TradeDTO> trades = tradeService.searchTradesRsql(query);
+        List<TradeDTO> trades = tradeService.searchTradesRsql(query);
 
-    // return ResponseEntity.ok(trades);
-    // }
+        return ResponseEntity.ok(trades);
+    }
 
 }
