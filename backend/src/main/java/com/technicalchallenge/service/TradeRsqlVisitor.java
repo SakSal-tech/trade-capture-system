@@ -188,6 +188,19 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
                                 pattern);
                     }
                 }
+                // Handle case-insensitive LIKE operator (=like=)
+                if (operator.equals("=like=")) {
+                    // Convert RSQL-style *wildcards* into SQL-style %wildcards%
+                    String pattern = values.get(0)
+                            .replace('*', '%')
+                            .toLowerCase(); // Make the search case-insensitive
+
+                    // Apply LOWER() to both sides (field + search text)
+                    return criteriaBuilder.like(
+                            criteriaBuilder.lower(path.as(String.class)),
+                            pattern);
+                }
+
                 // check for "not in" operator (=out=)
                 // for example: tradeStatus.tradeStatus=out=(CANCELLED,REJECTED)
                 if (operator.equals("=out="))

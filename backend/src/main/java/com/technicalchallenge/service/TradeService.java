@@ -21,8 +21,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import jakarta.persistence.criteria.Predicate;
 
@@ -31,7 +33,6 @@ import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Root;
 import cz.jirutka.rsql.parser.RSQLParser;
 import cz.jirutka.rsql.parser.ast.Node;
-import cz.jirutka.rsql.parser.RSQLParser;
 import cz.jirutka.rsql.parser.ast.ComparisonOperator;
 import cz.jirutka.rsql.parser.ast.RSQLOperators;
 
@@ -814,10 +815,29 @@ public class TradeService {
     // TODO:
     public List<TradeDTO> searchTradesRsql(String query) {
         // Parse the raw string into an Abstract Syntax Tree (AST)
-        Node root = new RSQLParser().parse(query);// turns text like counterparty.name==ABC into a tree of nodes
+        // Node root = new RSQLParser().parse(query);// turns text like
+        // counterparty.name==ABC into a tree of nodes
 
-        // convert the tree into Spring data JPA Specification<Trade>
-        Specification<Trade> spec = root.accept(new TradeRsqlVisitor());// asks the visitor class to walk that tree and
+        // FIX: Register custom RSQL operator for wildcard/like queries
+        // Start with the default RSQL operators (==,!=,=gt=, etc.). Using set for
+        // avoiding operator duplication and hashset for fast lookup O(1).
+        Set<ComparisonOperator> operators = new HashSet<>(RSQLOperators.defaultOperators());
+        // Step 2: Create a new ComparisonOperator for '=like=' (wildcard search)
+        ComparisonOperator LIKE = new ComparisonOperator("=like=");
+        // Add the custom LIKE operator to the set
+        operators.add(LIKE);
+
+        // Create an RSQLParser that understands the new '=like=' operator
+        RSQLParser parser = new RSQLParser(operators);
+        // This block fixes the error: 'Unknown operator: =like=' and enables wildcard
+        // search in RSQL queries.
+
+        // Parse query into AST (Abstract Syntax Tree)
+        Node root = parser.parse(query);
+
+        // Convert the parsed query tree to a Specification
+        Specification<Trade> spec = root.accept(new TradeRsqlVisitor());
+        // asks the visitor class to walk that tree and
         // build. The spec is the result of the qeury,
         // root is the object
         // now a Node (could be AndNode, OrNode, or
