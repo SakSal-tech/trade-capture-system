@@ -21,7 +21,7 @@ I checked pom file and the dependency is there mvn clean install then
 `
 to confirm the RSQL dependency is present. I can see the rsql dependency is there [INFO] +- cz.jirutka.rsql:rsql-parser:jar:2.1.0:compile
 
-I found out that the class AbstractRSQLVisitor does not exist in the rsql-parser library version you are using (2.1.0). I changed to RSQLVisitor class.
+I found out that the class AbstractRSQLVisitor does not exist in the rsql-parser library version using (2.1.0). I changed to RSQLVisitor class.
 2025-10-09T15:00:00 | TradeRsqlVisitor.java | The type Path is not generic; it cannot be parameterized with arguments <?>
 
 ### Problem
@@ -109,3 +109,53 @@ RSQL search was returning empty results even though matching data existed in the
 ### Outcome
 
 After these final changes, the RSQL endpoint now returns the correct output and matches records as expected. The Specification logic and entity mappings are working, and the search functionality is robust and reliable.
+
+### Problem
+
+`[ERROR] Compilation failure:
+[ERROR] /C:/Users/saksa/cbfacademy/trade-capture-system/backend/src/main/java/com/technicalchallenge/service/TradeService.java:[36,34] cannot find symbol
+  symbol:   class Operator
+  location: package cz.jirutka.rsql.parser.ast
+`
+
+RSQL parser did not recognize the wildcard/like operator (`=like=`) in queries such as `counterparty.name=like=*bank*`. This caused errors like `Unknown operator: =like=` and prevented wildcard search functionality.
+
+### Solution
+
+- Registered a custom RSQL operator for wildcard/like queries by creating a new `ComparisonOperator` with the value `=like=`.
+- Added the custom operator to the set of default RSQL operators using a `HashSet`:
+
+```java
+Set<ComparisonOperator> operators = new HashSet<>(RSQLOperators.defaultOperators());
+ComparisonOperator LIKE = new ComparisonOperator("=like=");
+operators.add(LIKE);
+RSQLParser parser = new RSQLParser(operators);
+```
+
+- Used a `Set` (specifically a `HashSet`) to ensure each operator is unique and to provide fast lookup and insertion. This is important for operator registration, so user does not accidentally register the same operator multiple times and the parser can efficiently check available operators.
+- Created a new `RSQLParser` instance with the updated set of operators so it recognizes the new `=like=` operator.
+- Updated the RSQL visitor logic to handle the `=like=` operator and perform SQL `LIKE` queries using wildcards.
+- Added validation and handling for the `=like=` operator in the RSQL visitor class, ensuring case-insensitive wildcard matching. Example:
+
+```java
+// Handle case-insensitive LIKE operator (=like=)
+if (operator.equals("=like=")) {
+    // Convert RSQL-style *wildcards* into SQL-style %wildcards%
+    String pattern = values.get(0)
+        .replace('*', '%')
+        .toLowerCase(); // Make the search case-insensitive
+
+    // Apply LOWER() to both sides (field + search text)
+    return criteriaBuilder.like(
+        criteriaBuilder.lower(path.as(String.class)),
+        pattern);
+}
+```
+
+- Verified the fix by running queries such as `counterparty.name=like=*bank*` and confirming correct results are returned.
+
+### Outcome
+
+Wildcard search using the `=like=` operator now works as expected in RSQL queries. The parser recognizes the operator, and the service returns correct results for queries with wildcards.
+
+2025-10-09T20:30:00 | TradeService.java, TradeRsqlVisitor.java | RSQL wildcard/like operator fix
