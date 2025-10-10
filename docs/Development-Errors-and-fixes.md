@@ -159,3 +159,47 @@ if (operator.equals("=like=")) {
 Wildcard search using the `=like=` operator now works as expected in RSQL queries. The parser recognizes the operator, and the service returns correct results for queries with wildcards.
 
 2025-10-09T20:30:00 | TradeService.java, TradeRsqlVisitor.java | RSQL wildcard/like operator fix
+
+### Problem
+
+I wanted to verify that my unit test for TradeRsqlVisitor actually detects failures and does not produce false positives. This is a common practice to ensure that the test is meaningful and will catch real bugs if they occur.
+
+### Investigation
+
+- I temporarily changed the assertion in my test from `assertNotNull(spec, ...)` to `assertNull(spec, ...)` to force a failure.
+- Alternatively, I could have changed the visitor code to return `null` for the tested method.
+- When I ran the test, it failed as expected, confirming that the test is working and will catch problems if the visitor does not return a valid Specification.
+
+### Solution
+
+- After confirming the test can fail, I restored the correct assertion (`assertNotNull(spec, ...)`) and code.
+- This process proved that my test is not a false positive and will correctly report errors if the code breaks in the future.
+
+### Outcome
+
+Deliberately testing for failure is a useful technique to validate new tests. It is not meant to be left in the codebase, but helps ensure that the test suite is reliable and meaningful. My TradeRsqlVisitor test now provides confidence that the visitor logic is being checked properly.
+
+### Problem
+
+`org.junit.jupiter.api.AssertionFailedError: Expected exception to be thrown, but nothing was thrown.
+    at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:55)
+    at com.technicalchallenge.service.TradeRsqlVisitorTest.testInvalidOperatorThrowsException(TradeRsqlVisitorTest.java:123)`
+
+Unit tests for TradeRsqlVisitor did not throw an exception for unsupported RSQL operators (e.g., =invalid=), causing tests to pass when they should fail. This could allow invalid queries to be silently ignored, reducing robustness and making bugs harder to detect.
+
+### Root Cause
+
+The visitor logic only threw exceptions for unsupported operators in the toPredicate method, not in the visit(ComparisonNode) method. As a result, invalid operators could be processed without error until later, or even return null, which is unsafe.
+
+### Solution
+
+Added a check for supported operators at the start of visit(ComparisonNode) in TradeRsqlVisitor.
+Now throws IllegalArgumentException immediately for unsupported operators, ensuring invalid queries are rejected early.
+Replaced any return null in toPredicate with an exception for safety and clarity.
+Updated unit tests to expect exceptions for invalid operators and verify correct error handling.
+
+### Outcome
+
+Tests now fail as expected for unsupported operators, and the codebase is more robust against invalid RSQL queries. Exception handling is consistent and safe, and documentation is updated for future reference.
+
+2025-10-09T21:00:00 | TradeRsqlVisitor.java, TradeRsqlVisitorTest.java | Invalid operator exception handling fix

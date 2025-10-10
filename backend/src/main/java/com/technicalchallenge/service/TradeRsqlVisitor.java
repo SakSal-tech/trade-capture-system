@@ -1,6 +1,7 @@
 package com.technicalchallenge.service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import jakarta.persistence.criteria.Predicate;
 
@@ -92,6 +93,17 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
         String field = node.getSelector();
         // operator symbol e.g == or =ge=
         String operator = node.getOperator().getSymbol();
+        // FIX: to fix the failing test. List all supported operators
+        List<String> supportedOperators = Arrays.asList("==", "!=", "=gt=", "=lt=", "=ge=", "=le=", "=in=", "=like=",
+                "=out=");
+        // Throw and exception if the operator is not recognised, e.g
+        // /api/trades/rsql?query=counterparty.name=xyz=ABC.The operator "=xyz=" is not
+        // valid or supported.
+
+        if (!supportedOperators.contains(operator)) {
+            throw new IllegalArgumentException("Unsupported operator: " + operator);
+        }
+
         // values is the right-hand of the expression(list of literal text values) e.g
         // status=in=(LIVE,NEW). values = ["LIVE", "NEW"]
         List<String> values = node.getArguments();// e.g ["ABC"]
@@ -207,12 +219,13 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
                     if (operator.equals("=out=")) {
                         return criteriaBuilder.not(path.in(values));
                     }
-                // If the operator is not recognised, return null. e.g
-                // /api/trades/rsql?query=counterparty.name=xyz=ABC.The operator "=xyz=" is not
-                // valid or supported.
 
-                return null;
+                // invalid operator exception is handled at the start. This should never be
+                // reached for supported operators.
+                // If it is, it means a bug in the logic above.
+                // Throw an exception to catch unexpected cases early.
 
+                throw new IllegalStateException("No predicate could be built for operator: " + operator);
             }
 
             /*
