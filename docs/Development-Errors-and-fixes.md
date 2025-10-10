@@ -202,4 +202,98 @@ Updated unit tests to expect exceptions for invalid operators and verify correct
 
 Tests now fail as expected for unsupported operators, and the codebase is more robust against invalid RSQL queries. Exception handling is consistent and safe, and documentation is updated for future reference.
 
+### Test failed
+
 2025-10-09T21:00:00 | TradeRsqlVisitor.java, TradeRsqlVisitorTest.java | Invalid operator exception handling fix
+2025-10-10T22:20:00 | TradeRsqlVisitorTest.java | Type mismatch and Mockito generics errors in testVisitComparisonNode_unexpectedValueType
+
+### Problem 1: Type Mismatch Conversion Error
+
+The test method for RSQL visitor failed when a query value did not match the expected Java type of the model field. For example, passing a string value 'NotANumber' for a numeric field (e.g., tradeId of type Long) caused a conversion error:
+
+```java
+Object typedValue = convertValue(fieldType, values.get(0));
+```
+
+This resulted in:
+
+```
+IllegalArgumentException: Invalid value 'NotANumber' for type Long
+```
+
+### Solution
+
+Added robust type conversion and error handling in the utility method:
+
+```java
+public static Object convertValue(Class<?> type, String value) {
+    try {
+        if (type == String.class) return value;
+        if (type == Integer.class || type == int.class) return Integer.parseInt(value);
+        if (type == Long.class || type == long.class) return Long.parseLong(value);
+        // ...other types
+        throw new IllegalArgumentException("Unsupported type: " + type.getSimpleName());
+    } catch (Exception e) {
+        throw new IllegalArgumentException("Invalid value '" + value + "' for type " + type.getSimpleName());
+    }
+}
+```
+
+This ensures that invalid values for a field type throw a clear exception, and the test now passes by expecting this error.
+
+### Problem 2: Mockito Type Safety and Generics Error
+
+Mockito stubbing in the test method failed due to type safety and generics mismatch when mocking JPA Criteria API Path and its return types:
+
+```java
+Mockito.when(root.get("tradeId")).thenReturn(path); // Type mismatch error
+Mockito.when(path.getJavaType()).thenReturn(Long.class); // Generics error
+```
+
+Resulted in:
+
+```
+The method thenReturn(Path<Object>) is not applicable for the arguments (Path<Long>)
+Type safety: Unchecked cast from Path to Path<Long>
+```
+
+### Solution
+
+Resolved by using raw type casting and method-level suppression for unchecked warnings:
+
+```java
+@SuppressWarnings({"unchecked", "rawtypes"})
+void testVisitComparisonNode_unexpectedValueType() {
+    Path rawPath = (Path) path;
+    Class rawClass = (Class) Long.class;
+    Mockito.when(root.get(Mockito.eq("tradeId"))).thenReturn(rawPath);
+    Mockito.when(path.getJavaType()).thenReturn(rawClass);
+    // ...rest of test
+}
+```
+
+This allows the test to compile and run, while still verifying the correct exception is thrown for type mismatches.
+
+### Progress
+
+- Identified and documented type conversion and mocking errors.
+- Improved error handling in conversion utility.
+- Refactored test code for type safety and generics compatibility.
+- All tests now pass, confirming robust handling of edge cases in RSQL visitor logic.
+
+// Utility Method Explanation
+The `convertValue` utility method is designed to convert a string value from an RSQL query into the correct Java type expected by the model field. This ensures type safety when building JPA predicates. The method checks the field's type (e.g., `Long`, `Integer`, `String`) and parses the value accordingly. If the value cannot be converted, it throws an `IllegalArgumentException`.
+
+Usage in the RSQL visitor:
+
+- In the Specification's `toPredicate` method, after determining the field type using JPA Criteria API (`path.getJavaType()`), the code calls `convertValue(fieldType, values.get(0))` to convert the query value to the correct type before building the predicate.
+- This guarantees that comparisons (e.g., `tradeId == 123`) are performed with the correct types, preventing runtime errors and ensuring robust query handling.
+
+Example usage:
+
+```java
+Class<?> fieldType = path.getJavaType();
+Object typedValue = convertValue(fieldType, values.get(0));
+```
+
+This pattern is used for all supported operators, so every query value is validated and converted before being used in a database comparison.

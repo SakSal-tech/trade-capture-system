@@ -104,6 +104,10 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
             throw new IllegalArgumentException("Unsupported operator: " + operator);
         }
 
+        if (!supportedOperators.contains(operator)) {
+            throw new IllegalArgumentException("Unsupported operator: " + operator);
+        }
+
         // values is the right-hand of the expression(list of literal text values) e.g
         // status=in=(LIVE,NEW). values = ["LIVE", "NEW"]
         List<String> values = node.getArguments();// e.g ["ABC"]
@@ -111,9 +115,40 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
         // for debugging to see what parsed
         System.out
                 .println("[RSQL] ComparisonNode -> field=" + field + ", operation=" + operator + ", values=" + values);
-        // build predicate(condition) by returning anonymous inner class( an object that
-        // has a method inside and
-        // implements the Specification<Trade> interface)
+        // Strict reflection-based field existence check for nested fields (run
+        // immediately)
+        String[] fieldParts = field.split("\\.");
+        Class<?> currentClass = Trade.class;
+        for (int i = 0; i < fieldParts.length; i++) {
+            String part = fieldParts[i];
+            java.lang.reflect.Field f = null;
+            Class<?> searchClass = currentClass;
+            while (searchClass != null) {
+                try {
+                    f = searchClass.getDeclaredField(part);
+                    break;
+                } catch (NoSuchFieldException ex) {
+                    searchClass = searchClass.getSuperclass();
+                }
+            }
+            if (f == null) {
+                throw new IllegalArgumentException("Invalid field in query: " + field);
+            }
+            // For nested fields, ensure the type is not a JPA proxy or collection
+            if (i < fieldParts.length - 1) {
+                Class<?> type = f.getType();
+                if (type.isPrimitive() || type == String.class || Number.class.isAssignableFrom(type)
+                        || type.isEnum()) {
+                    throw new IllegalArgumentException(
+                            "Cannot traverse into non-entity field: " + part + " in query: " + field);
+                }
+                currentClass = type;
+            } else {
+                currentClass = f.getType();
+            }
+        }
+
+        // build predicate(condition) by returning anonymous inner class
         return new Specification<Trade>() {
             @Override
             public Predicate toPredicate(
@@ -121,109 +156,126 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
                     @org.springframework.lang.NonNull CriteriaQuery<?> query,
                     @org.springframework.lang.NonNull CriteriaBuilder criteriaBuilder) {
 
-                // building predicate.
-                String[] fieldParts = field.split("\\.");// separatethe query string by "." e.g. counterparty.name==ABC,
-                                                         // field = "counterparty.name"; then fieldParts =
-                                                         // ["counterparty", "name"];. The entity Trade has a nested
-                                                         // object counterparty, which is the property name
-
-                Path<?> path = root;//// path is like a pointer object that will move deeper into nested fields e.g
-                                    //// in
-                                    // Counterparty table, path is counterparty.name.
-
+                // Now traverse the path as before
+                Path<?> path = root;
                 for (String part : fieldParts) {
                     path = path.get(part);
                 }
+                Class<?> fieldType;
+                try {
+                    fieldType = path.getJavaType();
+                } catch (NullPointerException e) {
+                    throw new IllegalArgumentException("Invalid field in query: " + field, e);
+                }
+                Object typedValue;
+                try {
+                    typedValue = convertValue(fieldType, values.get(0));
+                } catch (Exception e) {
+                    throw new IllegalArgumentException(
+                            "Invalid value '" + values.get(0) + "' for type " + fieldType.getSimpleName(), e);
+                }
+
+                // Fixed: Use typedValue for type safety and cast to String for string
+                // operations
                 if (operator.equals("==")) {
-                    if (path.getJavaType() == String.class) {
+                    if (fieldType == String.class) {
                         return criteriaBuilder.equal(
                                 criteriaBuilder.lower(path.as(String.class)),
-                                values.get(0).toLowerCase());
+                                ((String) typedValue).toLowerCase()); // Cast to String for lower-case comparison
                     } else {
-                        return criteriaBuilder.equal(path, values.get(0));
+                        return criteriaBuilder.equal(path, typedValue); // Use typedValue for correct type
                     }
                 }
-                // check for "not equal" (!=) operator
+                // Fixed: Use typedValue and cast to String for not equal string comparison
                 if (operator.equals("!=")) {
-                    if (path.getJavaType() == String.class) {
+                    if (fieldType == String.class) {
                         return criteriaBuilder.notEqual(
                                 criteriaBuilder.lower(path.as(String.class)),
-                                values.get(0).toLowerCase());
+                                ((String) typedValue).toLowerCase()); // Cast to String for lower-case comparison
                     } else {
-                        return criteriaBuilder.notEqual(path, values.get(0));
+                        return criteriaBuilder.notEqual(path, typedValue); // Use typedValue for correct type
                     }
                 }
 
-                // check for "greater than" (>) in RSQL syntax, this is written as =gt=
+                // Fixed: Use correct type for greaterThan
                 if (operator.equals("=gt=")) {
-                    // convert path to a String expression (path.as(String.class))
-                    // because CriteriaBuilder's greaterThan() expects a Comparable type like
-                    // String, Number, Date, etc.
-                    return criteriaBuilder.greaterThan(path.as(String.class), values.get(0));
+                    if (fieldType == Integer.class || fieldType == int.class) {
+                        return criteriaBuilder.greaterThan(path.as(Integer.class), (Integer) typedValue);
+                    } else if (fieldType == Long.class || fieldType == long.class) {
+                        return criteriaBuilder.greaterThan(path.as(Long.class), (Long) typedValue);
+                    } else if (fieldType == Double.class || fieldType == double.class) {
+                        return criteriaBuilder.greaterThan(path.as(Double.class), (Double) typedValue);
+                    } else {
+                        return criteriaBuilder.greaterThan(path.as(String.class), ((String) typedValue));
+                    }
                 }
 
-                // check for "less than" (<) in RSQL syntax, this is written as =lt=
+                // Fixed: Use correct type for lessThan
                 if (operator.equals("=lt=")) {
-                    return criteriaBuilder.lessThan(path.as(String.class), values.get(0));
+                    if (fieldType == Integer.class || fieldType == int.class) {
+                        return criteriaBuilder.lessThan(path.as(Integer.class), (Integer) typedValue);
+                    } else if (fieldType == Long.class || fieldType == long.class) {
+                        return criteriaBuilder.lessThan(path.as(Long.class), (Long) typedValue);
+                    } else if (fieldType == Double.class || fieldType == double.class) {
+                        return criteriaBuilder.lessThan(path.as(Double.class), (Double) typedValue);
+                    } else {
+                        return criteriaBuilder.lessThan(path.as(String.class), ((String) typedValue));
+                    }
                 }
 
-                // check for "greater than or equal to" (>=)
-                // in RSQL syntax, this is written as =ge=
+                // Fixed: Use correct type for greaterThanOrEqualTo
                 if (operator.equals("=ge=")) {
-                    return criteriaBuilder.greaterThanOrEqualTo(path.as(String.class), values.get(0));
+                    if (fieldType == Integer.class || fieldType == int.class) {
+                        return criteriaBuilder.greaterThanOrEqualTo(path.as(Integer.class), (Integer) typedValue);
+                    } else if (fieldType == Long.class || fieldType == long.class) {
+                        return criteriaBuilder.greaterThanOrEqualTo(path.as(Long.class), (Long) typedValue);
+                    } else if (fieldType == Double.class || fieldType == double.class) {
+                        return criteriaBuilder.greaterThanOrEqualTo(path.as(Double.class), (Double) typedValue);
+                    } else {
+                        return criteriaBuilder.greaterThanOrEqualTo(path.as(String.class), ((String) typedValue));
+                    }
                 }
 
-                // check for "less than or equal to" (<=)
-                // in RSQL syntax, this is written as =le=
+                // Fixed: Use correct type for lessThanOrEqualTo
                 if (operator.equals("=le=")) {
-                    return criteriaBuilder.lessThanOrEqualTo(path.as(String.class), values.get(0));
+                    if (fieldType == Integer.class || fieldType == int.class) {
+                        return criteriaBuilder.lessThanOrEqualTo(path.as(Integer.class), (Integer) typedValue);
+                    } else if (fieldType == Long.class || fieldType == long.class) {
+                        return criteriaBuilder.lessThanOrEqualTo(path.as(Long.class), (Long) typedValue);
+                    } else if (fieldType == Double.class || fieldType == double.class) {
+                        return criteriaBuilder.lessThanOrEqualTo(path.as(Double.class), (Double) typedValue);
+                    } else {
+                        return criteriaBuilder.lessThanOrEqualTo(path.as(String.class), ((String) typedValue));
+                    }
                 }
 
-                // check for "in" operator (=in=)
-                // for example: tradeStatus.tradeStatus=in=(LIVE,NEW)
+                // Fixed: Convert all values to correct type for 'in' operator
                 if (operator.equals("=in=")) {
-                    // path.in(values) builds a predicate like:
-                    // WHERE tradeStatus IN ('LIVE', 'NEW')
-                    return path.in(values);
+                    List<Object> typedValues = new ArrayList<>();
+                    for (String v : values) {
+                        typedValues.add(convertValue(fieldType, v));
+                    }
+                    return path.in(typedValues); // Use typedValues for type safety
                 }
 
-                // check for "like" operator (=like=)
-                // Purpose: wildcard string matching, e.g. *bank* matches any string containing
-                // 'bank'
-                // Usage: /api/trades/rsql?query=counterparty.name=like=*bank*
+                // Fixed: Cast typedValue to String for wildcard pattern
                 if (operator.equals("=like=")) {
-                    if (path.getJavaType() == String.class) {
-                        // Convert RSQL '*' wildcards to SQL '%' wildcards and make case-insensitive
-                        String pattern = values.get(0).replace("*", "%").toLowerCase();
+                    if (fieldType == String.class) {
+                        String pattern = ((String) typedValue).replace("*", "%").toLowerCase();
                         return criteriaBuilder.like(
                                 criteriaBuilder.lower(path.as(String.class)),
                                 pattern);
                     }
                 }
-                // Handle case-insensitive LIKE operator (=like=)
-                if (operator.equals("=like=")) {
-                    // Convert RSQL-style *wildcards* into SQL-style %wildcards%
-                    String pattern = values.get(0)
-                            .replace('*', '%')
-                            .toLowerCase(); // Make the search case-insensitive
 
-                    // Apply LOWER() to both sides (field + search text)
-                    return criteriaBuilder.like(
-                            criteriaBuilder.lower(path.as(String.class)),
-                            pattern);
-                }
-
-                // check for "not in" operator (=out=)
-                // for example: tradeStatus.tradeStatus=out=(CANCELLED,REJECTED)
-                if (operator.equals("=out="))
-                    if (operator.equals("=out=")) {
-                        return criteriaBuilder.not(path.in(values));
+                // Fixed: Converteded all values to correct type for 'out' operator
+                if (operator.equals("=out=")) {
+                    List<Object> typedValues = new ArrayList<>();
+                    for (String v : values) {
+                        typedValues.add(convertValue(fieldType, v));
                     }
-
-                // invalid operator exception is handled at the start. This should never be
-                // reached for supported operators.
-                // If it is, it means a bug in the logic above.
-                // Throw an exception to catch unexpected cases early.
+                    return criteriaBuilder.not(path.in(typedValues)); // Use typedValues for type safety
+                }
 
                 throw new IllegalStateException("No predicate could be built for operator: " + operator);
             }
@@ -235,6 +287,40 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
              */
         };
 
+    }
+
+    /*
+     * Fix for failing test Type Illegalargument exceptions
+     * Uses reflection and JPA Criteria API, to determine the actual Java type of
+     * the field in the entity/model (e.g., Long for tradeId).
+     * 
+     * Uses a utility method to convert the string to the expected type (e.g.,
+     * parses "123" to Long).
+     * Catchs conversion errors and throw an exception.
+     */
+    public static Object convertValue(Class<?> type, String value) {
+        // database expects the correct type for comparisons (e.g., tradeAmount > 1000
+        // needs 1000 as a number, not a string.
+        // If conversion succeeds, build the predicate. If conversion
+        // fails (e.g., "NotANumber" for a numeric field), catch the error and throw
+        // IllegalArgumentException.
+
+        try {
+            if (type == String.class)
+                return value;
+            if (type == Integer.class || type == int.class)
+                return Integer.parseInt(value);
+            if (type == Long.class || type == long.class)
+                return Long.parseLong(value);
+            if (type == Double.class || type == double.class)
+                return Double.parseDouble(value);
+            if (type == Boolean.class || type == boolean.class)
+                return Boolean.parseBoolean(value);
+            // Add more types as needed
+            throw new IllegalArgumentException("Unsupported type: " + type.getSimpleName());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid value '" + value + "' for type " + type.getSimpleName());
+        }
     }
 
 }

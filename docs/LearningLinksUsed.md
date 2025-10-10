@@ -80,3 +80,10 @@ https://www.youtube.com/watch?v=oq-c3D67WqM
 Filtering API Responses for users
 
 https://www.youtube.com/watch?v=d-Bljxm--EQ
+
+## Java Reflection
+
+- https://docs.oracle.com/javase/tutorial/reflect/index.html
+- https://www.baeldung.com/java-reflection
+- https://www.geeksforgeeks.org/reflection-in-java/
+- https://www.tutorialspoint.com/java/java_reflection.htm
