@@ -6,16 +6,25 @@ import org.springframework.data.jpa.domain.Specification;
 import com.technicalchallenge.model.Trade;
 
 import static org.junit.jupiter.api.Assertions.*; // For assertions like assertNotNull
+import static org.mockito.Answers.*;
+import org.mockito.Mockito;
+
 import cz.jirutka.rsql.parser.ast.AndNode;
 import cz.jirutka.rsql.parser.ast.ComparisonNode;
 import cz.jirutka.rsql.parser.ast.ComparisonOperator;
 import cz.jirutka.rsql.parser.ast.OrNode;
+
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Root;
+
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import java.util.Arrays;
+import java.util.List;
 
-import java.util.Arrays; // For creating lists easily
 /*This class tests the logic of TradeRSQLVIsitor class method Visit(And), visit(Or) one method each and visit(comparison) will be broken down into methods as it handles many operators */
-
 public class TradeRsqlVisitorTest {
 
     @Test
@@ -49,7 +58,7 @@ public class TradeRsqlVisitorTest {
         Specification<Trade> spec = visitor.visit(andNode, null);
 
         // THEN
-        // check spec is not null to make sure your visitor actually returns something
+        // check spec is not null to make sure the visitor actually returns something
         // and that visitor successfully built a Specification object from the RSQL AST
         assertNotNull(spec, "Specification should not be null");
 
@@ -148,4 +157,108 @@ public class TradeRsqlVisitorTest {
 
     }
 
+    /*
+     * Parameterized test to verify that TradeRsqlVisitor correctly handles multiple
+     * values for 'in' and 'out' operators. This simulates queries like:
+     * tradeType=in=(SPOT,OPTION,SWAP)
+     * tradeStatus.tradeStatus=out=(CANCELLED,REJECTED,LIVE)
+     * The test splits the value string from the CSV source into a list, constructs
+     * a ComparisonNode, and asserts that the visitor returns a non-null
+     * Specification for these multi-value scenarios.
+     */
+    @ParameterizedTest
+    @CsvSource({
+
+            "tradeType, =in=, SPOT; option;swap",
+            "tradeStatus.tradeStatus,=out=,CANCELLED;REJECTED;LIVE"
+
+    })
+
+    void testVisitComparisonNode_multipleValuesInOut(String field, String operator, String value) {
+        // Split the semicolon-separated string into a list of values for the operator
+
+        List<String> values = Arrays.asList(value.split(";"));// separate the items in
+        // IN OUT
+
+        ComparisonNode node = new ComparisonNode(new ComparisonOperator(operator), field, Arrays.asList(value));
+        TradeRsqlVisitor visitor = new TradeRsqlVisitor();
+        Specification<Trade> spec = visitor.visit(node, null);
+        assertNotNull(spec, "Speccification should not be null for operator " + operator + " and values " + values);
+
+    }
+
+    /**
+     * Parameterized test to verify TradeRsqlVisitor handles wildcard patterns for
+     * the 'like' operator.
+     * Tests patterns at the start, end, and middle of the string.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "counterparty.name,=like=,Bank*",
+            "counterparty.name,=like=,*Bank",
+            "counterparty.name,=like=,*Ban*"
+    })
+    void testVisitComparisonNode_wildcardLikePatterns(String field, String operator, String value) {
+        List<String> values = Arrays.asList(value); // Single value in a list
+        ComparisonNode node = new ComparisonNode(new ComparisonOperator(operator), field, values);
+        TradeRsqlVisitor visitor = new TradeRsqlVisitor();
+        Specification<Trade> spec = visitor.visit(node, null);
+        assertNotNull(spec, "Specification should not be null for wildcard pattern: " + value);
+    }
+
+    /**
+     * Test that TradeRsqlVisitor handles nonexistent fields .
+     * Expects an IllegalArgumentException or similar when an invalid field is used.
+     */
+    @Test
+    void testVisitComparisonNode_nonexistentField() {
+        List<String> values = Arrays.asList("SomeValue");
+        ComparisonNode node = new ComparisonNode(new ComparisonOperator("=="), "nonexistentField", values);
+        TradeRsqlVisitor visitor = new TradeRsqlVisitor();
+
+        assertThrows(IllegalArgumentException.class, () -> visitor.visit(node, null),
+                "Expected exception for nonexistent field");
+    }
+
+    /**
+     * Test that TradeRsqlVisitor handles unexpected value types (e.g., string for
+     * numeric field).
+     * Expects an IllegalArgumentException or similar when a type mismatch occurs
+     * for
+     * example, passing a string to a numeric field.
+     */
+    @Test
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    void testVisitComparisonNode_unexpectedValueType() {
+        // GIVEN: Using a numeric field (tradeId) but passing a non-numeric value
+        List<String> values = Arrays.asList("NotANumber");
+        ComparisonNode node = new ComparisonNode(new ComparisonOperator("=="), "tradeId", values);
+        TradeRsqlVisitor visitor = new TradeRsqlVisitor();
+
+        // The visitor builds a Specification object
+        Specification<Trade> spec = visitor.visit(node, null);
+
+        // Mock JPA Criteria API objects (no real DB connection)
+        @SuppressWarnings("unchecked") // to avoid unchecked conversion” or “raw type used without generics from
+                                       // Mockito.when(path.getJavaType()).thenReturn(Long.class); which is raw types
+                                       // here. It's intentional and safe for this mock test
+
+        Root<Trade> root = (Root<Trade>) Mockito.mock(Root.class); // Represents the entity "Trade"
+        CriteriaQuery<?> query = Mockito.mock(CriteriaQuery.class); // Represents the SQL query
+        CriteriaBuilder cb = Mockito.mock(CriteriaBuilder.class); // Used to build WHERE clauses
+        Path<?> path = Mockito.mock(Path.class); // Represents the field path (tradeId)
+
+        // Define mock behavior
+        Path rawPath = (Path) path;
+        Class rawClass = (Class) Long.class;
+        Mockito.when(root.get(Mockito.eq("tradeId"))).thenReturn(rawPath); // Use raw type cast to avoid generics error
+        Mockito.when(path.getJavaType()).thenReturn(rawClass); // Use raw type cast to avoid generics error
+
+        // WHEN + THEN
+        // Now, toPredicate() uses these mocks, tries to convert "NotANumber" to Long,
+        // which throws NumberFormatException → wrapped as IllegalArgumentException.
+        assertThrows(IllegalArgumentException.class,
+                () -> spec.toPredicate(root, query, cb),
+                "Expected IllegalArgumentException for invalid numeric value");
+    }
 }
