@@ -156,13 +156,9 @@ if (operator.equals("=like=")) {
 
 ### Outcome
 
-Wildcard search using the `=like=` operator now works as expected in RSQL queries. The parser recognizes the operator, and the service returns correct results for queries with wildcards.
-
 2025-10-09T20:30:00 | TradeService.java, TradeRsqlVisitor.java | RSQL wildcard/like operator fix
 
 ### Problem
-
-I wanted to verify that my unit test for TradeRsqlVisitor actually detects failures and does not produce false positives. This is a common practice to ensure that the test is meaningful and will catch real bugs if they occur.
 
 ### Investigation
 
@@ -297,3 +293,44 @@ Object typedValue = convertValue(fieldType, values.get(0));
 ```
 
 This pattern is used for all supported operators, so every query value is validated and converted before being used in a database comparison.
+
+### Problem
+
+Test failure in testSearchTrades_FilterByCounterparty - AssertionFailedError: expected: <BigBank> but was: <null>
+
+### Cause:
+
+The mock for tradeMapper.toDto(any(Trade.class)) returned a new TradeDTO with no fields set, so counterpartyName was null in the result.
+
+### Solution:
+
+Updated the stubbing to return a TradeDTO with counterpartyName set to "BigBank":
+
+### Problem
+
+The method findAll(Example<Trade>) is ambiguous for the type TradeRepository
+
+### Cause:
+
+Mockito stubbing for findAll(any()) was ambiguous because TradeRepository inherits multiple overloaded findAll methods from its parent interfaces.
+
+### Solution:
+
+Made the stubbing explicit for the Specification overload:
+`when(tradeRepository.findAll(any(Specification.class))).thenReturn(Arrays.asList(trade));`
+
+Problem
+Test failure in testFilterTrades_FilterByCounterparty - NullPointerException: Cannot invoke "org.springframework.data.domain.Page.getContent()" because "tradePage" is null
+Method:
+testFilterTrades_FilterByCounterparty
+Class:
+TradeServiceTest
+
+### Root Cause:
+
+The test called tradeService.filterTrades(criteria, 0, 10).getContent(), but the repository/service mock did not return a valid Page<Trade>, resulting in a null value and a NullPointerException when .getContent() was called.
+getContent() is a method on the Spring Data Page object. It returns the actual list of items (e.g., List<TradeDTO>) for the current page, extracted from the paginated result. For example, if the query returns a page containing 10 trades, getContent() will return a List<TradeDTO> with those 10 trades.
+In the test, the repository/service mock did not return a valid Page object—so the result of filterTrades(...) was null. When called .getContent() on this null value, it caused a NullPointerException. The fix is to ensure the mock returns a real (non-null) Page object, so getContent() can safely return the expected list of results.
+
+Solution:
+Mock the repository to return a non-null Page object using Mockito:
