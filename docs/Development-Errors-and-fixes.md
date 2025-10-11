@@ -332,5 +332,28 @@ The test called tradeService.filterTrades(criteria, 0, 10).getContent(), but the
 getContent() is a method on the Spring Data Page object. It returns the actual list of items (e.g., List<TradeDTO>) for the current page, extracted from the paginated result. For example, if the query returns a page containing 10 trades, getContent() will return a List<TradeDTO> with those 10 trades.
 In the test, the repository/service mock did not return a valid Page object—so the result of filterTrades(...) was null. When called .getContent() on this null value, it caused a NullPointerException. The fix is to ensure the mock returns a real (non-null) Page object, so getContent() can safely return the expected list of results.
 
-Solution:
+### Solution:
+
 Mock the repository to return a non-null Page object using Mockito:
+
+### Problem test failing TradeTradeValidationServiceTest
+
+[ERROR] TradeValidationServiceTest.failWhenMajurityBeforeStartDate:34 expected: <true> but was: <false>
+[INFO] Finished at: 2025-10-11T22:52:09+01:00
+
+### Cause
+
+Forgot to validate that the maturity date is not before the trade date. The test expected the validation to fail when maturity date is before trade date, but the code only checked against start date.
+
+### Solution
+
+Added an OR condition to the validation logic to check both maturity date against start date and start date against trade date:
+
+```java
+if ((trade.getTradeMaturityDate().isBefore(trade.getTradeStartDate())
+     || (trade.getTradeStartDate().isBefore(trade.getTradeDate())))) {
+    // fail validation
+}
+```
+
+This ensures that the test passes and both business rules are enforced.
