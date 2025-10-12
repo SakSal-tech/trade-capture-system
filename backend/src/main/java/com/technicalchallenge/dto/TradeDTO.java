@@ -76,4 +76,7 @@ public class TradeDTO {
 
     // Additional fields for extensibility
     private List<AdditionalInfoDTO> additionalFields;
+
+    // Add: Action to be performed on trade
+    private String action;
 }
