@@ -9,6 +9,7 @@ import lombok.Setter;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Getter
@@ -57,4 +58,7 @@ public class TradeLegDTO {
 
     // Associated cashflows
     private List<CashflowDTO> cashflows;
+
+    // ADDED: each leg to have a maturityDate
+    private LocalDate tradeMaturityDate;
 }
