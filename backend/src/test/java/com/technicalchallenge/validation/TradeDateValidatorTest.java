@@ -1,4 +1,4 @@
-package com.technicalchallenge.service;
+package com.technicalchallenge.validation;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.time.LocalDate;
@@ -8,10 +8,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.technicalchallenge.dto.TradeDTO;
-import com.technicalchallenge.validation.TradeValidationResult;
-import com.technicalchallenge.validation.TradeValidationEngine;
 
-public class TradeValidationServiceTest {
+public class TradeDateValidatorTest {
     // creates a new instance of the test class for each test method
     private TradeValidationEngine tradeValidationService;
     private TradeDTO trade;
