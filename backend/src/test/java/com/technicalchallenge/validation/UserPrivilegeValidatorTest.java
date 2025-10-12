@@ -20,7 +20,7 @@ public class UserPrivilegeValidatorTest {
         // set up tradedto object with required field
         TradeDTO tradeDTO = new TradeDTO();
 
-        // Instantiate the UserPrivilegeValidator (not the engine yet)
+        // Instantiate the UserPrivilegeValidator
         UserPrivilegeValidator validator = new UserPrivilegeValidator();
 
         // sets the trade action to "CREATE". Runs the validation engine to check if the
