@@ -2,6 +2,7 @@ package com.technicalchallenge.validation;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.technicalchallenge.dto.TradeDTO;
@@ -23,6 +24,7 @@ public class UserPrivilegeValidatorTest {
         assertTrue(result.isValid(), "TRADER should be able to " + action + " trades");
     }
 
+    @DisplayName("Trader can perform all trade actions")
     @Test
     void traderCanPerformAllTradeActions() {
         // represents the user's role (e.g., TRADER, SALES) and is the main way to

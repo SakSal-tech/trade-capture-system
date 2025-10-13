@@ -1,5 +1,6 @@
 package com.technicalchallenge.validation;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import com.technicalchallenge.dto.TradeLegDTO;
@@ -84,7 +85,7 @@ public class TradeLegValidator {
      * Returns true if leg is not floating, or if floating and indexId/indexName are
      * present.
      */
-    public static boolean ValidateFloatingLegIndex(TradeLegDTO leg) {
+    public static boolean validateFloatingLegIndex(TradeLegDTO leg) {
         if (leg == null)
             return false;
         /*
@@ -99,6 +100,57 @@ public class TradeLegValidator {
         // index name are provided and that the index name is not blank
         if (legType != null && legType.equalsIgnoreCase("FLOATING")) {
             return leg.getIndexId() != null && leg.getIndexName() != null && !leg.getIndexName().isBlank();
+        }
+        return true;
+    }
+
+    public boolean validateLegRate(TradeLegDTO leg) {
+        // Null check for leg object
+        if (leg == null) {
+            return false;
+        }
+
+        String legType = leg.getLegType();
+        Double rate = leg.getRate();
+
+        // Validation for FIXED leg type
+        if (legType != null && legType.equalsIgnoreCase("FIXED")) {
+            // Rate must not be null
+            if (rate == null) {
+                return false;
+            }
+            // Rate must be greater than zero
+            if (rate <= 0) {
+                return false;
+            }
+            // Rate must not be unrealistically high (e.g., > 100%)
+            if (rate > 100) {
+                return false;
+            }
+            // Check for excessive decimal precision (e.g., more than 4 decimals)
+            BigDecimal rateDecimal = BigDecimal.valueOf(rate);
+            if (rateDecimal.scale() > 4) {
+                return false;
+            }
+            return true;
+        }
+
+        // Validation for FLOATING leg type
+        if (legType != null && legType.equalsIgnoreCase("FLOATING")) {
+            // Rate should typically be null for floating legs
+            if (rate != null && rate != 0.0) {
+                // If business rules require floating leg rate to be null, fail if not null
+                // return false;
+                // If floating leg rate is allowed to be set, pass
+                // For now, allow null or zero
+                return true;
+            }
+            return true;
+        }
+
+        // For other leg types, allow null or positive rate
+        if (rate == null || rate < 0) {
+            return false;
         }
         return true;
     }
