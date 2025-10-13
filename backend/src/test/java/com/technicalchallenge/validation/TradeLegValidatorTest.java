@@ -3,47 +3,82 @@ package com.technicalchallenge.validation;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
 
-/*Cross-Leg Business Rules:
+/*
+Cross-Leg Business Rules:
     Both legs must have identical maturity dates
     Legs must have opposite pay/receive flags
     Floating legs must have an index specified
     Fixed legs must have a valid rate
- */
+*/
 
 public class TradeLegValidatorTest {
-    @DisplayName("Should fail when two trade legs have different maturity dates")
+    private TradeLegDTO leg1;
+    private TradeLegDTO leg2;
 
-    @Test
-    void shouldFailWhenLegMaturityDatesDiffer() {
-        // GIVENGIVEN two trade legs with different maturity dates
-        TradeLegDTO leg1 = new TradeLegDTO();
-        leg1.setTradeMaturityDate(LocalDate.of(2025, 10, 10));
-
-        TradeLegDTO leg2 = new TradeLegDTO();
-        leg2.setTradeMaturityDate(LocalDate.of(2025, 11, 11));
-
-        List<TradeLegDTO> tradeLegs = List.of(leg1, leg2);
-
-        TradeValidationResult result = new TradeValidationResult();
-
-        TradeLegValidator validator = new TradeLegValidator();
-
-        // WHEN the validator checks the legs
-
-        validator.validateTradeLeg(tradeLegs, result);
-        // THEN the validation should fail and return an appropriate error message
-        assertFalse(result.isValid());
-        assertTrue(result.getErrors().contains("Both legs must have identical maturity dates"));
-
+    // Refactored: Moved similar objects and list for multiple objects to the setup
+    // method
+    @BeforeEach
+    void setUp() {
+        leg1 = new TradeLegDTO();
+        leg2 = new TradeLegDTO();
     }
 
+    // Refactoring: Added helper method to reduce repeating similar code in test
+    // methods (DRY principle).
+    // Creates two legs with given maturity dates for quick setup.
+    private List<TradeLegDTO> createLegsWithMaturityDates(LocalDate date1, LocalDate date2) {
+        leg1.setTradeMaturityDate(date1);
+        leg2.setTradeMaturityDate(date2);
+        return List.of(leg1, leg2);
+    }
+
+    // Refactoring: Added helper method to encapsulate validation logic so it is not
+    // repeated in each test.
+    private TradeValidationResult validateLegs(List<TradeLegDTO> tradeLegs) {
+        TradeValidationResult result = new TradeValidationResult();
+        TradeLegValidator validator = new TradeLegValidator();
+        validator.validateTradeLeg(tradeLegs, result);
+        validator.validateTradeLegPayReceive(tradeLegs, result);
+        return result;
+    }
+
+    @DisplayName("Should fail when two trade legs have different maturity dates")
+    @Test
+    // GIVEN two trade legs with different maturity dates
+    // WHEN the validator checks the legs
+    // THEN the validation should fail and return an appropriate error message
+    void shouldFailWhenLegMaturityDatesDiffer() {
+        List<TradeLegDTO> tradeLegs = createLegsWithMaturityDates(
+                LocalDate.of(2025, 10, 10),
+                LocalDate.of(2025, 11, 11));
+
+        TradeValidationResult result = validateLegs(tradeLegs);
+
+        assertFalse(result.isValid());
+        assertTrue(result.getErrors().contains("Both legs must have identical maturity dates"));
+    }
+
+    @DisplayName("Should fail when legs have the same pay/receive flag")
+    @Test
+    // GIVEN two legs with identical pay/receive flags
+    // WHEN the validator checks the legs
+    // THEN the validation should fail and return an appropriate error message
+    void shouldFailWhenLegsHaveSamePayReceiveFlag() {
+        leg1.setPayReceiveFlag("PAY");
+        leg2.setPayReceiveFlag("PAY");
+
+        List<TradeLegDTO> tradeLegs = List.of(leg1, leg2);
+        TradeValidationResult result = validateLegs(tradeLegs);
+
+        assertFalse(result.isValid());
+        assertTrue(result.getErrors().contains("Legs must have opposite pay/receive flags"));
+    }
 }

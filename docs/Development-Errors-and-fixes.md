@@ -139,7 +139,6 @@ RSQLParser parser = new RSQLParser(operators);
 
 ```java
 // Handle case-insensitive LIKE operator (=like=)
-if (operator.equals("=like=")) {
     // Convert RSQL-style *wildcards* into SQL-style %wildcards%
     String pattern = values.get(0)
         .replace('*', '%')
@@ -357,3 +356,49 @@ if ((trade.getTradeMaturityDate().isBefore(trade.getTradeStartDate())
 ```
 
 This ensures that the test passes and both business rules are enforced.
+
+# Error 1
+
+2025-10-13T09:15:00 | TradeLegValidatorTest.java | NullPointerException when validating pay/receive flags
+
+## Cause
+
+Called .equals() on a null pay/receive flag in TradeLegDTO, resulting in a NullPointerException during validation.
+
+## Solution
+
+Added explicit null checks before calling .equals() on pay/receive flags in TradeLegValidator:
+
+```java
+if (leg1.getPayReceiveFlag() != null && leg2.getPayReceiveFlag() != null) {
+    // compare flags
+}
+```
+
+### Problem
+
+2025-10-13T09:20:00 | TradeLegValidator.java | Incorrect validation logic for opposite pay/receive flags
+
+### Cause
+
+Validation logic did not correctly check for opposite pay/receive flags, causing tests to fail for valid legs.
+
+### Solution
+
+Refactored validation to use:
+if (!leg1.getPayReceiveFlag().equals(leg2.getPayReceiveFlag())) {
+// valid: flags are opposite
+}
+
+Error 3
+2025-10-13T09:25:00 | TradeLegValidatorTest.java | Test failure due to missing error message assertion
+
+### Cause
+
+Test did not assert that the correct error message was returned when pay/receive flags were not opposite, resulting in false positives.
+
+### Solution
+
+Added assertion for error message in TradeLegValidatorTest:
+
+`assertTrue(result.getErrorMessages().contains("Legs must have opposite pay/receive flags"));`
