@@ -57,7 +57,7 @@ public class TradeLegValidator {
         leg1 = tradeLegs.get(0);
         leg2 = tradeLegs.get(1);
 
-        // Fix: Null check before calling .equals() in your validation method as test
+        // Fix: Null check before calling .equals() in the validation method as test
         // was failing
         if (leg1.getPayReceiveFlag() == null || leg2.getPayReceiveFlag() == null) {
             result.setError("Both legs must have a pay/receive flag defined");
@@ -76,5 +76,30 @@ public class TradeLegValidator {
         }
         return true;// Always return true if no error was found
 
+    }
+
+    // --- Floating leg index validation ---
+    /**
+     * Checks if a floating leg has a valid index specified.
+     * Returns true if leg is not floating, or if floating and indexId/indexName are
+     * present.
+     */
+    public static boolean ValidateFloatingLegIndex(TradeLegDTO leg) {
+        if (leg == null)
+            return false;
+        /*
+         * Trade Business Rules:
+         * FIXED leg: Pays a fixed interest rate. FLOATING leg: Pays a variable interest
+         * rate, which changes over time. Index: For a floating leg, the interest rate
+         * is not fixed, it's based on a financial index (like LIBOR, EURIBOR,
+         * SONIA,etc.Cannot have a floating leg without specifying which index it uses
+         */
+        String legType = leg.getLegType();
+        // If the leg type is "FLOATING", then the code checks that both an index ID and
+        // index name are provided and that the index name is not blank
+        if (legType != null && legType.equalsIgnoreCase("FLOATING")) {
+            return leg.getIndexId() != null && leg.getIndexName() != null && !leg.getIndexName().isBlank();
+        }
+        return true;
     }
 }
