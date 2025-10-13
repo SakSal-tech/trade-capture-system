@@ -402,3 +402,53 @@ Test did not assert that the correct error message was returned when pay/receive
 Added assertion for error message in TradeLegValidatorTest:
 
 `assertTrue(result.getErrorMessages().contains("Legs must have opposite pay/receive flags"));`
+
+# Error 1
+
+2025-10-13T: TradeDateValidatorTest.failWhenMajurityBeforeStartDate:35  
+NullPointerException: Cannot invoke "java.util.List.iterator()" because the return value of "com.technicalchallenge.dto.TradeDTO.getTradeLegs()" is null
+
+## Cause
+
+The test did not initialize the `tradeLegs` field in `TradeDTO`. The validation engine attempted to iterate over `tradeDTO.getTradeLegs()`, which was null, resulting in a NullPointerException.
+
+## Solution
+
+Refactored the validation engine to only call leg validation if `tradeLegs` is not null and not empty. This prevents errors in tests or code that do not involve legs.
+
+---
+
+# Error 2
+
+2025-10-13T: TradeDateValidatorTest.failWhenStartBeforeTradeDate:52  
+NullPointerException: Cannot invoke "java.util.List.iterator()" because the return value of "com.technicalchallenge.dto.TradeDTO.getTradeLegs()" is null
+
+## Cause
+
+Same as Error 1: The test did not initialize the `tradeLegs` field in `TradeDTO`, causing a NullPointerException when the engine tried to iterate over it.
+
+## Solution
+
+Refactored the validation engine to check for non-null and non-empty `tradeLegs` before running leg validation logic instead of tradeDTO.
+
+---
+
+# Error 3
+
+2025-10-13T: TradeDateValidatorTest.failWhenTradeDateOlderThan30Days:66  
+NullPointerException: Cannot invoke "java.util.List.iterator()" because the return value of "com.technicalchallenge.dto.TradeDTO.getTradeLegs()" is null
+
+## Cause
+
+Same as above: The test did not initialize the `tradeLegs` field in `TradeDTO`, leading to a NullPointerException during validation.
+I had `validateTradeLeg(tradeDTO.getLegs(), errors);`
+The validation engine always called validateTradeLeg, even if tradeDTO.getLegs() was null or empty, which could cause NullPointerExceptions.
+
+## Solution
+
+Validation engine now only calls leg validation if `tradeLegs` is present (not null and not empty), preventing this error in date-only tests.
+`if (tradeDTO.getLegs() != null && !tradeDTO.getLegs().isEmpty()) {
+    validateTradeLeg(tradeDTO.getLegs(), errors);
+}
+//`
+Now, validateTradeLeg is only called if legs are present, preventing NullPointerExceptions and making the validation more robust.

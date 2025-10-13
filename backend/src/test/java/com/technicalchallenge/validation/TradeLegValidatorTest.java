@@ -81,4 +81,33 @@ public class TradeLegValidatorTest {
         assertFalse(result.isValid());
         assertTrue(result.getErrors().contains("Legs must have opposite pay/receive flags"));
     }
+
+    @Test
+    void testFloatingLegRequiresIndex() {
+        // Floating leg with index specified (valid)
+        TradeLegDTO floatingLegValid = new TradeLegDTO();
+        floatingLegValid.setLegType("FLOATING");
+        floatingLegValid.setIndexId(1L);
+        floatingLegValid.setIndexName("LIBOR");
+
+        // Floating leg with missing index (invalid)
+        TradeLegDTO floatingLegNoIndex = new TradeLegDTO();
+        floatingLegNoIndex.setLegType("FLOATING");
+        floatingLegNoIndex.setIndexId(null);
+        floatingLegNoIndex.setIndexName(null);
+
+        // Non-floating leg (should not require index)
+        TradeLegDTO fixedLeg = new TradeLegDTO();
+        fixedLeg.setLegType("FIXED");
+        fixedLeg.setIndexId(null);
+        fixedLeg.setIndexName(null);
+
+        // Assume isFloatingLegIndexValid is your validation method
+        assertTrue(TradeLegValidator.ValidateFloatingLegIndex(floatingLegValid),
+                "Floating leg with index should be valid");
+        assertFalse(TradeLegValidator.ValidateFloatingLegIndex(floatingLegNoIndex),
+                "Floating leg without index should be invalid");
+        assertTrue(TradeLegValidator.ValidateFloatingLegIndex(fixedLeg),
+                "Fixed leg should be valid even without index");
+    }
 }
