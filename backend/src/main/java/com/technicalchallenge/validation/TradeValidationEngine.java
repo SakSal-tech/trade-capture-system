@@ -1,9 +1,12 @@
 package com.technicalchallenge.validation;
 
+import org.springframework.stereotype.Service;
+
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
 
 // This class runs all validators and returns results. Acts as the main entry point, clean, testable orchestration of multiple validations for easy maintenance if validations scale
+@Service
 public class TradeValidationEngine {
 
     // This engine now only validates trade-related business rules, not user

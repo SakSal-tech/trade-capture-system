@@ -1,12 +1,10 @@
 package com.technicalchallenge.controller;
 
-import com.technicalchallenge.dto.SearchCriteriaDTO;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.mapper.TradeMapper;
 import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.service.TradeService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -46,18 +44,6 @@ public class TradeController {
         return tradeService.getAllTrades().stream()
                 .map(tradeMapper::toDto)
                 .toList();
-    }
-
-    @GetMapping("/filter")
-    // Page<TradeDTO> is a page (a paginated list) of TradeDTO objects
-    // ResponseEntity<Page<TradeDTO>> is the HTTP response wrapper that contains
-    // that page and extra HTTP info (status code, headers)
-    public ResponseEntity<Page<TradeDTO>> filterTrades(@ModelAttribute SearchCriteriaDTO criteriaDTO,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-
-        Page<TradeDTO> pagedResult = tradeService.filterTrades(criteriaDTO, page, size);
-        return ResponseEntity.ok(pagedResult);
-
     }
 
     @GetMapping("/{id}")
@@ -160,24 +146,6 @@ public class TradeController {
             logger.error("Error cancelling trade: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body("Error cancelling trade: " + e.getMessage());
         }
-    }
-
-    @GetMapping("/search")
-    // This method uses that criteriaDTO to find matching trades in the database and
-    // returns them as a list of TradeDTO objects. criteriaDTO tells the service
-    // what to search for and List<TradeDTO> is the
-    // search result returned.
-    public ResponseEntity<List<TradeDTO>> searchTrades(SearchCriteriaDTO criteriaDTO) {
-        List<TradeDTO> results = tradeService.searchTrades(criteriaDTO);
-        return ResponseEntity.ok(results);
-    }
-
-    @GetMapping("/rsql")
-    public ResponseEntity<List<TradeDTO>> searchTradesRsql(@RequestParam String query) {
-
-        List<TradeDTO> trades = tradeService.searchTradesRsql(query);
-
-        return ResponseEntity.ok(trades);
     }
 
 }
