@@ -115,7 +115,7 @@ class TradeServiceTest {
     @Test
     void testCreateTrade_Success() {
         // Given
-        // FIX: createTrade() validates reference data → must provide
+        // FIX: createTrade() validates reference data, must provide
         // book/counterparty/status
         tradeDTO.setBookName("TestBook"); // FIX: required by service reference lookup
         tradeDTO.setCounterpartyName("TestCounterparty"); // FIX: required by service reference lookup
@@ -220,7 +220,7 @@ class TradeServiceTest {
         // Mocks the repository call so that looking up trade ID 100001, returns
         // Optional.of(existing) instead of hitting the DB.
         when(tradeRepository.findByTradeIdAndActiveTrue(100001L)).thenReturn(Optional.of(existing));
-        // Creates a new, empty TradeStatus object you'll use as a stubbed return value
+        // Creates a new, empty TradeStatus object to use as a stubbed return value
         TradeStatus amended = new TradeStatus();
         // Sets a fake primary key (long 40) on that status, simulating a persisted row.
         amended.setId(40L);
@@ -306,11 +306,4 @@ class TradeServiceTest {
                                                                         // type
     }
 
-    /**
-     * Tests the searchTrades method to verify that filtering by counterparty name
-     * works.
-     * Sets up a Trade entity with a specific counterparty, mocks repository and
-     * mapper,
-     * and asserts that the returned TradeDTO has the expected counterparty name.
-     */
 }

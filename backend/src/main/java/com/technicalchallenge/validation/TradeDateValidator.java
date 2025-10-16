@@ -25,7 +25,7 @@ public class TradeDateValidator {
         // Business rule 3:Trade date cannot be more than 30 days in the past
         // long because because the number of days between two points in time can be
         // very large.
-        // ChronoUnit, tells Java what unit of time you want to measure between two
+        // ChronoUnit, tells Java what unit of time want to measure between two
         // temporal objects
         long daysBetween = ChronoUnit.DAYS.between(trade.getTradeDate(), LocalDate.now());
 

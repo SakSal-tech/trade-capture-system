@@ -188,7 +188,7 @@ public class TradeService {
             /*
              * trim(): Remove any leading or trailing spaces from the
              * username.split("\\s+")Split the username into parts using whitespace (spaces,
-             * tabs, etc.) as the separator. radeDTO.getTraderUserName() returns
+             * * tabs, etc.) as the separator. radeDTO.getTraderUserName() returns
              * "  John   Smith  ". .trim() removes leading/trailing spaces: "John   Smith"
              * .split("\\s+") splits by one or more spaces: ["John", "Smith"]
              */
@@ -563,9 +563,9 @@ public class TradeService {
         // /12. This formula annualises the rate and scales it by the payment
         // interval(This ensures the payment matches the correct portion of the annual
         // interest for the interval.To calculate the payment for a period shorter than
-        // a year, you multiply the notional by the annual rate, then adjust for the
+        // a year, multiply the notional by the annual rate, then adjust for the
         // fraction of the year covered by the payment interval (e.g., for a quarterly
-        // payment, you use 3/12 of the annual rate). The result is wrapped in a
+        // payment, use 3/12 of the annual rate). The result is wrapped in a
         // BigDecimal for precision.
         if ("Fixed".equals(legType)) {
             double notional = leg.getNotional().doubleValue();

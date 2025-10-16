@@ -1,11 +1,13 @@
 # Trading Application - Project Setup Guide
 
 ## Overview
+
 This document provides comprehensive setup instructions for the trading application technical challenge. The application consists of a Spring Boot backend and React frontend, designed to simulate a real-world trading system.
 
 ## Prerequisites
 
 ### System Requirements
+
 - **Operating System**: Windows 10/11, macOS 10.14+, or Linux (Ubuntu 18.04+)
 - **RAM**: Minimum 8GB, Recommended 16GB
 - **Disk Space**: At least 5GB free space
@@ -14,42 +16,50 @@ This document provides comprehensive setup instructions for the trading applicat
 ### Required Software
 
 #### 1. Java Development Kit (JDK)
+
 - **Version**: JDK 17 or higher
 - **Download**: [Oracle JDK](https://www.oracle.com/java/technologies/downloads/) or [OpenJDK](https://openjdk.org/)
 - **Verification**: Run `java -version` and `javac -version`
 
 #### 2. Node.js and Package Manager
+
 - **Node.js Version**: Node.js 18.x or higher
 - **Download**: [Node.js Official Website](https://nodejs.org/)
 - **Verification**: Run `node --version`
 
 **Package Manager Options:**
+
 - **npm** (comes with Node.js): Run `npm --version` to verify
-- **pnpm** (recommended for this project): 
+- **pnpm** (recommended for this project):
   - **Installation**: `npm install -g pnpm`
   - **Verification**: Run `pnpm --version`
   - **Note**: This project is configured to use pnpm and includes `pnpm-lock.yaml`
 
 #### 3. Maven
+
 - **Version**: Maven 3.8 or higher
 - **Download**: [Apache Maven](https://maven.apache.org/download.cgi)
 - **Verification**: Run `mvn --version`
 - **Installation Required**: Candidates must install Maven directly (Maven wrapper not supported for this challenge)
 
 #### 4. Git
+
 - **Version**: Latest stable version
 - **Download**: [Git Official Website](https://git-scm.com/)
 - **Verification**: Run `git --version`
 
 #### 5. IDE/Code Editor (Recommended)
+
 - **Backend**: IntelliJ IDEA, Eclipse, or VS Code with Java extensions
 - **Frontend**: VS Code, WebStorm, or any modern editor with React support
 
 #### 6. Database Browser (Optional)
+
 - **H2 Console**: Built into the application (accessible via browser)
 - **Alternative**: DB Browser for SQLite, DBeaver, or similar tool
 
 ## Project Structure
+
 ```
 trading-application/
 ├── backend/                 # Spring Boot application
@@ -73,12 +83,14 @@ trading-application/
 ### Step 1: Fork and Clone the Repository
 
 #### Fork the Repository
+
 1. **Navigate to the Repository**: Go to the provided repository URL in your web browser
 2. **Fork the Repository**: Click the "Fork" button in the top-right corner of the repository page
 3. **Create Your Fork**: This creates a copy of the repository under your GitHub account
 4. **Note Your Fork URL**: Your forked repository will be at `https://github.com/YOUR_USERNAME/trade-capture-system`
 
 #### Clone Your Forked Repository
+
 ```bash
 # Clone your forked repository (replace YOUR_USERNAME with your actual GitHub username)
 git clone https://github.com/YOUR_USERNAME/trade-capture-system.git
@@ -88,17 +100,20 @@ cd trade-capture-system
 ### Step 2: Backend Setup
 
 #### Navigate to Backend Directory
+
 ```bash
 cd backend
 ```
 
 #### Install Dependencies and Build
+
 ```bash
 # Using Maven (required - must be installed)
 mvn clean install
 ```
 
 #### Run Backend Application
+
 ```bash
 # Using Maven
 mvn spring-boot:run
@@ -108,6 +123,7 @@ java -jar target/*.jar
 ```
 
 #### Verify Backend is Running
+
 - **Application URL (swagger)**: http://localhost:8080/swagger-ui/index.html
 - **Health Check**: http://localhost:8080/actuator/health
 - **H2 Database Console**: http://localhost:8080/h2-console
@@ -116,6 +132,7 @@ java -jar target/*.jar
   - **Password**: (leave empty)
 
 #### Verify API Documentation and Monitoring
+
 - **Swagger UI**: http://localhost:8080/swagger-ui/index.html
 - **OpenAPI JSON**: http://localhost:8080/api-docs
 - **Actuator Endpoints**: http://localhost:8080/actuator/
@@ -125,6 +142,7 @@ java -jar target/*.jar
 ### Step 3: Frontend Setup
 
 #### Open New Terminal and Navigate to Frontend Directory
+
 ```bash
 cd frontend
 ```
@@ -132,6 +150,7 @@ cd frontend
 #### Install Dependencies
 
 **Option 1: Using pnpm (Recommended - Project is configured for pnpm)**
+
 ```bash
 # Install pnpm globally if not already installed
 npm install -g pnpm
@@ -141,6 +160,7 @@ pnpm install
 ```
 
 **Option 2: Using npm (Alternative)**
+
 ```bash
 # Install dependencies
 npm install
@@ -153,6 +173,7 @@ npm install
 #### Run Frontend Application
 
 **Using pnpm (Recommended)**
+
 ```bash
 # Development server
 pnpm dev
@@ -165,8 +186,9 @@ pnpm preview  # Preview production build
 ```
 
 **Using npm (Alternative)**
+
 ```bash
-# Development server  
+# Development server
 npm run dev
 
 # Alternative commands
@@ -177,8 +199,9 @@ npm run preview  # Preview production build
 ```
 
 #### Verify Frontend is Running
+
 - **Application URL**: Check terminal for actual port assignment
-  - **npm (Vite)**: Typically http://localhost:5173 
+  - **npm (Vite)**: Typically http://localhost:5173
   - **pnpm (Vite)**: Typically http://localhost:3000
 - **Should automatically open in browser**
 - **Note**: The frontend uses Vite, which will automatically assign an available port if the default is busy
@@ -187,11 +210,13 @@ npm run preview  # Preview production build
 ### Step 4: Verify Full Application
 
 #### Check Both Services are Running
+
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8080
 - **Database Console**: http://localhost:8080/h2-console
 
 #### Test Basic Functionality
+
 1. **Access the Application**: Navigate to http://localhost:3000
 2. **Login/Register**: Create a user account or use existing credentials
 3. **Explore Features**: Navigate through available trading functionalities
@@ -200,6 +225,7 @@ npm run preview  # Preview production build
 ## Available Functionalities
 
 ### Backend Features
+
 - **REST API Endpoints**: Comprehensive trading operations
 - **Trade Management**: Create, read, update, delete trades
 - **User Management**: User authentication and authorization
@@ -208,6 +234,7 @@ npm run preview  # Preview production build
 - **Database Operations**: H2 in-memory database with file persistence
 
 ### Frontend Features
+
 - **User Interface**: Modern React-based trading interface
 - **Trade Booking**: Interactive forms for creating trades
 - **Trade Management**: View and manage existing trades
@@ -218,10 +245,12 @@ npm run preview  # Preview production build
 ### Key Endpoints for Testing
 
 #### Authentication
+
 - `POST /api/auth/login` - User login
 - `POST /api/auth/register` - User registration
 
 #### Trades
+
 - `GET /api/trades` - Get all trades
 - `POST /api/trades` - Create new trade
 - `GET /api/trades/{id}` - Get trade by ID
@@ -229,6 +258,7 @@ npm run preview  # Preview production build
 - `DELETE /api/trades/{id}` - Delete trade
 
 #### Reference Data
+
 - `GET /api/books` - Get all books
 - `GET /api/counterparties` - Get all counterparties
 - `GET /api/currencies` - Get all currencies
@@ -237,13 +267,16 @@ npm run preview  # Preview production build
 ## Database Information
 
 ### Default Data
+
 The application comes pre-loaded with sample data:
+
 - **Users**: Sample traders, sales users, and support staff
 - **Books**: Trading books for different desks
 - **Counterparties**: Sample counterparties for trading
 - **Reference Data**: Currencies, trade types, statuses, etc.
 
 ### Database Console Access
+
 1. Navigate to http://localhost:8080/h2-console
 2. Use connection settings:
    - **Driver Class**: `org.h2.Driver`
@@ -252,6 +285,7 @@ The application comes pre-loaded with sample data:
    - **Password**: (leave empty)
 
 ### Key Tables
+
 - `TRADE` - Main trade information
 - `TRADE_LEG` - Trade leg details
 - `CASHFLOW` - Generated cashflows
@@ -264,8 +298,10 @@ The application comes pre-loaded with sample data:
 ### Common Issues
 
 #### Backend Won't Start
+
 **Issue**: `Port 8080 already in use`
-**Solution**: 
+**Solution**:
+
 ```bash
 # Find process using port 8080
 lsof -i :8080  # macOS/Linux
@@ -279,8 +315,10 @@ netstat -ano | findstr :8080  # Windows
 **Solution**: Ensure JDK 17 or higher is installed and JAVA_HOME is set correctly
 
 #### Frontend Won't Start
+
 **Issue**: `npm install fails`
-**Solution**: 
+**Solution**:
+
 ```bash
 # Clear npm cache
 npm cache clean --force
@@ -291,7 +329,8 @@ npm install
 ```
 
 **Issue**: `pnpm install fails`
-**Solution**: 
+**Solution**:
+
 ```bash
 # Clear pnpm cache
 pnpm store prune
@@ -303,7 +342,8 @@ pnpm install
 ```
 
 **Issue**: `Package manager conflicts`
-**Solution**: 
+**Solution**:
+
 ```bash
 # If switching from npm to pnpm
 rm -rf node_modules package-lock.json
@@ -316,40 +356,48 @@ npm install
 
 **Issue**: `Port 3000 already in use`
 **Solution**: Kill the process using port 3000 or Vite will automatically use the next available port:
+
 ```bash
 # For npm
 PORT=3001 npm run dev  # Linux/macOS
 set PORT=3001 && npm run dev  # Windows
 
-# For pnpm  
+# For pnpm
 PORT=3001 pnpm dev  # Linux/macOS
 set PORT=3001 && pnpm dev  # Windows
 ```
 
 #### Database Issues
+
 **Issue**: `Cannot connect to H2 database`
-**Solution**: 
+**Solution**:
+
 1. Ensure backend is running
 2. Check JDBC URL: `jdbc:h2:file:./data/tradingdb`
 3. Verify data directory exists and is writable
 
 **Issue**: `Database tables not found`
-**Solution**: 
+**Solution**:
+
 1. Check `data.sql` file in `src/main/resources`
 2. Restart backend application
 3. Check application logs for initialization errors
 
 ### Performance Issues
+
 **Issue**: Application runs slowly
 **Solutions**:
+
 1. Increase JVM heap size: `java -Xmx2g -jar target/*.jar`
 2. Ensure sufficient RAM available
 3. Close unnecessary applications
 4. Use SSD storage if available
 
 ### Network Issues
+
 **Issue**: Frontend cannot connect to backend
 **Solutions**:
+
 1. Verify backend is running on port 8080
 2. Check firewall settings
 3. Ensure CORS is properly configured
@@ -357,11 +405,12 @@ set PORT=3001 && pnpm dev  # Windows
 
 **Issue**: CORS errors in browser console
 **Solutions**:
+
 1. **Default Configuration**: Backend is pre-configured for both common Vite ports
    - Supports `http://localhost:3000` (typical pnpm default)
    - Supports `http://localhost:5173` (typical npm default)
 2. **Custom Port Usage**: If using a different port, update CORS configuration in `backend/src/main/java/com/technicalchallenge/config/WebConfig.java`
-3. **Configuration Location**: 
+3. **Configuration Location**:
    ```java
    // In WebConfig.java
    .allowedOrigins("http://localhost:3000", "http://localhost:5173")
@@ -370,6 +419,7 @@ set PORT=3001 && pnpm dev  # Windows
 ## Testing the Setup
 
 ### Quick Verification Checklist
+
 - [ ] Backend starts without errors
 - [ ] Frontend starts without errors
 - [ ] Can access H2 database console at http://localhost:8080/h2-console
@@ -384,6 +434,7 @@ set PORT=3001 && pnpm dev  # Windows
 ### Required Verification Steps
 
 #### 1. Backend API Verification
+
 ```bash
 # Test health endpoint
 curl http://localhost:8080/actuator/health
@@ -396,12 +447,14 @@ curl http://localhost:8080/api/trades
 ```
 
 #### 2. Swagger UI Verification
+
 1. Navigate to http://localhost:8080/swagger-ui/index.html
 2. Verify all API endpoints are documented
 3. Confirm you can expand endpoint sections
 4. Test at least one GET endpoint using "Try it out" feature
 
 #### 3. Actuator Monitoring Verification
+
 1. **Health Check**: http://localhost:8080/actuator/health should return status "UP"
 2. **Application Info**: http://localhost:8080/actuator/info should show build and environment details
 3. **Metrics**: http://localhost:8080/actuator/metrics should list available metrics

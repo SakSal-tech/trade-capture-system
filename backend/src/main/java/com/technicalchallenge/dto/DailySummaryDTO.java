@@ -2,10 +2,11 @@ package com.technicalchallenge.dto;
 
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.List; // I added this import because I changed historicalComparisons to use List instead of Map.
 import lombok.Getter;
 import lombok.Setter;
 
-//Aggregated DTO, wraps related summaries(Today’s trading , Book-level summaries, Historical comparisons) the Dashboard
+//Aggregated DTO, wraps related summaries(Today's trading , Book-level summaries, Historical comparisons) the Dashboard
 @Getter
 @Setter
 public class DailySummaryDTO {
@@ -21,8 +22,10 @@ public class DailySummaryDTO {
     // Book-level activity summaries (bookId -> trade count, notional, etc.)
     private Map<Long, BookActivitySummary> bookActivitySummaries;
 
-    // Comparison to previous trading days (date -> summary)
-    private Map<String, DailyComparisonSummary> historicalComparisons;
+    // I changed this from Map<String, DailyComparisonSummary> to
+    // List<DailyComparisonSummary> so the response matches the integration test
+    // expectations. See Development-Errors-and-fixes.md for details.
+    private List<DailyComparisonSummary> historicalComparisons;
 
     @Setter
     @Getter
