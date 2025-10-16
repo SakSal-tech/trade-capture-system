@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -160,7 +161,9 @@ public class CashflowServiceTest {
         invalidCashflow.setValueDate(LocalDate.now().plusMonths(3));
 
         // When & Then
-        assertThrows(IllegalArgumentException.class, () -> cashflowService.saveCashflow(invalidCashflow)); // Fixed: expression lambda
+        assertThrows(IllegalArgumentException.class, () -> cashflowService.saveCashflow(invalidCashflow)); // Fixed:
+                                                                                                           // expression
+                                                                                                           // lambda
         verify(cashflowRepository, never()).save(any(Cashflow.class));
     }
 
@@ -173,7 +176,9 @@ public class CashflowServiceTest {
         invalidCashflow.setValueDate(null); // Missing value date
 
         // When & Then
-        assertThrows(IllegalArgumentException.class, () -> cashflowService.saveCashflow(invalidCashflow)); // Fixed: expression lambda
+        assertThrows(IllegalArgumentException.class, () -> cashflowService.saveCashflow(invalidCashflow)); // Fixed:
+                                                                                                           // expression
+                                                                                                           // lambda
         verify(cashflowRepository, never()).save(any(Cashflow.class));
     }
 
@@ -189,4 +194,7 @@ public class CashflowServiceTest {
         // Then
         verify(cashflowRepository).deleteById(cashflowId);
     }
+
+    // @Test
+    // void CashflowServiceTest
 }

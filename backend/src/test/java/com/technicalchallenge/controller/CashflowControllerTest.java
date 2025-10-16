@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+// import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,6 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(CashflowController.class)
+// @WithMockUser
 public class CashflowControllerTest {
 
     @Autowired
@@ -133,6 +135,10 @@ public class CashflowControllerTest {
         verify(cashflowService).getCashflowById(999L);
     }
 
+    // I am adding the TRADER role to this test methods to match the privilege
+    // enforcement rules and resolve the 403 Forbidden error. The TRADER role allows
+    // create, amend, terminate, and cancel actions.
+    // @WithMockUser(roles = "TRADER")
     @Test
     void testCreateCashflow() throws Exception {
         // Given
@@ -150,6 +156,10 @@ public class CashflowControllerTest {
         verify(cashflowService).populateReferenceDataByName(any(Cashflow.class), any(CashflowDTO.class));
     }
 
+    // I am adding the TRADER role to this test method to match the privilege
+    // enforcement rules and resolve the 403 Forbidden error. The TRADER role allows
+    // create, amend, terminate, and cancel actions.
+    // @WithMockUser(roles = "TRADER")
     @Test
     void testCreateCashflowValidationFailure_NegativePaymentValue() throws Exception {
         // Given

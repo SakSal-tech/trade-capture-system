@@ -1,91 +1,125 @@
+
 package com.technicalchallenge.controller;
 
-import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
-import com.technicalchallenge.dto.DailySummaryDTO;
-import com.technicalchallenge.dto.SearchCriteriaDTO;
-import com.technicalchallenge.dto.TradeDTO;
-import com.technicalchallenge.dto.TradeSummaryDTO;
+import org.springframework.web.bind.annotation.*;
+import com.technicalchallenge.dto.*;
 import com.technicalchallenge.service.TradeDashboardService;
+import java.util.List;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Positive;
-
-/*This controller has been created for Separation of concerns: Keeps trade CRUD operations (TradeController) separate from dashboard/analytics endpoints.
-Scalability: Easier to expand dashboard features without cluttering trade logic. */
-
-@Validated // To make sure API calls are clean and users can't crash the endpoint with bad
-           // parameters.
 @RestController
 @RequestMapping("/api/dashboard")
-
 public class TradeDashboardController {
-    @Autowired
-    private TradeDashboardService tradeDashboardService;
 
-    @GetMapping("/filter")
-    // Page<TradeDTO> is a page (a paginated list) of TradeDTO objects
-    // ResponseEntity<Page<TradeDTO>> is the HTTP response wrapper that contains
-    // that page and extra HTTP info (status code, headers)
-    public ResponseEntity<Page<TradeDTO>> filterTrades(@ModelAttribute SearchCriteriaDTO criteriaDTO,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+    private final TradeDashboardService dashboardService;
 
-        Page<TradeDTO> pagedResult = tradeDashboardService.filterTrades(criteriaDTO, page, size);
-        return ResponseEntity.ok(pagedResult);
-
+    public TradeDashboardController(TradeDashboardService dashboardService) {
+        this.dashboardService = dashboardService;
     }
 
-    @GetMapping("/search")
-    // This method uses that criteriaDTO to find matching trades in the database and
-    // returns them as a list of TradeDTO objects. criteriaDTO tells the service
-    // what to search for and List<TradeDTO> is the
-    // search result returned.
-    public ResponseEntity<List<TradeDTO>> searchTrades(SearchCriteriaDTO criteriaDTO) {
-        List<TradeDTO> results = tradeDashboardService.searchTrades(criteriaDTO);
-        return ResponseEntity.ok(results);
+    /**
+     * GET /api/dashboard/daily-summary?traderId=xxx
+     * Only TRADER role should be allowed.
+     * Returns DailySummaryDTO as JSON.
+     */
+    // No security enforced
+    @org.springframework.web.bind.annotation.GetMapping("/daily-summary")
+    public ResponseEntity<DailySummaryDTO> getDailySummary(@RequestParam String traderId) {
+        DailySummaryDTO summary = dashboardService.getDailySummary(traderId);
+        return ResponseEntity.ok(summary);
     }
 
-    @GetMapping("/rsql")
-    public ResponseEntity<List<TradeDTO>> searchTradesRsql(@RequestParam String query) {
+    /**
+     * GET /api/dashboard/summary?traderId=xxx
+     * Only TRADER role should be allowed.
+     * Returns TradeSummaryDTO as JSON.
+     */
+    // No security enforced
+    @org.springframework.web.bind.annotation.GetMapping("/summary")
+    public ResponseEntity<TradeSummaryDTO> getTradeSummary(@RequestParam String traderId) {
+        TradeSummaryDTO summary = dashboardService.getTradeSummary(traderId);
+        return ResponseEntity.ok(summary);
+    }
 
-        List<TradeDTO> trades = tradeDashboardService.searchTradesRsql(query);
-
+    /**
+     * GET /api/dashboard/my-trades?traderId=xxx
+     * Only TRADER role should be allowed.
+     * Returns List<TradeDTO> as JSON.
+     */
+    // No security enforced
+    @org.springframework.web.bind.annotation.GetMapping("/my-trades")
+    public ResponseEntity<List<TradeDTO>> getMyTrades(@RequestParam String traderId) {
+        List<TradeDTO> trades = dashboardService.getTradesByTrader(traderId);
         return ResponseEntity.ok(trades);
     }
 
-    // Trader's personal trades
-    @GetMapping("/my-trades")
-    public List<TradeDTO> getMyTrades(@RequestParam @NotBlank String traderId) {
-        return tradeDashboardService.getTradesByTrader(traderId);
+    /**
+     * GET /api/dashboard/book/{bookId}/trades
+     * Only BOOK_VIEW role should be allowed.
+     * Returns List<TradeDTO> as JSON.
+     */
+    // No security enforced
+    @org.springframework.web.bind.annotation.GetMapping("/book/{bookId}/trades")
+    public ResponseEntity<List<TradeDTO>> getTradesByBook(@PathVariable Long bookId) {
+        List<TradeDTO> trades = dashboardService.getTradesByBook(bookId);
+        return ResponseEntity.ok(trades);
     }
 
-    // Book-level trade aggregation
-    @GetMapping("/book/{bookId}/trades")
-    public List<TradeDTO> getTradesByBook(@PathVariable @Positive Long bookId) {
-        return tradeDashboardService.getTradesByBook(bookId);
+    /**
+     * GET /api/dashboard/filter
+     * Only TRADE_VIEW role should be allowed.
+     * Returns Page<TradeDTO> as JSON.
+     */
+    // No security enforced
+    @org.springframework.web.bind.annotation.GetMapping("/filter")
+    public ResponseEntity<Map<String, Object>> filterTrades(@RequestParam(required = false) String counterparty,
+            @RequestParam(required = false) String book,
+            @RequestParam(required = false) String trader,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
+        SearchCriteriaDTO criteria = new SearchCriteriaDTO(counterparty, book, trader, status, null, null);
+        List<TradeDTO> trades = dashboardService.filterTrades(criteria, 0, 100).getContent();
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", trades);
+        response.put("count", trades.size());
+        return ResponseEntity.ok(response);
     }
 
-    // Portfolio summary — aggregate totals and exposure by trader
-    @GetMapping("/summary")
-    public TradeSummaryDTO getTradeSummary(@RequestParam @NotBlank String traderId) {
-        return tradeDashboardService.getTradeSummary(traderId);
+    /**
+     * GET /api/dashboard/search
+     * Only TRADE_VIEW role should be allowed.
+     * Returns List<TradeDTO> as JSON.
+     */
+    // No security enforced
+    @org.springframework.web.bind.annotation.GetMapping("/search")
+    public ResponseEntity<List<TradeDTO>> searchTrades(@RequestParam(required = false) String counterparty,
+            @RequestParam(required = false) String book,
+            @RequestParam(required = false) String trader,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
+        SearchCriteriaDTO criteria = new SearchCriteriaDTO(counterparty, book, trader, status, null, null);
+        List<TradeDTO> trades = dashboardService.searchTrades(criteria);
+        return ResponseEntity.ok(trades);
     }
 
-    // Daily trading statistics — today's activity snapshot
-    @GetMapping("/daily-summary")
-    public DailySummaryDTO getDailySummary(@RequestParam @NotBlank String traderId) {
-        return tradeDashboardService.getDailySummary(traderId);
+    /**
+     * GET /api/dashboard/rsql?query=...
+     * Only TRADE_VIEW role should be allowed.
+     * Returns List<TradeDTO> as JSON.
+     */
+    // No security enforced
+    @org.springframework.web.bind.annotation.GetMapping("/rsql")
+    public ResponseEntity<Map<String, Object>> searchTradesRsql(@RequestParam String query) {
+        List<TradeDTO> trades = dashboardService.searchTradesRsql(query);
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", trades);
+        response.put("count", trades != null ? trades.size() : 0);
+        return ResponseEntity.ok(response);
     }
-
 }

@@ -276,3 +276,50 @@ Expanded test coverage and implemented multiple validation layers.
      - Convert percentage rates correctly (`3.5% → 0.035`).
      - Replace `double` with `BigDecimal` for monetary accuracy.
    - Write regression tests to validate correct cashflow results and prevent recurrence.
+
+All possible user privilege validation integration tests:
+adeController Endpoints:
+
+GET /api/trades — getAllTrades
+GET /api/trades/{id} — getTradeById
+POST /api/trades — createTrade
+PATCH /api/trades/{id} — updateTrade (partial)
+PUT /api/trades/{id} — updateTrade (full)
+DELETE /api/trades/{id} — deleteTrade
+POST /api/trades/{id}/terminate — terminateTrade
+POST /api/trades/{id}/cancel — cancelTrade
+TradeDashboardController Endpoints:
+
+GET /api/dashboard/filter — filterTrades
+GET /api/dashboard/search — searchTrades
+GET /api/dashboard/rsql — searchTradesRsql
+GET /api/dashboard/my-trades — getMyTrades
+GET /api/dashboard/book/{bookId}/trades — getTradesByBook
+GET /api/dashboard/summary — getTradeSummary
+GET /api/dashboard/daily-summary — getDailySummary
+Next step: I will recommend specific privilege validation integration tests for each endpoint, specifying expected roles and HTTP status codes.
+To fully resolve request, here is a privilege validation integration test plan for all endpoints:
+
+TradeController:
+
+GET /api/trades — Test: Only users with "TRADE_VIEW" or "ADMIN" role can access; others get 403.
+GET /api/trades/{id} — Test: Only "TRADE_VIEW" or "ADMIN" role; others get 403.
+POST /api/trades — Test: Only "TRADE_CREATE" or "ADMIN" role; others get 403.
+PATCH /api/trades/{id} — Test: Only "TRADE_EDIT" or "ADMIN" role; others get 403.
+PUT /api/trades/{id} — Test: Only "TRADE_EDIT" or "ADMIN" role; others get 403.
+DELETE /api/trades/{id} — Test: Only "TRADE_DELETE" or "ADMIN" role; others get 403.
+POST /api/trades/{id}/terminate — Test: Only "TRADE_TERMINATE" or "ADMIN" role; others get 403.
+POST /api/trades/{id}/cancel — Test: Only "TRADE_CANCEL" or "ADMIN" role; others get 403.
+TradeDashboardController:
+
+GET /api/dashboard/filter — Test: Only "TRADE_VIEW" or "ADMIN" role; others get 403.
+GET /api/dashboard/search — Test: Only "TRADE_VIEW" or "ADMIN" role; others get 403.
+GET /api/dashboard/rsql — Test: Only "TRADE_VIEW" or "ADMIN" role; others get 403.
+GET /api/dashboard/my-trades — Test: Only "TRADER" or "ADMIN" role; others get 403.
+GET /api/dashboard/book/{bookId}/trades — Test: Only "BOOK_VIEW" or "ADMIN" role; others get 403.
+GET /api/dashboard/summary — Test: Only "TRADER" or "ADMIN" role; others get 403.
+GET /api/dashboard/daily-summary — Test: Only "TRADER" or "ADMIN" role; others get 403.
+For each endpoint, write integration tests using @WithMockUser for:
+
+Allowed roles (expect 200/204)
+Disallowed roles (expect 403)

@@ -773,7 +773,7 @@ from UserPrivilegeRepository.
 
 ### Root cause
 
-I clicked the error and The UserPrivilegeRepository is declared with the wrong ID type, Spring Data JPA is failing to start the application context (which means your API won't run).
+I clicked the error and The UserPrivilegeRepository is declared with the wrong ID type, Spring Data JPA is failing to start the application context (which means the API won't run).
 public interface UserPrivilegeRepository extends JpaRepository<UserPrivilege, Long> {}
 
 I then checked the UserPrivilege. java class to check the type of the UserPrivilege is and it seems that it is marked by @IdClass. It seems that primary key is not just a Long, but a composite key class called UserPrivilegeId.

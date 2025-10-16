@@ -1,9 +1,12 @@
 package com.technicalchallenge.validation;
 
+import org.springframework.stereotype.Component;
+
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.model.UserProfile;
 
 // This engine is responsible for user privilege validation only
+@Component
 public class UserPrivilegeValidationEngine {
 
     public TradeValidationResult validateUserPrivilegeBusinessRules(TradeDTO tradeDTO, UserProfile userProfile) {

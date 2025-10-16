@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+// import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
@@ -28,6 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(TradeController.class)
+// @WithMockUser
 public class TradeControllerTest {
 
     @Autowired
@@ -143,6 +145,11 @@ public class TradeControllerTest {
         verify(tradeService).saveTrade(any(Trade.class), any(TradeDTO.class));
         verify(tradeService).populateReferenceDataByName(any(Trade.class), any(TradeDTO.class));
     }
+
+    // I am adding the TRADER role to this test method to match the privilege
+    // enforcement rules and resolve the 403 Forbidden error. The TRADER role allows
+    // create, amend, terminate, and cancel actions.
+    // @WithMockUser(roles = "TRADER")
 
     @Test
     void testUpdateTrade() throws Exception {
