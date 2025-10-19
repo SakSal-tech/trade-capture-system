@@ -18,6 +18,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -551,9 +552,10 @@ public class TradeService {
      * trade leg and the payment interval (in months).
      */
     private BigDecimal calculateCashflowValue(TradeLeg leg, int monthsInterval) {
-        if (leg.getLegRateType() == null) { // If the leg’s rate type is not set, the method returns zero, prevents
+        if (leg.getLegRateType() == null) { // If the leg's rate type is not set, the method returns zero, prevents
                                             // calculation errors and signals missing data.
-            return BigDecimal.ZERO;
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_EVEN);// REFACRORED:format number to 2 decimal places
+                                                                       // using banker's rounding
         }
 
         String legType = leg.getLegRateType().getType();
@@ -567,19 +569,35 @@ public class TradeService {
         // fraction of the year covered by the payment interval (e.g., for a quarterly
         // payment, use 3/12 of the annual rate). The result is wrapped in a
         // BigDecimal for precision.
-        if ("Fixed".equals(legType)) {
-            double notional = leg.getNotional().doubleValue();
-            double rate = leg.getRate();
-            double months = monthsInterval;
+        // REFACTORED: changed .equals to equalsIgnoreCase to make the leg-type checks
+        // case-insensitive, if the database or test says "fixed" or "FIXED", this
+        // fails.
+        if ("Fixed".equalsIgnoreCase(legType)) {
+            // REFACTORED changed double to BigDecimal for money to stay as BigDecimal to
+            // avoid floating-point drift, loses precision and to avoid null notionals by
+            // using 0 instead to avoid a NullPointerException.
+            BigDecimal notional = (leg.getNotional() == null) ? BigDecimal.ZERO : leg.getNotional();
+            // REFACTORED TO FIX THE 100x bug
+            BigDecimal rawRate = BigDecimal.valueOf(leg.getRate());
+            // If the rate > 1 (like 3.5), it assumes it's a percentage and divides by 100.
+            // If the rate ≤ 1 (like 0.035), it assumes it's already a decimal and leaves it
+            // as-is.
+            BigDecimal rateDecimal = (rawRate.compareTo(BigDecimal.ONE) > 0) ? rawRate.divide(BigDecimal.valueOf(100))
+                    : rawRate;
+            // Converts months into fraction e.g 3 months into 0.25 a quarter, keeping 10
+            // decimal places
+            BigDecimal yearFraction = BigDecimal.valueOf(monthsInterval).divide(BigDecimal.valueOf(12), 10,
+                    RoundingMode.HALF_EVEN);// month/12 e.g 3/12 = 0.25 as BigDecimal
+            // 10,000,000 * 0.035 * (3 / 12) = 87,500
+            BigDecimal result = notional.multiply(rateDecimal).multiply(yearFraction).setScale(2,
+                    RoundingMode.HALF_EVEN);
 
-            double result = (notional * rate * months) / 12;
-
-            return BigDecimal.valueOf(result);
-        } else if ("Floating".equals(legType)) { // For "Floating" legs, the method currently returns zero.
-            return BigDecimal.ZERO;
+            return result;
+        } else if ("Floating".equalsIgnoreCase(legType)) { // For "Floating" legs, the method currently returns zero.
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_EVEN);
         }
-
-        return BigDecimal.ZERO;
+        // Fallback for unknown leg types return 0,0
+        return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_EVEN);
     }
 
     private void validateReferenceData(Trade trade) {
