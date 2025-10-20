@@ -14,18 +14,24 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+//This ensures that a servlet environment is created and HttpSecurity can be autowired.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 
 @AutoConfigureMockMvc
 
 @ActiveProfiles("test")
-
-@org.springframework.boot.autoconfigure.ImportAutoConfiguration(exclude = {
-                org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
-                org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration.class,
-                org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration.class,
-                org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration.class
-})
+// disables several Spring Boot security auto-configuration classes for the test
+// application context
+// removing those auto-configs makes it easier to run integration tests without
+// dealing with default authentication, filters, or OAuth2 behaviour
+// to disable default login behaviour or avoid authentication interfering with
+// controller tests.
+// @org.springframework.boot.autoconfigure.ImportAutoConfiguration(exclude = {
+// org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
+// org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration.class,
+// org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration.class,
+// org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration.class
+// })
 public class UserPrivilegeIntegrationTest {
 
         @Autowired
