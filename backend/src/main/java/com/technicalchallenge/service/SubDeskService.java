@@ -35,9 +35,10 @@ public class SubDeskService {
     public void populateReferenceDataByName(SubDesk subDesk, SubDeskDTO dto) {
         if (dto.getDeskName() != null && !dto.getDeskName().isBlank()) {
             var desk = deskRepository.findAll().stream()
-                .filter(d -> d.getDeskName().equalsIgnoreCase(dto.getDeskName()))
-                .findFirst().orElse(null);
-            if (desk == null) throw new IllegalArgumentException("Desk '" + dto.getDeskName() + "' does not exist");
+                    .filter(d -> d.getDeskName().equalsIgnoreCase(dto.getDeskName()))
+                    .findFirst().orElse(null);
+            if (desk == null)
+                throw new IllegalArgumentException("Desk '" + dto.getDeskName() + "' does not exist");
             subDesk.setDesk(desk);
         }
         // If deskName is null or blank, do not modify the current desk
@@ -53,4 +54,6 @@ public class SubDeskService {
         logger.warn("Deleting subdesk with id: {}", id);
         subDeskRepository.deleteById(id);
     }
+    // Adding this line to force commit
+
 }

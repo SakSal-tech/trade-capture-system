@@ -7,4 +7,6 @@ public class TradeSubTypeDTO {
     private Long id;
     private String tradeSubType;
     // getters and setters
+    // Adding this line to force commit
+
 }

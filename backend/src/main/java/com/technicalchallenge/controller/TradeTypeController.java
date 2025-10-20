@@ -76,4 +76,6 @@ public class TradeTypeController {
                 .map(TradeType::getTradeType)
                 .toList();
     }
+    // Adding this line to force commit
+
 }

@@ -15,10 +15,12 @@ public class UserDTO {
     private String firstName;
     private String lastName;
     private String loginId;
-    @JsonProperty(access =  JsonProperty.Access.WRITE_ONLY)
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
     private boolean active;
     private int version;
     private LocalDateTime lastModifiedTimestamp;
     private String userProfile;
+    // Adding this line to force commit
+
 }

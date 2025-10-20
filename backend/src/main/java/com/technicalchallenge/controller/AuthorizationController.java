@@ -15,12 +15,13 @@ public class AuthorizationController {
 
     private final AuthorizationService authorizationService;
 
-
     @PostMapping("/{userName}")
-    public ResponseEntity<?> login(@PathVariable(name = "userName") String userName, @RequestParam(name = "Authorization") String authorization) {
+    public ResponseEntity<?> login(@PathVariable(name = "userName") String userName,
+            @RequestParam(name = "Authorization") String authorization) {
 
-        return authorizationService.authenticateUser(userName, authorization) ?
-                ResponseEntity.ok("Login successful") :
-                ResponseEntity.status(HttpStatus.FORBIDDEN).body("Login failed");
+        return authorizationService.authenticateUser(userName, authorization) ? ResponseEntity.ok("Login successful")
+                : ResponseEntity.status(HttpStatus.FORBIDDEN).body("Login failed");
     }
+    // Adding this line to force commit
+
 }

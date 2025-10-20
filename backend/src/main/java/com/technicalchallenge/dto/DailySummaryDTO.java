@@ -42,4 +42,6 @@ public class DailySummaryDTO {
         private Map<String, BigDecimal> notionalByCurrency;
 
     }
+    // Adding this line to force commit
+
 }

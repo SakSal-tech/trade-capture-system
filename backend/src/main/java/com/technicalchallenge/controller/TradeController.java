@@ -178,5 +178,6 @@ public class TradeController {
             return ResponseEntity.badRequest().body("Error cancelling trade: " + e.getMessage());
         }
     }
+    // Adding this line to force commit
 
 }

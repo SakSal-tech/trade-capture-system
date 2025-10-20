@@ -37,4 +37,6 @@ public class DeskService {
         logger.warn("Deleting desk with id: {}", id);
         deskRepository.deleteById(id);
     }
+    // Adding this line to force commit
+
 }

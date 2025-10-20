@@ -79,4 +79,6 @@ public class TradeDTO {
 
     // Add: Action to be performed on trade
     private String action;
+    // Adding this line to force commit
+
 }

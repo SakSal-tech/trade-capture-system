@@ -383,4 +383,6 @@ public class TradeDashboardServiceTest {
         assertEquals(1, result.size());
         assertEquals(123L, result.get(0).getTradeId());
     }
+    // Adding this line to force commit
+
 }
