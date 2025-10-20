@@ -24,4 +24,5 @@ public class TradeSummaryDTO {
     // Risk exposure summaries (e.g. total delta, vega, etc.)
     // Summary metrics as key-value pairs for flexibility.
     private Map<String, BigDecimal> riskExposureSummary;
+
 }

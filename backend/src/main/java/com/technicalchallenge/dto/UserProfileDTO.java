@@ -6,5 +6,6 @@ import lombok.Data;
 public class UserProfileDTO {
     private Long id;
     private String userType;
-}
+    // Adding this line to force commit
 
+}

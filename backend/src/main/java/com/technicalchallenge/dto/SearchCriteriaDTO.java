@@ -36,5 +36,6 @@ public class SearchCriteriaDTO {
     private LocalDate startDate;
     @DateTimeFormat(iso = ISO.DATE)
     private LocalDate endDate;
+    // Adding this line to force commit
 
 }

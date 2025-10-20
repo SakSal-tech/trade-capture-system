@@ -69,5 +69,6 @@ public class TradeDateValidatorTest {
         assertTrue(result.getErrors().contains("Trade date cannot be more than 30 days in the past"));
 
     }
+    // Adding this line to force commit
 
 }

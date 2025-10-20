@@ -598,5 +598,6 @@ public class TradeService {
     private Long generateNextTradeId() {
         return 10000L + tradeRepository.count();
     }
+    // Adding this line to force commit
 
 }

@@ -189,5 +189,6 @@ public class TradeLegValidatorTest {
         boolean isValidRate = validator.validateLegRate(leg);
         assertFalse(isValidRate, "Fixed leg with excessive decimal precision should be invalid");
     }
+    // Adding this line to force commit
 
 }

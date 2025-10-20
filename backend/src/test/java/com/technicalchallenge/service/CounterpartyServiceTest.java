@@ -27,5 +27,5 @@ public class CounterpartyServiceTest {
         assertTrue(found.isPresent());
         assertEquals(1L, found.get().getId());
     }
-    // Add more tests for save, update, delete
+    // Adding this line to force commit
 }

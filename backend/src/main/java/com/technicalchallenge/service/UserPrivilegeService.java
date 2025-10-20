@@ -38,4 +38,6 @@ public class UserPrivilegeService {
         logger.warn("Deleting user privilege with id: {}", id);
         userPrivilegeRepository.deleteById(id);
     }
+    // Adding this line to force commit
+
 }

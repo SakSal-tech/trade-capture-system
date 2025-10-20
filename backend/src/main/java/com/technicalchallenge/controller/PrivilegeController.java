@@ -49,7 +49,8 @@ public class PrivilegeController {
     public ResponseEntity<PrivilegeDTO> createPrivilege(@Valid @RequestBody PrivilegeDTO privilegeDTO) {
         logger.info("Creating new privilege: {}", privilegeDTO);
         Privilege savedPrivilege = privilegeService.savePrivilege(privilegeMapper.toEntity(privilegeDTO));
-        return ResponseEntity.created(URI.create("/api/privileges/" + savedPrivilege.getId())).body(privilegeMapper.toDto(savedPrivilege));
+        return ResponseEntity.created(URI.create("/api/privileges/" + savedPrivilege.getId()))
+                .body(privilegeMapper.toDto(savedPrivilege));
     }
 
     @DeleteMapping("/{id}")
@@ -58,4 +59,6 @@ public class PrivilegeController {
         privilegeService.deletePrivilege(id);
         return ResponseEntity.noContent().build();
     }
+    // Adding this line to force commit
+
 }

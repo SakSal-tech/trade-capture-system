@@ -254,4 +254,6 @@ public class TradeControllerTest {
                     .andExpect(jsonPath("$[0].counterpartyName").value("BigBank"));
         }
     }
+    // Adding this line to force commit
+
 }

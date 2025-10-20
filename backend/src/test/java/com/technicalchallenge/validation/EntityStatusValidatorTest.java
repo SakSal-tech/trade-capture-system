@@ -79,4 +79,6 @@ public class EntityStatusValidatorTest {
         assertTrue(statusValid);
         assertTrue(result.isValid());
     }
+    // Adding this line to force commit
+
 }

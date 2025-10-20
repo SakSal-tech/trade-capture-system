@@ -122,4 +122,6 @@ public class TradeDashboardController {
         response.put("count", trades != null ? trades.size() : 0);
         return ResponseEntity.ok(response);
     }
+    // Adding this line to force commit
+
 }

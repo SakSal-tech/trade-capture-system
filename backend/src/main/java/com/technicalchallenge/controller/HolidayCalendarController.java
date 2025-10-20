@@ -49,7 +49,8 @@ public class HolidayCalendarController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<HolidayCalendarDTO> update(@PathVariable Long id, @RequestBody HolidayCalendarDTO holidayCalendarDTO) {
+    public ResponseEntity<HolidayCalendarDTO> update(@PathVariable Long id,
+            @RequestBody HolidayCalendarDTO holidayCalendarDTO) {
         return holidayCalendarService.findById(id)
                 .map(existing -> {
                     HolidayCalendar entity = holidayCalendarMapper.toEntity(holidayCalendarDTO);
@@ -76,4 +77,6 @@ public class HolidayCalendarController {
                 .map(HolidayCalendar::getHolidayCalendar)
                 .toList();
     }
+    // Adding this line to force commit
+
 }

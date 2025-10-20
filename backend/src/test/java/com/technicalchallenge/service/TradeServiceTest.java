@@ -305,5 +305,6 @@ class TradeServiceTest {
         verify(cashflowRepository, times(12)).save(any(Cashflow.class));// Cashflow.class any instance of the Cashflow
                                                                         // type
     }
+    // Adding this line to force commit
 
 }

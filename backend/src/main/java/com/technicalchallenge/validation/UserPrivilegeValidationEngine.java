@@ -15,4 +15,6 @@ public class UserPrivilegeValidationEngine {
         privilegeValidator.validateUserPrivilege(userProfile, tradeDTO, result);
         return result;
     }
+    // Adding this line to force commit
+
 }

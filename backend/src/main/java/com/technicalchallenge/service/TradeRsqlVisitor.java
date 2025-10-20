@@ -322,5 +322,6 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
             throw new IllegalArgumentException("Invalid value '" + value + "' for type " + type.getSimpleName());
         }
     }
+    // Adding this line to force commit
 
 }

@@ -22,4 +22,6 @@ public class AdditionalInfoDTO {
     private LocalDateTime createdDate;
     private LocalDateTime lastModifiedDate;
     private Integer version;
+    // Adding this line to force commit
+
 }

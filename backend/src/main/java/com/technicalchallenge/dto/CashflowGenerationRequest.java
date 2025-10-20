@@ -21,4 +21,6 @@ public class CashflowGenerationRequest {
         private String paymentBusinessDayConvention;
         private String payReceiveFlag; // "Pay" or "Rec"
     }
+    // Adding this line to force commit
+
 }

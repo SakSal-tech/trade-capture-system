@@ -54,4 +54,6 @@ public class CounterpartyControllerTest {
         mockMvc.perform(get("/api/counterparties"))
                 .andExpect(status().isOk());
     }
+    // Adding this line to force commit
+
 }

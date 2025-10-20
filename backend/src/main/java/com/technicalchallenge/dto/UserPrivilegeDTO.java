@@ -7,4 +7,6 @@ public class UserPrivilegeDTO {
     private Long userId;
     private Long privilegeId;
     // getters and setters
+    // Adding this line to force commit
+
 }

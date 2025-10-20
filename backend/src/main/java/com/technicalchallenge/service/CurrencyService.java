@@ -37,4 +37,6 @@ public class CurrencyService {
         logger.warn("Deleting currency with id: {}", id);
         currencyRepository.deleteById(id);
     }
+    // Adding this line to force commit
+
 }

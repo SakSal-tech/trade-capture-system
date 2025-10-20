@@ -37,4 +37,6 @@ public class LegTypeService {
         logger.warn("Deleting leg type with id: {}", id);
         legTypeRepository.deleteById(id);
     }
+    // Adding this line to force commit
+
 }
