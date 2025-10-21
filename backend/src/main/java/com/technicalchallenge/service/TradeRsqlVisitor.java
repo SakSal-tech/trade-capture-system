@@ -301,7 +301,7 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
      */
     public static Object convertValue(Class<?> type, String value) {
         // I refactored this method to handle LocalDate and LocalDateTime conversions
-        // properly, while preserving your existing logic and comments.
+        // properly, while preserving existing logic and comments.
         try {
             if (type == String.class)
                 return value;

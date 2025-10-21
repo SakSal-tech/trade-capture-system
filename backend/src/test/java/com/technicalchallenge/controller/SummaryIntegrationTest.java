@@ -3,6 +3,8 @@ package com.technicalchallenge.controller;
 import org.springframework.test.context.ActiveProfiles;
 
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +44,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                // during a test are rolled back at the end, keeping the test data isolated and
                // repeatable
 @Rollback // Marks the transaction to be rolled back after the test
+@WithMockUser(username = "testTrader", roles = { "TRADER", "TRADE_VIEW" })
+@ActiveProfiles("test")
+
 public class SummaryIntegrationTest extends BaseIntegrationTest {
         // Injecting dependencies to enable the use mockMvc for endpoint testing, seed
         // and query trades in the database and call service methods

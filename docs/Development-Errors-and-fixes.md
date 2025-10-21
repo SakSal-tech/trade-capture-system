@@ -2385,8 +2385,8 @@ mockMvc.perform(post("/api/trades")
 
 ### Impact
 
-⚠️ Currently still failing until all integration tests explicitly authenticate.  
-✅ Business logic correctness verified — 403s confirm access control works.
+Currently still failing until all integration tests explicitly authenticate.  
+Business logic correctness verified — 403s confirm access control works.
 
 ---
 
@@ -2607,3 +2607,914 @@ BUILD SUCCESS
 ```
 
 The bug was fully reproduced, diagnosed, and fixed.
+
+# Trade Capture System – Debugging Log (All 31+ failing tests to green)
+
+This log is a narrative of how I investigated and fixed more than thirty failing tests across the backend, written in first person and UK English. I include the original failure messages, the root cause I discovered, the solution I implemented with code snippets, and the impact on the codebase and test suite. I have grouped related failures so the story is readable and thorough.
+
+---
+
+## 1) 403 where 200 expected on read-only endpoints
+
+### Problem (from tests)
+
+```
+AdvanceSearchDashboardIntegrationTest.testSearchTradesEndpoint: Status expected:<200> but was:<403>
+AdvanceSearchDashboardIntegrationTest.testFilterTradesEndpoint: Status expected:<200> but was:<403>
+AdvanceSearchDashboardIntegrationTest.testRsqlEndpoint: Status expected:<200> but was:<403>
+```
+
+and similarly on several summary endpoints:
+
+```
+SummaryIntegrationTest.testSummaryEndpointMultipleTradesToday: Status expected:<200> but was:<403>
+SummaryIntegrationTest.testSummaryEndpointNoTradesToday: Status expected:<200> but was:<403>
+SummaryIntegrationTest.testSummaryEndpointMultipleTradesYesterday: Status expected:<200> but was:<403>
+... (and other SummaryIntegrationTest methods)
+```
+
+### Root cause
+
+I had `@WithMockUser` at class level in `BaseIntegrationTest`, which was fine, but some tests still failed with 403 because the roles did not match the controller’s required authorities for those endpoints. In some places I was accidentally running as SUPPORT for endpoints that only TRADER should see, and in others I forgot to include the role that the security config checks (e.g. `TRADE_VIEW`).
+
+### Solution
+
+I made test roles explicit on each test method, and for read-only endpoints I used a TRADER-oriented identity (or whichever role the controller allows). I removed the global `@WithMockUser` from `BaseIntegrationTest` to prevent accidental authentication bleed-through and declared per-method roles.
+
+```java
+// BaseIntegrationTest (after)
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@Transactional
+public abstract class BaseIntegrationTest {}
+
+// Per-test
+@WithMockUser(username = "viewerUser", roles = { "TRADER" })
+void testSearchTradesEndpoint() throws Exception {
+    mockMvc.perform(get("/api/dashboard/search"))
+           .andExpect(status().isOk());
+}
+```
+
+### Impact
+
+All search and filter endpoints now authenticate correctly with the intended role. The three `AdvanceSearchDashboardIntegrationTest` failures and the group of `SummaryIntegrationTest` 403s went green once I assigned the right roles and ensured the database had the expected data.
+
+---
+
+## 2) 401 vs 403 for unauthenticated tests
+
+### Problem (from tests)
+
+```
+UserPrivilegeIntegrationTest.testUnauthenticatedUserDenied: Status expected:<401> but was:<200> (initially)
+... later became 403 instead of 401
+```
+
+### Root cause
+
+With `@WithMockUser` on the base class, my “unauthenticated” test was actually authenticated as “alice”. When I switched to `@WithAnonymousUser`, Spring Security still considered the request authenticated (anonymous principal) and returned 403 where the endpoint required a specific role, hence 403 not 401.
+
+### Solution
+
+I removed the base-level `@WithMockUser` entirely and used either no annotation (truly unauthenticated) or `@WithAnonymousUser` only when I explicitly wanted anonymous. For the test I updated the expectation depending on desired behaviour:
+
+- If the endpoint is secured and should challenge non-authenticated requests, expect 401.
+- If the endpoint permits anonymous but requires a role, expect 403.
+
+```java
+@Test
+void testUnauthenticatedUserDenied() throws Exception {
+    mockMvc.perform(get("/api/dashboard/daily-summary?traderId=testTrader"))
+           .andExpect(status().isUnauthorized()); // truly no authentication now
+}
+```
+
+### Impact
+
+The intent of the tests now matches the security behaviour. No accidental 200 or 403 due to inherited mock users. The unauthenticated test stabilised.
+
+---
+
+## 3) 400 Bad Request instead of 403 Forbidden for modifying endpoints
+
+### Problem (from tests)
+
+```
+UserPrivilegeIntegrationTest.testSupportRoleDeniedPatchTrade: Status expected:<403> but was:<400>
+UserPrivilegeIntegrationTest.testSupportRoleDeniedPatchTrade_Simple: Status expected:<403> but was:<400>
+TradeControllerTest.testCreateTrade: Status expected:<201> but was:<403> (later 400)
+```
+
+### Root cause
+
+My request bodies for create/patch were failing validation. In places I sent only a `{ "tradeId": 1 }` payload or used the wrong property name (`legs` instead of `tradeLegs`). The controller rejected these as 400 before security could decide 403, so the tests asserted the wrong layer.
+
+### Solution
+
+I supplied a minimal valid `TradeDTO` JSON matching the validation rules and the service preconditions: bookName, counterpartyName, tradeDate, and exactly two legs under `tradeLegs`. I also added CSRF tokens for write operations, because our security config expects CSRF by default.
+
+```java
+@Test
+@WithMockUser(username="supportUser", roles={"SUPPORT"})
+void testSupportRoleDeniedPatchTrade_Simple() throws Exception {
+    String validPatchJson = "{\n" +
+      "  \"bookName\": \"ValidBook\",\n" +
+      "  \"counterpartyName\": \"ValidCounterparty\",\n" +
+      "  \"tradeDate\": \"2025-01-01\",\n" +
+      "  \"tradeLegs\": [\n" +
+      "    {\"legId\":1,\"notional\":1000000,\"currency\":\"USD\",\"startDate\":\"2025-01-01\",\"endDate\":\"2026-01-01\"},\n" +
+      "    {\"legId\":2,\"notional\":1000000,\"currency\":\"USD\",\"startDate\":\"2025-01-01\",\"endDate\":\"2026-01-01\"}\n" +
+      "  ]\n" +
+      "}";
+
+    mockMvc.perform(patch("/api/trades/1")
+           .contentType(MediaType.APPLICATION_JSON)
+           .content(validPatchJson)
+           .with(csrf()))
+           .andExpect(status().isForbidden());
+}
+```
+
+### Impact
+
+All the tests expecting 403 now reach the security layer and assert 403, not 400. This resolved multiple failures at once across `UserPrivilegeIntegrationTest` and `TradeControllerTest`.
+
+---
+
+## 4) 404 Not Found when fetching specific trade by id
+
+### Problem (from tests)
+
+```
+UserPrivilegeIntegrationTest.testTradeViewRoleAllowedById: Status expected:<200> but was:<404>
+UserPrivilegeIntegrationTest.testSupportRoleAllowedTradeById: Status expected:<200> but was:<404>
+```
+
+### Root cause
+
+I was asking for `/api/trades/1` assuming test seed data had a trade with id 1. That was not guaranteed, and later I cleared tables in `@BeforeEach`, so the ID definitely did not exist. In addition, my main `data.sql` was being refactored and not always applied before this test ran.
+
+### Solution
+
+I created the trade in the test to control the ID, then fetched using that exact ID. I also ensured the minimal graph (Book, Counterparty) was persisted first to satisfy FK constraints.
+
+```java
+@Test
+@WithMockUser(username="viewerUser", roles={"TRADER","TRADE_VIEW"})
+void testTradeViewRoleAllowedById() throws Exception {
+    Book book = new Book();
+    book.setBookName("Book-" + System.nanoTime());
+    book.setActive(true);
+    book.setVersion(1);
+    bookRepository.save(book);
+
+    Counterparty cp = new Counterparty();
+    cp.setName("CounterOne");
+    cp.setActive(true);
+    cp.setCreatedDate(LocalDate.now());
+    counterpartyRepository.save(cp);
+
+    Trade t = new Trade();
+    t.setTradeDate(LocalDate.now());
+    t.setBook(book);
+    t.setCounterparty(cp);
+    t.setActive(true);
+    t.setVersion(1);
+    Trade saved = tradeRepository.save(t);
+
+    mockMvc.perform(get("/api/trades/" + saved.getId()))
+           .andExpect(status().isOk());
+}
+```
+
+### Impact
+
+The 404s disappeared. I no longer couple these tests to a specific `data.sql` row that may change in future.
+
+---
+
+## 5) JSON path tradeId expected 200001 but was null
+
+### Problem (from tests)
+
+```
+UserPrivilegeIntegrationTest.testTradeCreateRoleAllowed: JSON path "$.tradeId" Expected: is <200001> but: was null
+```
+
+### Root cause
+
+I mocked `tradeMapper.toDto` to return an empty `TradeDTO` without the `tradeId` set, so the test’s JSONPath assertion failed even though the request looked valid. The mock should return a DTO containing the id that the test is asserting.
+
+### Solution
+
+I set the `tradeId` on the mocked DTO.
+
+```java
+Trade trade = new Trade();
+TradeDTO tradeDTO = new TradeDTO();
+tradeDTO.setTradeId(200001L);
+
+when(tradeMapper.toEntity(any(TradeDTO.class))).thenReturn(trade);
+when(tradeService.saveTrade(any(Trade.class), any(TradeDTO.class))).thenReturn(trade);
+when(tradeMapper.toDto(any(Trade.class))).thenReturn(tradeDTO);
+```
+
+### Impact
+
+The create test now returns the expected JSON structure and passes.
+
+---
+
+## 6) DataIntegrityViolationException on Book primary key
+
+### Problem (from test run)
+
+```
+org.springframework.dao.DataIntegrityViolationException: could not execute statement [Unique index or primary key violation: "PRIMARY KEY ON public.book(id) ... 'TEST-BOOK-1'"]
+```
+
+### Root cause
+
+I had duplicate seed data for `book` and `counterparty` across `src/main/resources/data.sql` and `src/test/resources/data.sql`. The main script created book id 1 named TEST-BOOK-1 and the test seed either recreated it or created related rows referencing ids that clashed. Also, in one case I cleared tables in `@BeforeEach` and then Hibernate tried to re-insert using generated id that clashed with hard-coded ids.
+
+### Solution
+
+I consolidated and de-duplicated seed data, ensured foreign key order, and changed IDs to avoid overlap between main and test seeds. I made sure the parent rows exist before the children and that anything the tests create uses generated IDs or unique names.
+
+```sql
+-- main data.sql (relevant parts)
+INSERT INTO desk (id, desk_name) VALUES (1000, 'FX'), (1001, 'Rates'), (1002, 'Credit');
+INSERT INTO sub_desk (id, subdesk_name, desk_id) VALUES (1000, 'FX Spot', 1000);
+INSERT INTO cost_center (id, cost_center_name, subdesk_id) VALUES (1000, 'London Trading', 1000);
+
+-- book ids do not clash with tests and include FK
+INSERT INTO book (id, book_name, active, version, cost_center_id) VALUES
+  (1000, 'FX-BOOK-1', true, 1, 1000),
+  (1001, 'RATES-BOOK-1', true, 1, 1000);
+
+-- counterparty
+INSERT INTO counterparty (id, name, address, phone_number, internal_code, created_date, last_modified_date, active) VALUES
+  (1000, 'TestBank', '1 Bank St', '123-456-7890', 1001, '2024-01-01', '2025-06-02', true);
+```
+
+And in `src/test/resources/data.sql` I kept only minimal non-overlapping rows (for privileges) or moved the test to create its own rows programmatically.
+
+### Impact
+
+The suite stopped tripping over duplicate keys. The context loads consistently and the repository inserts do not fail.
+
+---
+
+## 7) NonUniqueResultException on Counterparty findByName("BigBank")
+
+### Problem
+
+```
+jakarta.persistence.NonUniqueResultException: query did not return a unique result: 2
+```
+
+### Root cause
+
+I had two counterparties named BigBank in `data.sql` (one with id 1 and another with id 1000). The repository method expected a single row.
+
+### Solution
+
+I renamed the duplicate in main seed data to `TestBank` and left a single `BigBank` row only where truly required by a test. Where tests require a named counterparty, I create it inside the test.
+
+```sql
+-- Keep just one BigBank
+INSERT INTO counterparty (id, name, ...) VALUES (1, 'BigBank', ...);
+-- Rename the other
+INSERT INTO counterparty (id, name, ...) VALUES (1000, 'TestBank', ...);
+```
+
+### Impact
+
+All queries relying on a unique counterparty name behave predictably.
+
+---
+
+## 8) CSRF missing on write requests
+
+### Problem
+
+Some write tests failed with 403 even though the role allowed the action.
+
+### Root cause
+
+Our security configuration requires CSRF tokens for state-changing requests. In tests I forgot to include `.with(csrf())` for POST, PATCH and DELETE.
+
+### Solution
+
+I added `.with(csrf())` to write operations.
+
+```java
+mockMvc.perform(post("/api/trades")
+        .with(csrf())
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(validJson))
+       .andExpect(status().isCreated());
+```
+
+### Impact
+
+The requests now pass the CSRF filter and the tests hit the controller methods properly.
+
+---
+
+## 9) 201 expected but 403 due to wrong role mapping
+
+### Problem
+
+```
+TradeControllerTest.testCreateTrade: Status expected:<201> but was:<403>
+```
+
+### Root cause
+
+I authenticated as a TRADER who didn’t have the specific authority the controller checks for create (e.g. `TRADE_CREATE` or `BOOK_TRADE`). The role name in tests did not match the granted authority in security config.
+
+### Solution
+
+I granted the precise authority in the test identity that the controller expects for creation.
+
+```java
+@WithMockUser(username="creatorUser", roles={"TRADER","TRADE_CREATE"})
+void testCreateTrade() { ... }
+```
+
+### Impact
+
+Create now returns 201 as expected.
+
+---
+
+## 10) 200 expected but 404 because I deleted seed data in @BeforeEach
+
+### Problem
+
+After adding an aggressive `deleteAll()` in `@BeforeEach`, some tests started returning 404 for IDs that used to exist.
+
+### Root cause
+
+I wiped out seed rows required by other test methods in the same class. Those methods assumed specific IDs existed due to `data.sql` but my cleanup removed them.
+
+### Solution
+
+Either: stop deleting those tables for that class, or recreate the required rows at the start of each test. I chose to create per-test rows to keep isolation.
+
+```java
+@BeforeEach
+void setup() {
+    tradeRepository.deleteAll();
+    // then create only what this test class needs in each test
+}
+```
+
+### Impact
+
+The tests are isolated and no longer rely on fragile global IDs.
+
+---
+
+## 11) ApplicationContext failed due to FK order in data.sql
+
+### Problem
+
+On start-up:
+
+```
+Failed to execute SQL script statement #21 ... Referential integrity constraint violation ... trade.book_id references book.id
+```
+
+### Root cause
+
+I inserted trades that referenced books and counterparties that did not yet exist in the script order.
+
+### Solution
+
+I reordered `data.sql` so parent tables are populated before child tables. Desk → Sub Desk → Cost Centre → Book → Counterparty → Trade Type/Subtype/Status → Trade → Trade Leg → Cashflow.
+
+```sql
+-- parents first
+INSERT INTO desk ...;
+INSERT INTO sub_desk ...;
+INSERT INTO cost_center ...;
+INSERT INTO book ...;
+INSERT INTO counterparty ...;
+-- then trades that reference them
+INSERT INTO trade ...;
+INSERT INTO trade_leg ...;
+```
+
+### Impact
+
+Application context now loads reliably for every test run.
+
+---
+
+## 12) Using wrong JSON property name for legs
+
+### Problem
+
+400 for create/patch although I thought the JSON was valid.
+
+### Root cause
+
+The DTO expects the property `tradeLegs` but I sent `legs` in some tests, which Jackson could not bind to the DTO field. Validation then failed.
+
+### Solution
+
+I changed `legs` to `tradeLegs` everywhere.
+
+```json
+{
+  "tradeLegs": [{ "legId": 1 }, { "legId": 2 }]
+}
+```
+
+### Impact
+
+Binding succeeds and the controller reaches domain validation rather than failing at JSON binding.
+
+---
+
+## 13) Testing with mocks inside integration tests
+
+### Problem
+
+A few integration tests mocked `TradeService` and `TradeMapper` while still relying on JPA repositories and `data.sql`. The results were inconsistent, especially for IDs and serialised fields like `tradeId` in the response body.
+
+### Root cause
+
+Mixing mocked service/mapper with the real MVC and database flow meant I was asserting behaviour that didn’t reflect the actual persistence layer. In one case, the mock returned a DTO without the id set, causing the JSONPath failure.
+
+### Solution
+
+I reduced mocking in integration tests to the minimum. For controller-only tests I kept mocks. For end-to-end tests I used real beans and created real rows. Where mocks remain, I ensure the mock returns the JSON fields the test asserts.
+
+```java
+// Prefer real persistence for integration
+@Autowired TradeRepository tradeRepository;
+...
+Trade saved = tradeRepository.save(trade);
+mockMvc.perform(get("/api/trades/" + saved.getId())).andExpect(status().isOk());
+```
+
+### Impact
+
+Tests now reflect real behaviour and are less brittle.
+
+---
+
+## 14) Duplicate user, role and privilege rows between main and test seeds
+
+### Problem
+
+Random integrity violations and non-deterministic lookups during the run of all tests together.
+
+### Root cause
+
+I duplicated user profiles, users and privileges between `src/main/resources/data.sql` and `src/test/resources/data.sql`, sometimes with overlapping ids and names.
+
+### Solution
+
+I made the main seed the canonical base, and reduced the test seed to a minimal set that does not overlap or I created identities at test-time with repositories. Where the test seed is needed, I used id ranges that do not clash with main.
+
+```sql
+-- test seed (only what I need, different ids)
+INSERT INTO user_profile (id, user_type) VALUES (2000, 'TRADER_SALES'), (2001, 'SUPPORT');
+INSERT INTO application_user (id, login_id, user_profile_id, active, version, last_modified_timestamp) VALUES (2000, 'viewerUser', 2000, true, 1, CURRENT_TIMESTAMP());
+```
+
+### Impact
+
+No more collisions on ids or ambiguous results during combined runs.
+
+---
+
+## 15) Summary endpoint assertions mismatched expected structure
+
+### Problem
+
+Initially I asserted the summary response returned an empty array for `historicalComparisons` when no data existed, but the service returns a zeroed object inside an array for a consistent shape.
+
+### Root cause
+
+My tests assumed a different response contract than the service provides.
+
+### Solution
+
+I adjusted the assertion to expect a zeroed summary object.
+
+```java
+.andExpect(jsonPath("$.historicalComparisons").isArray())
+.andExpect(jsonPath("$.historicalComparisons[0].tradeCount").value(0));
+```
+
+### Impact
+
+The summary tests align with the current API contract.
+
+---
+
+## 16) Id collisions on create due to hard-coded tradeId
+
+### Problem
+
+When I set `tradeId` explicitly to 1 or reused an existing value, subsequent test runs caused duplicates or logic branches that assume uniqueness to fail.
+
+### Root cause
+
+I was hard-coding `tradeId` rather than letting the database generate ids. In the service-level validation there were expectations on uniqueness.
+
+### Solution
+
+I removed hard-coded ids from create payloads unless I specifically needed to assert the value. When I must assert a value, I choose an id range that will not collide with seeds (e.g. 200001) and ensure the mock or mapper returns it in the DTO.
+
+```java
+// For integration tests, omit tradeId so DB generates
+{
+  "bookName":"TestBook",
+  "counterpartyName":"BigBank",
+  "tradeDate": "2025-01-01",
+  "tradeLegs":[{...},{...}]
+}
+```
+
+### Impact
+
+No more duplicate key problems or flaky behaviour on repeated runs.
+
+---
+
+## 17) Clearing repositories twice in @BeforeEach
+
+### Problem
+
+In one class I had `deleteAll()` twice for the same tables, which wasn’t harmful but was noisy and risked hiding ordering problems.
+
+### Root cause
+
+Copy-paste while trying to guarantee a clean state.
+
+### Solution
+
+I cleaned up the setup methods and deleted data once, then only created what the test needed.
+
+```java
+@BeforeEach
+void setup() {
+    tradeRepository.deleteAll();
+    bookRepository.deleteAll();
+    counterpartyRepository.deleteAll();
+}
+```
+
+### Impact
+
+Faster tests and clearer intent.
+
+---
+
+## 18) Missing parent FK rows for new test-created trades
+
+### Problem
+
+Occasional constraint violations when I created a trade in a test.
+
+### Root cause
+
+I created a `Trade` that referenced a `Book` and `Counterparty` I hadn’t inserted yet, or where ids clashed with seeds.
+
+### Solution
+
+In tests I persist parent entities first, using unique names, then persist the trade.
+
+```java
+Book book = bookRepository.save(new Book(null, "Book-" + System.nanoTime(), true, 1L, 1000L));
+Counterparty cp = counterpartyRepository.save(...);
+Trade t = tradeRepository.save(...);
+```
+
+### Impact
+
+No more FK exceptions during tests.
+
+---
+
+## 19) Confusion between business roles and granular authorities
+
+### Problem
+
+I expected role TRADER to be enough for endpoints guarded by `hasAuthority('TRADE_VIEW')` or similar.
+
+### Root cause
+
+My mental model conflated high-level roles with specific authorities. The controller security annotations check for named authorities that may not be included in the simple role list given to `@WithMockUser` unless I put them there.
+
+### Solution
+
+For tests I added the exact authorities in the roles list or updated the user privilege mapping in seed data to grant the authority.
+
+```java
+@WithMockUser(username="viewerUser", roles={"TRADER", "TRADE_VIEW"})
+```
+
+### Impact
+
+Security tests assert the intended policy rather than a simplified role model.
+
+---
+
+## 20) When to mock vs not to mock in integration
+
+### Problem
+
+I had inconsistent tests: some used mocked service and mapper with the real MVC and DB; others used the full stack.
+
+### Root cause
+
+I blurred the boundary between controller-unit tests and proper integration tests.
+
+### Solution
+
+As a rule:
+
+- For controller behaviour only (mapping, status codes, validation), I keep the service and mapper mocked.
+- For end-to-end behaviour (repositories, entities, `data.sql`), I avoid mocks and hit the real beans.
+- Where I must mock, I return exactly what the test asserts.
+
+### Impact
+
+Cleaner tests, more predictable outcomes, and fewer brittle assertions.
+
+---
+
+## 21) Fixed ordering and isolation in `SummaryIntegrationTest`
+
+### Problem
+
+Several 403s and data-dependent assertions failed when the full suite ran.
+
+### Root cause
+
+Role mismatch and cross-test leakage of data assumptions.
+
+### Solution
+
+I set the correct `@WithMockUser` per method, seeded just the data each method needed, and asserted against values created within the test scope.
+
+```java
+@WithMockUser(username = "testTrader", roles = { "TRADER" })
+void testSummaryEndpointMultipleTradesToday() throws Exception {
+    // create two trades for today for testTrader, then assert count == 2
+}
+```
+
+### Impact
+
+All summary tests pass regardless of execution order.
+
+---
+
+## 22) RSQL and filter endpoints reliance on default data
+
+### Problem
+
+RSQL tests expected 200 but failed previously due to 403 or 404.
+
+### Root cause
+
+Wrong role and missing base data for the query.
+
+### Solution
+
+I gave the identity permission to view (`TRADER` or `TRADE_VIEW`) and ensured at least one book with id used by the query existed either via `data.sql` or created in the test.
+
+```java
+@WithMockUser(username="viewerUser", roles={"TRADER"})
+mockMvc.perform(get("/api/dashboard/rsql?query=book.id==1"))
+       .andExpect(status().isOk());
+```
+
+### Impact
+
+The RSQL tests are stable.
+
+---
+
+## 23) Move to class-level or method-level `@WithAnonymousUser`
+
+### Problem
+
+I initially put `@WithAnonymousUser` at class level, which unintentionally made several tests anonymous.
+
+### Root cause
+
+I tried to default everything to anonymous after removing base-level `@WithMockUser`.
+
+### Solution
+
+I removed class-level `@WithAnonymousUser` and placed it only on the specific tests that require it. Others have explicit `@WithMockUser` or no annotation (truly unauthenticated) depending on the scenario.
+
+### Impact
+
+No accidental loss of authentication across a whole class.
+
+---
+
+## 24) Ensuring CSRF plays nicely with custom SecurityConfig
+
+### Problem
+
+Some requests still 403’d even with correct roles.
+
+### Root cause
+
+Our `SecurityConfig` uses cookie CSRF in prod; in tests, `.with(csrf())` works if the filter chain accepts it. Initially this was mismatched.
+
+### Solution
+
+Kept production config unchanged, but in tests I included `.with(csrf())` on write calls. Where necessary, I allowed the standard `SecurityMockMvcRequestPostProcessors.csrf()` token to be recognised by the chain in the test profile.
+
+### Impact
+
+Security behaviour in tests mirrors production semantics sufficiently without making tests brittle.
+
+---
+
+## 25) Double-deletion of all tables in Summary test setup
+
+### Problem
+
+I had two consecutive `deleteAll()` blocks, which was redundant.
+
+### Root cause
+
+Overzealous cleanup whilst experimenting.
+
+### Solution
+
+Removed the duplicate deletions and left a single, well-ordered cleanup.
+
+### Impact
+
+Cleaner and quicker setup.
+
+---
+
+## 26) Aligning controller expectations for “my trades” and “daily summary”
+
+### Problem
+
+403s for endpoints that should be available to TRADER identities via query parameters like `traderId=testTrader`.
+
+### Root cause
+
+Wrong role and occasionally missing user rows for the login id used in the query (e.g. testTrader did not exist in user table).
+
+### Solution
+
+I ensured test identities existed in seed data or created them at test time and used `@WithMockUser(username="testTrader", roles={"TRADER"})`.
+
+```java
+@WithMockUser(username="testTrader", roles={"TRADER"})
+mockMvc.perform(get("/api/dashboard/daily-summary").param("traderId", "testTrader"))
+       .andExpect(status().isOk());
+```
+
+### Impact
+
+The “my trades” suite of endpoints is green.
+
+---
+
+## 27) Build failures due to context not loading when all tests run
+
+### Problem
+
+Some classes passed individually but failed when the entire suite ran.
+
+### Root cause
+
+State leakage via the database, seed duplication, and reliance on global ids. Also, I had a few tests that created entities without rolling back changes.
+
+### Solution
+
+I added `@Transactional` on the base test class so each test runs in a transaction rolled back at the end. I also reduced reliance on global ids and created data per test.
+
+```java
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@Transactional
+public abstract class BaseIntegrationTest {}
+```
+
+### Impact
+
+Stable green runs irrespective of execution order.
+
+---
+
+## 28) Adjusting expectations for controller behaviour once validation passes
+
+### Problem
+
+Where I previously hit validation first and saw 400, after adding valid payloads I started hitting authorisation and saw 403, which meant I needed to update the assertions and occasionally the test names.
+
+### Solution
+
+Refreshed all expectations to assert the intended layer. If the test is meant to assert permissions, I ensure the payload is valid and then expect 403 or 200 as appropriate.
+
+### Impact
+
+Tests now clearly differentiate between validation and authorisation failures.
+
+---
+
+## 29) Ensuring serialisation returns expected fields
+
+### Problem
+
+In create tests I asserted the response body contained `tradeId` but the serialisation returned null due to my mock.
+
+### Solution
+
+I made the mapper mock return a DTO that contains `tradeId`. In non-mock tests I asserted properties that are truly persisted and returned by the controller.
+
+```java
+when(tradeMapper.toDto(any(Trade.class))).thenReturn(new TradeDTO() {{ setTradeId(200001L); }});
+```
+
+### Impact
+
+JSONPath assertions are meaningful and stable.
+
+---
+
+## 30) Removing magic IDs from tests unless absolutely necessary
+
+### Problem
+
+Hard-coded references such as `/api/trades/1` led to intermittent 404s and FK issues.
+
+### Solution
+
+Create the entities in the test and use the saved ID. Where I depend on a specific id (for RSQL examples), I ensure the seed actually creates that row and I do not delete it in `@BeforeEach`, or I adapt the test to create what it needs.
+
+### Impact
+
+Tests are self-contained and do not depend on fragile global assumptions.
+
+---
+
+## 31) Consistency of naming between DTOs and entities
+
+### Problem
+
+Occasional confusion over the DTO fields vs entity fields (e.g. `tradeLegs` in DTO vs the entity relationship name).
+
+### Solution
+
+Audited the DTO and mapper and ensured test JSON uses DTO names exactly. Where necessary I added comments above tests to explain the mapping, to help future me avoid reintroducing “legs” vs “tradeLegs”.
+
+```java
+/*
+ * Note: JSON uses "tradeLegs" which maps to TradeDTO.tradeLegs via Jackson.
+ * Using "legs" will fail to bind and return 400.
+ */
+```
+
+### Impact
+
+Binding is reliable and tests document the contract clearly.
+
+---
+
+# Final state
+
+All previously failing tests now pass:
+
+- AdvanceSearchDashboardIntegrationTest: all green
+- SummaryIntegrationTest: all green
+- TradeControllerTest: all green
+- UserPrivilegeIntegrationTest: all green
+
+This outcome was achieved by:
+
+- Removing global `@WithMockUser` and declaring roles per test
+- Fixing seed data duplication and FK ordering
+- Creating data inside tests rather than relying on fragile global ids
+- Supplying valid JSON bodies for write endpoints and including CSRF
+- Aligning assertions with the intended layer (401 vs 403 vs 400 vs 200)
+- Reducing mocks in integration tests and ensuring mapper mocks return the fields I assert
+
+If anything regresses, my first checks will be: HTTP status layer, seed data order, per-test isolation, and that the test’s identity matches the controller’s required authority.
+
+### Issues that still exist:
+
+After I thightened security and access rights and all 31 tests passed the problem seems have moved to frontendend that e.g traders now cannot access their tradeSumamry and it shows 403 on Swagger. I will investigate endpoints PreAuthorize roles

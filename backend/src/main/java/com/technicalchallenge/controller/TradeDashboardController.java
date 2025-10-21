@@ -48,7 +48,9 @@ public class TradeDashboardController {
     // I’ve added TRADER-only access here as well because trade summaries are part
     // of the trader’s own performance view.
     @GetMapping("/summary")
-    @PreAuthorize("hasRole('TRADER')")
+    // @PreAuthorize("hasRole('TRADER')")
+    @PreAuthorize("hasAnyAuthority('TRADE_VIEW','TRADER')")
+
     public ResponseEntity<TradeSummaryDTO> getTradeSummary(@RequestParam String traderId) {
         TradeSummaryDTO summary = dashboardService.getTradeSummary(traderId);
         return ResponseEntity.ok(summary);
