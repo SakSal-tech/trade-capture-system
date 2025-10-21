@@ -28,9 +28,9 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(TradeController.class)
+//@WebMvcTest(TradeController.class)
 // @WithMockUser
-public class TradeControllerTest {
+public class TradeControllerTest extends BaseIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -254,6 +254,5 @@ public class TradeControllerTest {
                     .andExpect(jsonPath("$[0].counterpartyName").value("BigBank"));
         }
     }
-    // Adding this line to force commit
 
 }

@@ -18,9 +18,11 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(BookController.class)
+//@WebMvcTest(BookController.class)//tells Spring Boot to only load the web layer — specifically the controller(s) you name.
+//It does not load the service, repository, or database layers.
 // @WithMockUser
-public class BookControllerTest {
+
+public class BookControllerTest extends BaseIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
@@ -56,5 +58,4 @@ public class BookControllerTest {
         mockMvc.perform(get("/api/books"))
                 .andExpect(status().isOk());
     }
-    // Adding this line to force commit
 }

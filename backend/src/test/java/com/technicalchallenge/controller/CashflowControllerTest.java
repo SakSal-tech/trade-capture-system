@@ -31,9 +31,9 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(CashflowController.class)
+//@WebMvcTest(CashflowController.class)
 // @WithMockUser
-public class CashflowControllerTest {
+public class CashflowControllerTest extends BaseIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -242,6 +242,5 @@ public class CashflowControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
     }
-    // Adding this line to force commit
 
 }

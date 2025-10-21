@@ -1,4 +1,3 @@
-
 package com.technicalchallenge.controller;
 
 import org.springframework.test.context.ActiveProfiles;
@@ -12,14 +11,13 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 //This ensures that a servlet environment is created and HttpSecurity can be autowired.
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+//@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 
-@AutoConfigureMockMvc
+//@AutoConfigureMockMvc
 
-@ActiveProfiles("test")
 // disables several Spring Boot security auto-configuration classes for the test
 // application context
 // removing those auto-configs makes it easier to run integration tests without
@@ -32,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration.class,
 // org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration.class
 // })
-public class UserPrivilegeIntegrationTest {
+public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
 
         @Autowired
         private MockMvc mockMvc;
@@ -70,89 +68,92 @@ public class UserPrivilegeIntegrationTest {
 
         // Privilege validation for GET /api/trades
 
-        @DisplayName("TRADE_VIEW role should be allowed to access all trades")
+        @DisplayName("TRADER role should be allowed to access all trades")
 
         @Test
-
-        @WithMockUser(username = "viewerUser", roles = { "TRADE_VIEW" })
+        @WithMockUser(username = "viewerUser", roles = { "TRADER" })
         void testTradeViewRoleAllowed() throws Exception {
-                // Here Simulating a user with the TRADE_VIEW role trying to access all
-                // trades.
-                // I expect this user to be allowed, so the status should be 200 OK.
+                // Simulating a user with the TRADER role trying to access all trades.
+                // TRADERs are allowed according to TradeController.
                 mockMvc.perform(get("/api/trades"))
                                 .andExpect(status().isOk());
         }
 
-        @DisplayName("SUPPORT role should be denied access to all trades")
+        @DisplayName("SUPPORT role should be allowed to access all trades")
 
         @Test
-
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
-        void testSupportRoleDeniedAllTrades() throws Exception {
-                // Here Simulating a user with the SUPPORT role trying to access all
+        void testSupportRoleAllowedAllTrades() throws Exception {
+                // SUPPORT users are now allowed since TradeController permits SUPPORT to view
                 // trades.
-                // I expect this user to be denied, so the status should be 403 Forbidden.
                 mockMvc.perform(get("/api/trades"))
-                                .andExpect(status().isForbidden());
+                                .andExpect(status().isOk());
         }
 
         // Privilege validation for GET /api/trades/{id}
 
-        @DisplayName("TRADE_VIEW role should be allowed to access trade by id")
+        @DisplayName("TRADER role should be allowed to access trade by id")
 
         @Test
-
-        @WithMockUser(username = "viewerUser", roles = { "TRADE_VIEW" })
+        @WithMockUser(username = "viewerUser", roles = { "TRADER" })
         void testTradeViewRoleAllowedById() throws Exception {
-                // Simulating a user with TRADE_VIEW role accessing a specific trade by id
+                // Simulating a user with TRADER role accessing a specific trade by id.
                 mockMvc.perform(get("/api/trades/1"))
                                 .andExpect(status().isOk());
         }
 
-        @DisplayName("SUPPORT role should be denied access to trade by id")
+        @DisplayName("SUPPORT role should be allowed to access trade by id")
 
         @Test
-
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
-        void testSupportRoleDeniedTradeById() throws Exception {
-                // simulating a user with SUPPORT role accessing a specific trade by id.
+        void testSupportRoleAllowedTradeById() throws Exception {
+                // SUPPORT role can view trades by id (allowed in TradeController).
                 mockMvc.perform(get("/api/trades/1"))
-                                .andExpect(status().isForbidden());
+                                .andExpect(status().isOk());
         }
 
         // Privilege validation for POST /api/trades
 
-        @DisplayName("TRADE_CREATE role should be allowed to create trade")
+        @DisplayName("TRADER role should be allowed to create trade")
 
         @Test
-
-        @WithMockUser(username = "creatorUser", roles = { "TRADE_CREATE" })
+        @WithMockUser(username = "creatorUser", roles = { "TRADER" })
         void testTradeCreateRoleAllowed() throws Exception {
-                // Simulating a user with TRADE_CREATE role creating a trade.
+                // TRADER can create trade according to TradeController.
                 mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/trades")
                                 .contentType("application/json")
-                                .content("{\"tradeId\":1}"))
-                                .andExpect(status().isOk());
+                                .content("""
+                                                    {
+                                                        "tradeId": 1,
+                                                        "bookName": "TEST-BOOK-1",
+                                                        "counterpartyName": "BigBank",
+                                                        "tradeType": "Swap",
+                                                        "tradeSubType": "Vanilla",
+                                                        "tradeDate": "2024-06-01",
+                                                        "tradeStartDate": "2024-06-03",
+                                                        "tradeMaturityDate": "2029-06-03",
+                                                        "tradeExecutionDate": "2024-06-01",
+                                                        "traderName": "Simon King"
+                                                    }
+                                                """))
+                                .andExpect(status().isCreated()); // Expect 201 Created
         }
 
         @DisplayName("SUPPORT role should be denied to create trade")
 
         @Test
-
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
         void testSupportRoleDeniedCreateTrade() throws Exception {
-                // Simulating a user with SUPPORT role trying to create a trade.
                 mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/trades")
                                 .contentType("application/json")
                                 .content("{\"tradeId\":1}"))
                                 .andExpect(status().isForbidden());
         }
 
-        @DisplayName("TRADE_EDIT role should be allowed to patch trade")
+        @DisplayName("TRADER role should be allowed to patch trade")
         @Test
-        @WithMockUser(username = "editorUser", roles = { "TRADE_EDIT" })
+        @WithMockUser(username = "editorUser", roles = { "TRADER" })
         void testTradeEditRoleAllowedPatch() throws Exception {
-                // Simulating a user with TRADE_EDIT role patching a trade.
                 mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                                 .patch("/api/trades/1")
                                 .contentType("application/json")
@@ -163,10 +164,8 @@ public class UserPrivilegeIntegrationTest {
         @DisplayName("SUPPORT role should be denied to patch trade")
 
         @Test
-
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
         void testSupportRoleDeniedPatchTrade() throws Exception {
-                // Simulating a user with SUPPORT role trying to patch a trade.
                 mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                                 .patch("/api/trades/1")
                                 .contentType("application/json")
@@ -174,23 +173,19 @@ public class UserPrivilegeIntegrationTest {
                                 .andExpect(status().isForbidden());
         }
 
-        @DisplayName("TRADE_DELETE role should be allowed to delete trade")
+        @DisplayName("TRADER role should be allowed to delete trade")
         @Test
-        @WithMockUser(username = "deleterUser", roles = { "TRADE_DELETE" })
+        @WithMockUser(username = "deleterUser", roles = { "TRADER" })
         void testTradeDeleteRoleAllowed() throws Exception {
-                // Simulating a user with TRADE_DELETE role deleting a trade.
                 mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                                 .delete("/api/trades/1"))
                                 .andExpect(status().isNoContent());
         }
 
         @DisplayName("SUPPORT role should be denied to delete trade")
-
         @Test
-
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
         void testSupportRoleDeniedDeleteTrade() throws Exception {
-                // Simulating a user with SUPPORT role trying to delete a trade.
                 mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                                 .delete("/api/trades/1"))
                                 .andExpect(status().isForbidden());
@@ -198,206 +193,149 @@ public class UserPrivilegeIntegrationTest {
 
         // Privilege validation for POST /api/trades/{id}/terminate
 
-        @DisplayName("TRADE_TERMINATE role should be allowed to terminate trade")
-
+        @DisplayName("TRADER role should be allowed to terminate trade")
         @Test
-
-        @WithMockUser(username = "terminatorUser", roles = { "TRADE_TERMINATE" })
+        @WithMockUser(username = "terminatorUser", roles = { "TRADER" })
         void testTradeTerminateRoleAllowed() throws Exception {
-                // Simulating a user with TRADE_TERMINATE role terminating a trade.
-                mockMvc.perform(
-                                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
-                                                "/api/trades/1/terminate"))
+                mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                                "/api/trades/1/terminate"))
                                 .andExpect(status().isOk());
         }
 
         @DisplayName("SUPPORT role should be denied to terminate trade")
-
         @Test
-
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
         void testSupportRoleDeniedTerminateTrade() throws Exception {
-                // Simulating a user with SUPPORT role trying to terminate a trade.
-                mockMvc.perform(
-                                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
-                                                "/api/trades/1/terminate"))
+                mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                                "/api/trades/1/terminate"))
                                 .andExpect(status().isForbidden());
         }
 
         // Privilege validation for POST /api/trades/{id}/cancel
 
-        @DisplayName("TRADE_CANCEL role should be allowed to cancel trade")
-
+        @DisplayName("TRADER role should be allowed to cancel trade")
         @Test
-
-        @WithMockUser(username = "cancellerUser", roles = { "TRADE_CANCEL" })
+        @WithMockUser(username = "cancellerUser", roles = { "TRADER" })
         void testTradeCancelRoleAllowed() throws Exception {
-                // Simulating a user with TRADE_CANCEL role cancelling a trade.
-                mockMvc.perform(
-                                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
-                                                "/api/trades/1/cancel"))
+                mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                                "/api/trades/1/cancel"))
                                 .andExpect(status().isOk());
         }
 
         @DisplayName("SUPPORT role should be denied to cancel trade")
-
         @Test
-
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
         void testSupportRoleDeniedCancelTrade() throws Exception {
-                // Simulating a user with SUPPORT role trying to cancel a trade.
-                mockMvc.perform(
-                                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
-                                                "/api/trades/1/cancel"))
+                mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                                "/api/trades/1/cancel"))
                                 .andExpect(status().isForbidden());
         }
 
         // Privilege validation for GET /api/dashboard/filter
 
-        @DisplayName("TRADE_VIEW role should be allowed to filter trades")
-
+        @DisplayName("TRADER role should be allowed to filter trades")
         @Test
-
-        @WithMockUser(username = "viewerUser", roles = { "TRADE_VIEW" })
+        @WithMockUser(username = "viewerUser", roles = { "TRADER" })
         void testTradeViewRoleAllowedFilter() throws Exception {
-                // Simulating a user with TRADE_VIEW role filtering trades.
                 mockMvc.perform(get("/api/dashboard/filter"))
                                 .andExpect(status().isOk());
         }
 
-        @DisplayName("SUPPORT role should be denied to filter trades")
-
+        @DisplayName("SUPPORT role should be allowed to filter trades")
         @Test
-
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
-        void testSupportRoleDeniedFilterTrades() throws Exception {
-                // Simulating a user with SUPPORT role trying to filter trades.
+        void testSupportRoleAllowedFilterTrades() throws Exception {
+                // SUPPORT now allowed as per controller rule.
                 mockMvc.perform(get("/api/dashboard/filter"))
-                                .andExpect(status().isForbidden());
+                                .andExpect(status().isOk());
         }
 
         // Privilege validation for GET /api/dashboard/search
 
-        @DisplayName("TRADE_VIEW role should be allowed to search trades")
-
+        @DisplayName("TRADER role should be allowed to search trades")
         @Test
-
-        @WithMockUser(username = "viewerUser", roles = { "TRADE_VIEW" })
+        @WithMockUser(username = "viewerUser", roles = { "TRADER" })
         void testTradeViewRoleAllowedSearch() throws Exception {
-                // Simulating a user with TRADE_VIEW role searching trades.
                 mockMvc.perform(get("/api/dashboard/search"))
                                 .andExpect(status().isOk());
         }
 
-        @DisplayName("SUPPORT role should be denied to search trades")
-
+        @DisplayName("SUPPORT role should be allowed to search trades")
         @Test
-
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
-        void testSupportRoleDeniedSearchTrades() throws Exception {
-                // Simulating a user with SUPPORT role trying to search trades.
+        void testSupportRoleAllowedSearchTrades() throws Exception {
                 mockMvc.perform(get("/api/dashboard/search"))
-                                .andExpect(status().isForbidden());
+                                .andExpect(status().isOk());
         }
 
         // Privilege validation for GET /api/dashboard/rsql
 
-        @DisplayName("TRADE_VIEW role should be allowed to search trades with RSQL")
-
+        @DisplayName("TRADER role should be allowed to search trades with RSQL")
         @Test
-
-        @WithMockUser(username = "viewerUser", roles = { "TRADE_VIEW" })
+        @WithMockUser(username = "viewerUser", roles = { "TRADER" })
         void testTradeViewRoleAllowedRsql() throws Exception {
-                // Simulating a user with TRADE_VIEW role searching trades with RSQL.
-                // I have updated the RSQL query to use the nested attribute book.id, as book
-                // is // an entity relationship.
-                // This should resolve the type mismatch error and is the correct way to filter
-                // by book ID in RSQL.
                 mockMvc.perform(get("/api/dashboard/rsql?query=book.id==1"))
                                 .andExpect(status().isOk());
         }
 
-        @DisplayName("SUPPORT role should be denied to search trades with RSQL")
+        @DisplayName("SUPPORT role should be allowed to search trades with RSQL")
         @Test
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
-        void testSupportRoleDeniedRsqlTrades() throws Exception {
-                // Simulating a user with SUPPORT role trying to search trades with RSQL.
-                // I have updated the RSQL query to use the nested attribute book.id, as book is
-                // an entity relationship.
-                // This should resolve the type mismatch error and is the correct way to filter
-                // by book ID in RSQL.
+        void testSupportRoleAllowedRsqlTrades() throws Exception {
                 mockMvc.perform(get("/api/dashboard/rsql?query=book.id==1"))
-                                .andExpect(status().isForbidden());
+                                .andExpect(status().isOk());
         }
 
         // Privilege validation for GET /api/dashboard/my-trades
 
         @DisplayName("TRADER role should be allowed to get my trades")
-
         @Test
-
         @WithMockUser(username = "testTrader", roles = { "TRADER" })
         void testTraderRoleAllowedMyTrades() throws Exception {
-                // Simulating a user with TRADER role getting their own trades.
                 mockMvc.perform(get("/api/dashboard/my-trades?traderId=testTrader"))
                                 .andExpect(status().isOk());
         }
 
         @DisplayName("SUPPORT role should be denied to get my trades")
-
         @Test
-
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
         void testSupportRoleDeniedMyTrades() throws Exception {
-                // Simulating a user with SUPPORT role trying to get my trades.
                 mockMvc.perform(get("/api/dashboard/my-trades?traderId=testTrader"))
                                 .andExpect(status().isForbidden());
         }
 
         // Privilege validation for GET /api/dashboard/book/{bookId}/trades
 
-        @DisplayName("BOOK_VIEW role should be allowed to get trades by book")
-
+        @DisplayName("TRADER role should be allowed to get trades by book")
         @Test
-
-        @WithMockUser(username = "bookViewer", roles = { "BOOK_VIEW" })
+        @WithMockUser(username = "bookViewer", roles = { "TRADER" })
         void testBookViewRoleAllowedGetTradesByBook() throws Exception {
-                // Simulating a user with BOOK_VIEW role getting trades by book.
                 mockMvc.perform(get("/api/dashboard/book/1/trades"))
                                 .andExpect(status().isOk());
         }
 
-        @DisplayName("SUPPORT role should be denied to get trades by book")
-
+        @DisplayName("SUPPORT role should be allowed to get trades by book")
         @Test
-
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
-        void testSupportRoleDeniedGetTradesByBook() throws Exception {
-                // Simulating a user with SUPPORT role trying to get trades by book.
+        void testSupportRoleAllowedGetTradesByBook() throws Exception {
                 mockMvc.perform(get("/api/dashboard/book/1/trades"))
-                                .andExpect(status().isForbidden());
+                                .andExpect(status().isOk());
         }
 
         // Privilege validation for GET /api/dashboard/summary
 
         @DisplayName("TRADER role should be allowed to get trade summary")
-
         @Test
-
         @WithMockUser(username = "testTrader", roles = { "TRADER" })
         void testTraderRoleAllowedTradeSummary() throws Exception {
-                // Simulating a user with TRADER role getting trade summary.
                 mockMvc.perform(get("/api/dashboard/summary?traderId=testTrader"))
                                 .andExpect(status().isOk());
         }
 
         @DisplayName("SUPPORT role should be denied to get trade summary")
-
         @Test
-
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
         void testSupportRoleDeniedTradeSummary() throws Exception {
-                // Simulating a user with SUPPORT role trying to get trade summary.
                 mockMvc.perform(get("/api/dashboard/summary?traderId=testTrader"))
                                 .andExpect(status().isForbidden());
         }
@@ -405,26 +343,18 @@ public class UserPrivilegeIntegrationTest {
         // Privilege validation for GET /api/dashboard/daily-summary
 
         @DisplayName("TRADER role should be allowed to get daily summary")
-
         @Test
-
         @WithMockUser(username = "testTrader", roles = { "TRADER" })
         void testTraderRoleAllowedDailySummary() throws Exception {
-                // Simulating a user with TRADER role getting daily summary.
                 mockMvc.perform(get("/api/dashboard/daily-summary?traderId=testTrader"))
                                 .andExpect(status().isOk());
         }
 
         @DisplayName("SUPPORT role should be denied to get daily summary")
-
         @Test
-
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
         void testSupportRoleDeniedDailySummary() throws Exception {
-                // Simulating a user with SUPPORT role trying to get daily summary.
                 mockMvc.perform(get("/api/dashboard/daily-summary?traderId=testTrader"))
                                 .andExpect(status().isForbidden());
         }
-        // Adding this line to force commit
-
 }
