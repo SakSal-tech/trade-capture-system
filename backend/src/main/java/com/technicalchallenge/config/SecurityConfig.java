@@ -21,7 +21,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * security annotations like @PreAuthorize and @PostAuthorize in controllers
  * are still enforced.
  *
- * In production, you should tighten access control by enabling authentication
+ * In production, tighten access control by enabling authentication
  * and replacing permitAll() with role-based authorization.
  */
 @Configuration
@@ -94,10 +94,11 @@ public class SecurityConfig {
                         .anyRequest().permitAll())
                 // Disable CSRF for non-browser API access
                 .csrf(csrf -> csrf.disable())
+                .httpBasic(httpBasic -> httpBasic.disable()) // Disable HTTP Basic authentication prompts
+                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable())
                 // Disable Spring Security’s default form login
                 // .formLogin(form -> form.disable())
-                // Disable HTTP Basic authentication prompts
-                .httpBasic(httpBasic -> httpBasic.disable());
+                );
         // Build and return the configured security chain
         return http.build();
     }

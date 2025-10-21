@@ -5,6 +5,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 
+import jakarta.transaction.Transactional;
+
 /**
  * BaseIntegrationTest
  *
@@ -19,13 +21,13 @@ import org.springframework.test.context.ActiveProfiles;
  * By extending this class, individual test classes can focus on testing
  * behaviour rather than configuration.
  *
- * If you need to test a different user role (e.g. SUPPORT or SALES),
- * you can override the @WithMockUser annotation on that test class or method.
+ * To test a different user role (e.g. SUPPORT or SALES),
+ * override the @WithMockUser annotation on that test class or method.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test") // Ensures the application-test.properties file is used
-@WithMockUser(username = "alice", roles = { "TRADER" })
+@Transactional
 public abstract class BaseIntegrationTest {
     // Common setup code can go here later if needed
 }

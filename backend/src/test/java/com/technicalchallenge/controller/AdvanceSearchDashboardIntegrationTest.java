@@ -4,6 +4,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -27,6 +29,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * If I need to test other user roles (like SUPPORT or SALES),
  * I can override this default using @WithMockUser on a specific test or class.
  */
+@WithMockUser(username = "testTrader", roles = { "TRADER" })
+@ActiveProfiles("test")
+
 public class AdvanceSearchDashboardIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

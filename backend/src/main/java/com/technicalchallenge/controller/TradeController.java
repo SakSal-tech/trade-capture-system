@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 @RequestMapping("/api/trades")
 @Validated
 @Tag(name = "Trades", description = "Trade management operations including booking, searching, and lifecycle management")
+
 public class TradeController {
 
     private static final Logger logger = LoggerFactory.getLogger(TradeController.class);
