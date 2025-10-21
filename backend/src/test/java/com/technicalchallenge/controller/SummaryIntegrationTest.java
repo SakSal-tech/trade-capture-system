@@ -21,7 +21,6 @@ import java.time.LocalDate;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,20 +29,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@AutoConfigureMockMvc // configures the MockMvc bean, allowing me to perform HTTP requests against
-@ActiveProfiles("test")
-@org.springframework.boot.autoconfigure.ImportAutoConfiguration(exclude = {
-                org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
-                org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration.class,
-                org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration.class,
-                org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration.class
-})
+//@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+// @AutoConfigureMockMvc // configures the MockMvc bean, allowing me to perform
+// HTTP requests against
+// @org.springframework.boot.autoconfigure.ImportAutoConfiguration(exclude = {
+// org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
+// org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration.class,
+// org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration.class,
+// org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration.class
+// })
 @Transactional // Ensures each test method runs in a transaction. All database changes made
                // during a test are rolled back at the end, keeping the test data isolated and
                // repeatable
 @Rollback // Marks the transaction to be rolled back after the test
-public class SummaryIntegrationTest {
+public class SummaryIntegrationTest extends BaseIntegrationTest {
         // Injecting dependencies to enable the use mockMvc for endpoint testing, seed
         // and query trades in the database and call service methods
 

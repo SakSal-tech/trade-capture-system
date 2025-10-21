@@ -20,10 +20,10 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@ExtendWith(SpringExtension.class)
-@WebMvcTest(CounterpartyController.class)
+//@ExtendWith(SpringExtension.class) // let me use the Spring context, dependency injection, @Autowired, etc
+// @WebMvcTest(CounterpartyController.class)
 // @WithMockUser
-public class CounterpartyControllerTest {
+public class CounterpartyControllerTest extends BaseIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
@@ -54,6 +54,5 @@ public class CounterpartyControllerTest {
         mockMvc.perform(get("/api/counterparties"))
                 .andExpect(status().isOk());
     }
-    // Adding this line to force commit
 
 }

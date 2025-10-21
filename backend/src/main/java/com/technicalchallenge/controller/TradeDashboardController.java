@@ -1,18 +1,21 @@
-
 package com.technicalchallenge.controller;
 
 import java.util.Map;
 import java.util.HashMap;
+import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+
 import com.technicalchallenge.dto.*;
 import com.technicalchallenge.service.TradeDashboardService;
-import java.util.List;
+
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/dashboard")
+@Tag(name = "Trade Dashboard", description = "Provides endpoints for trade summaries, filtering, and searches")
 public class TradeDashboardController {
 
     private final TradeDashboardService dashboardService;
@@ -26,8 +29,12 @@ public class TradeDashboardController {
      * Only TRADER role should be allowed.
      * Returns DailySummaryDTO as JSON.
      */
-    // No security enforced
-    @org.springframework.web.bind.annotation.GetMapping("/daily-summary")
+    // I’ve added @PreAuthorize to make sure that only users with the TRADER role
+    // can access the daily summary.
+    // This matches the business rule that traders have full visibility over their
+    // trades and summaries.
+    @GetMapping("/daily-summary")
+    @PreAuthorize("hasRole('TRADER')")
     public ResponseEntity<DailySummaryDTO> getDailySummary(@RequestParam String traderId) {
         DailySummaryDTO summary = dashboardService.getDailySummary(traderId);
         return ResponseEntity.ok(summary);
@@ -38,8 +45,10 @@ public class TradeDashboardController {
      * Only TRADER role should be allowed.
      * Returns TradeSummaryDTO as JSON.
      */
-    // No security enforced
-    @org.springframework.web.bind.annotation.GetMapping("/summary")
+    // I’ve added TRADER-only access here as well because trade summaries are part
+    // of the trader’s own performance view.
+    @GetMapping("/summary")
+    @PreAuthorize("hasRole('TRADER')")
     public ResponseEntity<TradeSummaryDTO> getTradeSummary(@RequestParam String traderId) {
         TradeSummaryDTO summary = dashboardService.getTradeSummary(traderId);
         return ResponseEntity.ok(summary);
@@ -50,8 +59,11 @@ public class TradeDashboardController {
      * Only TRADER role should be allowed.
      * Returns List<TradeDTO> as JSON.
      */
-    // No security enforced
-    @org.springframework.web.bind.annotation.GetMapping("/my-trades")
+    // I’ve used @PreAuthorize so that only TRADERs can see their own trades.
+    // Even though SUPPORT can view all trades, this endpoint is designed for the
+    // trader’s own trades, not general visibility.
+    @GetMapping("/my-trades")
+    @PreAuthorize("hasRole('TRADER')")
     public ResponseEntity<List<TradeDTO>> getMyTrades(@RequestParam String traderId) {
         List<TradeDTO> trades = dashboardService.getTradesByTrader(traderId);
         return ResponseEntity.ok(trades);
@@ -59,11 +71,16 @@ public class TradeDashboardController {
 
     /**
      * GET /api/dashboard/book/{bookId}/trades
-     * Only BOOK_VIEW role should be allowed.
-     * Returns List<TradeDTO> as JSON.
+     * View trades by book.
+     * MIDDLE_OFFICE and SUPPORT can view, TRADER can also view since they have all
+     * privileges.
      */
-    // No security enforced
-    @org.springframework.web.bind.annotation.GetMapping("/book/{bookId}/trades")
+    // I’ve opened this endpoint to TRADER, MIDDLE_OFFICE, and SUPPORT since all of
+    // them can view trades.
+    // SALES cannot access this as their privileges only allow creation and
+    // amendment.
+    @GetMapping("/book/{bookId}/trades")
+    @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')")
     public ResponseEntity<List<TradeDTO>> getTradesByBook(@PathVariable Long bookId) {
         List<TradeDTO> trades = dashboardService.getTradesByBook(bookId);
         return ResponseEntity.ok(trades);
@@ -71,11 +88,14 @@ public class TradeDashboardController {
 
     /**
      * GET /api/dashboard/filter
-     * Only TRADE_VIEW role should be allowed.
-     * Returns Page<TradeDTO> as JSON.
+     * Used for filtering trades.
+     * TRADER, MIDDLE_OFFICE, and SUPPORT can view filtered results.
      */
-    // No security enforced
-    @org.springframework.web.bind.annotation.GetMapping("/filter")
+    // I’ve allowed TRADER, MIDDLE_OFFICE, and SUPPORT because all three can view
+    // trades.
+    // SALES is excluded since they do not have trade viewing privileges.
+    @GetMapping("/filter")
+    @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')")
     public ResponseEntity<Map<String, Object>> filterTrades(@RequestParam(required = false) String counterparty,
             @RequestParam(required = false) String book,
             @RequestParam(required = false) String trader,
@@ -92,11 +112,14 @@ public class TradeDashboardController {
 
     /**
      * GET /api/dashboard/search
-     * Only TRADE_VIEW role should be allowed.
      * Returns List<TradeDTO> as JSON.
+     * TRADER, MIDDLE_OFFICE, and SUPPORT can view trades.
      */
-    // No security enforced
-    @org.springframework.web.bind.annotation.GetMapping("/search")
+    // I've set this to allow TRADER, MIDDLE_OFFICE, and SUPPORT.
+    // This ensures that all roles with view privileges can access the search
+    // functionality.
+    @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')")
     public ResponseEntity<List<TradeDTO>> searchTrades(@RequestParam(required = false) String counterparty,
             @RequestParam(required = false) String book,
             @RequestParam(required = false) String trader,
@@ -110,11 +133,13 @@ public class TradeDashboardController {
 
     /**
      * GET /api/dashboard/rsql?query=...
-     * Only TRADE_VIEW role should be allowed.
-     * Returns List<TradeDTO> as JSON.
+     * Used for advanced search queries.
+     * TRADER, MIDDLE_OFFICE, and SUPPORT can view trades.
      */
-    // No security enforced
-    @org.springframework.web.bind.annotation.GetMapping("/rsql")
+    // I've used the same access control as the search endpoint.
+    // All roles that can view trades are included here.
+    @GetMapping("/rsql")
+    @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')")
     public ResponseEntity<Map<String, Object>> searchTradesRsql(@RequestParam String query) {
         List<TradeDTO> trades = dashboardService.searchTradesRsql(query);
         Map<String, Object> response = new HashMap<>();
@@ -122,6 +147,4 @@ public class TradeDashboardController {
         response.put("count", trades != null ? trades.size() : 0);
         return ResponseEntity.ok(response);
     }
-    // Adding this line to force commit
-
 }

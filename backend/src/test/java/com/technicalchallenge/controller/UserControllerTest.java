@@ -21,9 +21,9 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(UserController.class)
+//@WebMvcTest(UserController.class)
 // @WithMockUser
-public class UserControllerTest {
+public class UserControllerTest extends BaseIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
