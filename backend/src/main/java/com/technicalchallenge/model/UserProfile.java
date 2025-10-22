@@ -14,4 +14,7 @@ public class UserProfile {
     private Long id;
 
     private String userType;
+
+    private String loginId; // I have added this so we can identify users by username.
+
 }
