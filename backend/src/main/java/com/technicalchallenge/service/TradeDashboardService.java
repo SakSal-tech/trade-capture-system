@@ -417,10 +417,40 @@ public class TradeDashboardService {
         return true;
     }
 
+    // private boolean hasPrivilege(String username, String privilege) {
+
+    // // Temporary safeguard to avoid null-pointer failures in tests or
+    // misconfigured
+    // // contexts.
+    // // If either dependency is not injected, I allow access so we do not return
+    // // false 403s.
+    // if (userPrivilegeService == null || privilegeValidationEngine == null) {
+    // return true;
+    // }
+
+    // // Step 1: read privileges from the database and check by user loginId and
+    // // privilege name.
+    // List<UserPrivilege> allPrivileges =
+    // userPrivilegeService.getAllUserPrivileges();
+
+    // boolean dbMatch = allPrivileges.stream().anyMatch(p -> p != null
+    // && p.getUser() != null
+    // && p.getUser().getLoginId() != null
+    // && p.getPrivilege() != null
+    // && p.getPrivilege().getName() != null
+    // && p.getUser().getLoginId().equalsIgnoreCase(username)
+    // && p.getPrivilege().getName().equalsIgnoreCase(privilege));
+
+    // // If the user does not have this privilege in the database, fail fast.
+    // if (!dbMatch) {
+    // return false;
+    // }
+
     // checks if the security context is available and then attempts to obtain the
     // Authentication object, which represents the current user's authentication
     // state. If authentication is present and the user's name is available, it
     // returns the authenticated user's name
+
     private String resolveCurrentTraderId() {
         Authentication authentication = SecurityContextHolder.getContext() != null
                 // SecurityContextHolder is a Spring Security class that holds the security

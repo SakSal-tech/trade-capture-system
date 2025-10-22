@@ -96,7 +96,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .httpBasic(httpBasic -> httpBasic.disable()) // Disable HTTP Basic authentication prompts
                 .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable())
-                // Disable Spring Security’s default form login
+                // Disable Spring Security's default form login
                 // .formLogin(form -> form.disable())
                 );
         // Build and return the configured security chain
