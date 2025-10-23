@@ -5,7 +5,6 @@ import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.service.TradeDashboardService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -156,10 +155,7 @@ public class TradeDashboardController {
      * expectations.
      */
     @GetMapping("/summary")
-    // Summary endpoints are restricted to traders or middle office by role,
-    // but we also accept the TRADE_VIEW privilege authority for users who
-    // have fine-grained privileges instead of role membership.
-    // Controller-level guard: allow MIDDLE_OFFICE or users with TRADE_VIEW to
+    // Allow MIDDLE_OFFICE or users with TRADE_VIEW to
     // request any trader's summary. A TRADER may only request their own
     // summary (compare request param to authentication.name). Example: if
     // 'joey' is logged in and tries to call /api/dashboard/summary?traderId=simon
@@ -191,7 +187,7 @@ public class TradeDashboardController {
     // Same conservative semantics as /summary: require MIDDLE_OFFICE or
     // TRADE_VIEW_ALL to view other traders' daily summaries; traders can view
     // only their own.
-    @PreAuthorize("hasAnyRole('MIDDLE_OFFICE') or hasAuthority('TRADE_VIEW_ALL') or (#traderId != null and #traderId.equalsIgnoreCase(authentication.name))")
+    @PreAuthorize("hasAnyRole('MIDDLE_OFFICE') or hasAuthority('TRADE_VIEW_ALL') or (#traderId == null || #traderId.equalsIgnoreCase(authentication.name))")
     public ResponseEntity<?> getDailySummary(@RequestParam(required = false) String traderId) {
         if (traderId == null || traderId.isBlank()) {
             // I have added a clear 400 response here since SummaryIntegrationTest

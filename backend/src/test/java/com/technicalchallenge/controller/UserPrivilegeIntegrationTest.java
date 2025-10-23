@@ -13,26 +13,20 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.http.MediaType;
 
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.time.LocalDate;
-import java.util.Optional;
 
 import static org.hamcrest.Matchers.is;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import org.junit.jupiter.api.BeforeEach;
-import org.springframework.boot.test.mock.mockito.MockBean;
 
 import com.technicalchallenge.model.Book;
 import com.technicalchallenge.model.Counterparty;
 import com.technicalchallenge.model.Trade;
 
 import jakarta.transaction.Transactional;
-
-import com.technicalchallenge.dto.TradeDTO;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
@@ -45,11 +39,28 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         @Autowired
         private MockMvc mockMvc;
 
-        @MockBean
-        private com.technicalchallenge.service.TradeService tradeService;
-
-        @MockBean
-        private com.technicalchallenge.mapper.TradeMapper tradeMapper;
+        /*
+         * This test class was refactored from a unit-style test that used @MockBean. I
+         * realised that I was mocking.
+         * for service/mapper to a true integration test. The goal is to exercise the
+         * full stack: controller -> service -> repository, using real data persisted
+         * into the test database. That ensures authorization rules and data mapping
+         * are validated end-to-end and makes the test more robust to changes in
+         * service logic.
+         *
+         * Key changes:
+         * - Removed mocks for TradeService/TradeMapper so controller calls the real
+         * service and the service calls repositories.
+         * - Persisted minimal reference data (Book, Counterparty) in @BeforeEach so
+         * population methods like populateReferenceDataByName() find expected
+         * records during create/update flows.
+         * - Persisted a Trade and set its business-level tradeId (100001L). The
+         * application looks up trades by trade.tradeId (business id) not the DB
+         * generated primary key, so tests use savedTradeBusinessId when calling
+         * controller endpoints.
+         * - Kept @Transactional + @Rollback so each test runs in isolation and leaves
+         * no permanent state in the test database.
+         */
 
         @Autowired
         private com.technicalchallenge.repository.BookRepository bookRepository;
@@ -61,7 +72,8 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         private com.technicalchallenge.repository.TradeRepository tradeRepository;
 
         private Trade trade;
-        private TradeDTO tradeDTO;
+        // tradeDTO was removed — tests use persisted entities or inline payloads
+        private Long savedTradeBusinessId;
 
         private static final String DAILY_SUMMARY_ENDPOINT = "/api/dashboard/daily-summary?traderId=testTrader";
 
@@ -71,16 +83,55 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                 bookRepository.deleteAll();
                 counterpartyRepository.deleteAll();
                 tradeRepository.deleteAll();
+                // Create minimal Book and Counterparty entries used by Trade
+                var book = new Book();
+                book.setBookName("Book-Test");
+                book = bookRepository.save(book);
 
+                // Also created a book matching the create-trade test payload. The
+                // create-trade controller uses populateReferenceDataByName() which
+                // looks up Book by name; creating this record ensures the create
+                // flow finds the Book and avoids `Book not found` runtime errors.
+                var createBook = new Book();
+                createBook.setBookName("TestBook");
+                createBook = bookRepository.save(createBook);
+
+                var counterparty = new Counterparty();
+                counterparty.setName("CounterOne");
+                counterparty = counterpartyRepository.save(counterparty);
+
+                // Create a counterparty the create-trade payload expects so the
+                // controller's populateReferenceDataByName() can resolve it.
+                var createCounterparty = new Counterparty();
+                createCounterparty.setName("BigBank");
+                createCounterparty = counterpartyRepository.save(createCounterparty);
+
+                /*
+                 * Persist a Trade so tests exercise the full path. Important:
+                 * - The application uses a business identifier `trade.tradeId` for
+                 * lookups (see TradeService.getTradeById which calls
+                 * tradeRepository.findByTradeIdAndActiveTrue). That means controller
+                 * endpoints expect the business tradeId in the path (e.g. /api/trades/{id}).
+                 * - To avoid 404s we set trade.setTradeId(100001L) so controller calls
+                 * in the tests resolve the persisted trade.
+                 */
                 trade = new Trade();
-                tradeDTO = new TradeDTO();
+                trade.setTradeId(100001L);
+                trade.setVersion(1);
+                trade.setActive(true);
+                trade.setBook(book);
+                trade.setCounterparty(counterparty);
+                trade.setTradeDate(LocalDate.now());
+                trade = tradeRepository.save(trade);
+                savedTradeBusinessId = trade.getTradeId();
+
+                // no TradeDTO field — tests create payloads inline when needed
         }
 
         @DisplayName("TRADER role should be allowed to access daily summary")
 
         @Test
         // I had to add dependency in the Pom file
-
         @WithMockUser(username = "testTrader", roles = { "TRADER" })
         void testTraderRoleAllowed() throws Exception {
                 mockMvc.perform(get(DAILY_SUMMARY_ENDPOINT)).andExpect(status().isOk());
@@ -104,7 +155,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                                 "}";
 
                 // Added .with(csrf()) to satisfy Spring Security for write operations
-                mockMvc.perform(patch("/api/trades/1")
+                mockMvc.perform(patch("/api/trades/" + savedTradeBusinessId)
                                 .contentType("application/json")
                                 .content(validPatchJson)
                                 .with(csrf()))
@@ -137,29 +188,12 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         @Test
         @WithMockUser(username = "viewerUser", roles = { "TRADER", "TRADE_VIEW" })
         void testTradeViewRoleAllowedById() throws Exception {
-                // Given - a mock Trade and DTO returned by the service/mapper
-                Trade trade = new Trade();
-                trade.setId(1L);
-                trade.setVersion(1);
-                trade.setActive(true);
-
-                TradeDTO tradeDTO = new TradeDTO();
-                tradeDTO.setTradeId(1L);
-                tradeDTO.setBookName("Book-Test");
-                tradeDTO.setCounterpartyName("CounterOne");
-                tradeDTO.setTradeDate(LocalDate.now());
-                // Mock expected service + mapper behavior
-                when(tradeService.getTradeById(1L)).thenReturn(Optional.of(trade));// Use Optional.of(...) only when the
-                                                                                   // value is non-null;
-                when(tradeMapper.toDto(trade)).thenReturn(tradeDTO);
-                when(tradeMapper.toDto(trade)).thenReturn(tradeDTO);
-                // Ensure it's visible to the controller transaction
-                // tradeRepository.flush();
-
-                // When / Then
-                mockMvc.perform(get("/api/trades/1"))
+                // When / Then - use the persisted business trade id so we hit the
+                // full controller -> service -> repository path and validate mapping
+                // and authorization behaviour end-to-end.
+                mockMvc.perform(get("/api/trades/" + savedTradeBusinessId))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.tradeId", is(1)))
+                                .andExpect(jsonPath("$.tradeId", is(savedTradeBusinessId.intValue())))
                                 .andExpect(jsonPath("$.bookName", is("Book-Test")))
                                 .andExpect(jsonPath("$.counterpartyName", is("CounterOne")));
         }
@@ -185,16 +219,10 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         @DisplayName("TRADER role should be allowed to create trade")
         @Test
         void testTradeCreateRoleAllowed() throws Exception {
-                // Given - ensure the mapper/service mocks return the expected objects
-                Trade trade = new Trade();
-                TradeDTO tradeDTO = new TradeDTO();
-                tradeDTO.setTradeId(200001L); // added: ensures response JSON includes tradeId
-
-                when(tradeMapper.toEntity(any(TradeDTO.class))).thenReturn(trade);
-                when(tradeService.saveTrade(any(Trade.class), any(TradeDTO.class))).thenReturn(trade);
-                when(tradeMapper.toDto(any(Trade.class))).thenReturn(tradeDTO); // mock now returns tradeId
-
-                // When / Then - send a valid payload
+                // When / Then - send a valid payload to create a trade and expect 201.
+                // We assert the echoed bookName rather than brittle numeric ids because
+                // the application generates or assigns tradeIds and the response id
+                // may differ across environments.
                 mockMvc.perform(post("/api/trades")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\n" +
@@ -212,7 +240,8 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                                                 "  ]\n" +
                                                 "}"))
                                 .andExpect(status().isCreated())
-                                .andExpect(jsonPath("$.tradeId", is(200001))); // now matches
+                                .andExpect(jsonPath("$.bookName", is("TestBook"))); // assert created payload echoed
+                                                                                    // correctly
         }
 
         @DisplayName("SUPPORT role should be denied to create trade")
@@ -252,7 +281,9 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         @Test
         @WithMockUser(username = "editorUser", roles = { "TRADER" })
         void testTradeEditRoleAllowedPatch() throws Exception {
-                // Minimal valid patch payload that satisfies DTO validation rules
+                // Minimal valid patch payload that satisfies DTO validation rules.
+                // The PATCH is executed against the business trade id we persisted
+                // earlier (savedTradeBusinessId) so the controller finds the trade.
                 String patchJson = "{\n" +
                                 "  \"bookName\": \"UpdatedBook\",\n" +
                                 "  \"counterpartyName\": \"BigBank\",\n" +
@@ -265,7 +296,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                                 "  ]\n" +
                                 "}";
 
-                mockMvc.perform(patch("/api/trades/1")
+                mockMvc.perform(patch("/api/trades/" + savedTradeBusinessId)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(patchJson))
                                 .andExpect(status().isOk());
@@ -288,7 +319,9 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                                 }
                                 """;
 
-                mockMvc.perform(patch("/api/trades/1")
+                // This test intentionally hits a trade id that does not belong to
+                // the caller (supportUser) — the controller/service should return 403.
+                mockMvc.perform(patch("/api/trades/" + savedTradeBusinessId)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(validPatchJson)
                                 .with(csrf()))
@@ -299,8 +332,10 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         @Test
         @WithMockUser(username = "deleterUser", roles = { "TRADER" })
         void testTradeDeleteRoleAllowed() throws Exception {
+                // Deleting the persisted trade via the controller exercises the
+                // deleteTrade path and verifies logical-delete or delete flow.
                 mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                                .delete("/api/trades/1")).andExpect(status().isNoContent());
+                                .delete("/api/trades/" + savedTradeBusinessId)).andExpect(status().isNoContent());
         }
 
         @DisplayName("SUPPORT role should be denied to delete trade")
@@ -308,7 +343,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
         void testSupportRoleDeniedDeleteTrade() throws Exception {
                 mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                                .delete("/api/trades/1")).andExpect(status().isForbidden());
+                                .delete("/api/trades/" + savedTradeBusinessId)).andExpect(status().isForbidden());
         }
 
         // Privilege validation for POST /api/trades/{id}/terminate
@@ -318,7 +353,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         @WithMockUser(username = "terminatorUser", roles = { "TRADER" })
         void testTradeTerminateRoleAllowed() throws Exception {
                 mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                                .post("/api/trades/1/terminate")).andExpect(status().isOk());
+                                .post("/api/trades/" + savedTradeBusinessId + "/terminate")).andExpect(status().isOk());
         }
 
         @DisplayName("SUPPORT role should be denied to terminate trade")
@@ -326,7 +361,8 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
         void testSupportRoleDeniedTerminateTrade() throws Exception {
                 mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                                .post("/api/trades/1/terminate")).andExpect(status().isForbidden());
+                                .post("/api/trades/" + savedTradeBusinessId + "/terminate"))
+                                .andExpect(status().isForbidden());
         }
 
         // Privilege validation for POST /api/trades/{id}/cancel
@@ -336,7 +372,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         @WithMockUser(username = "cancellerUser", roles = { "TRADER" })
         void testTradeCancelRoleAllowed() throws Exception {
                 mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                                .post("/api/trades/1/cancel")).andExpect(status().isOk());
+                                .post("/api/trades/" + savedTradeBusinessId + "/cancel")).andExpect(status().isOk());
         }
 
         @DisplayName("SUPPORT role should be denied to cancel trade")
@@ -344,7 +380,8 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
         void testSupportRoleDeniedCancelTrade() throws Exception {
                 mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                                .post("/api/trades/1/cancel")).andExpect(status().isForbidden());
+                                .post("/api/trades/" + savedTradeBusinessId + "/cancel"))
+                                .andExpect(status().isForbidden());
         }
 
         // Privilege validation for GET /api/dashboard/filter
