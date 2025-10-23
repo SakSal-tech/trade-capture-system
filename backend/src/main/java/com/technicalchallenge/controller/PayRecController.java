@@ -76,4 +76,5 @@ public class PayRecController {
                 .map(PayRec::getPayRec)
                 .toList();
     }
+
 }

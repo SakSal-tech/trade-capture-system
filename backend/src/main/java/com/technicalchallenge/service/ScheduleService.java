@@ -37,4 +37,6 @@ public class ScheduleService {
         logger.warn("Deleting schedule with id: {}", id);
         scheduleRepository.deleteById(id);
     }
+    // Adding this line to force commit
+
 }

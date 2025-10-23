@@ -39,8 +39,10 @@ public class CashflowService {
 
     public Cashflow saveCashflow(Cashflow cashflow) {
         logger.info("Saving cashflow: {}", cashflow);
-        // Business logic: value must be positive, valueDate required (enforced in controller)
-        if (cashflow.getPaymentValue() == null || cashflow.getPaymentValue().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+        // Business logic: value must be positive, valueDate required (enforced in
+        // controller)
+        if (cashflow.getPaymentValue() == null
+                || cashflow.getPaymentValue().compareTo(java.math.BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Cashflow value must be greater than 0");
         }
         if (cashflow.getValueDate() == null) {
@@ -58,18 +60,20 @@ public class CashflowService {
     public void populateReferenceDataByName(Cashflow cashflow, CashflowDTO dto) {
         if (dto.getPayRec() != null) {
             cashflow.setPayRec(payRecRepository.findAll().stream()
-                .filter(p -> p.getPayRec().equalsIgnoreCase(dto.getPayRec()))
-                .findFirst().orElse(null));
+                    .filter(p -> p.getPayRec().equalsIgnoreCase(dto.getPayRec()))
+                    .findFirst().orElse(null));
         }
         if (dto.getPaymentType() != null) {
             cashflow.setPaymentType(legTypeRepository.findAll().stream()
-                .filter(l -> l.getType().equalsIgnoreCase(dto.getPaymentType()))
-                .findFirst().orElse(null));
+                    .filter(l -> l.getType().equalsIgnoreCase(dto.getPaymentType()))
+                    .findFirst().orElse(null));
         }
         if (dto.getPaymentBusinessDayConvention() != null) {
             cashflow.setPaymentBusinessDayConvention(businessDayConventionRepository.findAll().stream()
-                .filter(b -> b.getBdc().equalsIgnoreCase(dto.getPaymentBusinessDayConvention()))
-                .findFirst().orElse(null));
+                    .filter(b -> b.getBdc().equalsIgnoreCase(dto.getPaymentBusinessDayConvention()))
+                    .findFirst().orElse(null));
         }
     }
+    // Adding this line to force commit
+
 }

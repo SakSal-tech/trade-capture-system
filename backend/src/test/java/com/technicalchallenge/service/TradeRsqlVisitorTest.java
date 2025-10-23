@@ -261,4 +261,6 @@ public class TradeRsqlVisitorTest {
                 () -> spec.toPredicate(root, query, cb),
                 "Expected IllegalArgumentException for invalid numeric value");
     }
+    // Adding this line to force commit
+
 }

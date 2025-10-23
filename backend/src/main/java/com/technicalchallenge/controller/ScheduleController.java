@@ -76,4 +76,6 @@ public class ScheduleController {
                 .map(Schedule::getSchedule)
                 .toList();
     }
+    // Adding this line to force commit
+
 }

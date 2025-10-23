@@ -37,4 +37,6 @@ public class BusinessDayConventionService {
         logger.warn("Deleting business day convention with id: {}", id);
         businessDayConventionRepository.deleteById(id);
     }
+    // Adding this line to force commit
+
 }

@@ -76,4 +76,6 @@ public class TradeStatusController {
                 .map(TradeStatus::getTradeStatus)
                 .toList();
     }
+    // Adding this line to force commit
+
 }

@@ -3,6 +3,7 @@ package com.technicalchallenge.service;
 import com.technicalchallenge.model.ApplicationUser;
 import com.technicalchallenge.repository.ApplicationUserRepository;
 import lombok.AllArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import org.slf4j.Logger;
@@ -16,11 +17,43 @@ import java.util.Optional;
 public class ApplicationUserService {
     private static final Logger logger = LoggerFactory.getLogger(ApplicationUserService.class);
     private final ApplicationUserRepository applicationUserRepository;
+    // Inject the application's PasswordEncoder so credential checks use the same
+    // encoder that Spring Security is configured with. This allows stored values
+    // like "{noop}password" (used in dev seed data) or stronger hashes (bcrypt)
+    // to be verified via passwordEncoder.matches(plain, encoded).
+    private final PasswordEncoder passwordEncoder;
 
     public boolean validateCredentials(String loginId, String password) {
         logger.debug("Validating credentials for user: {}", loginId);
         Optional<ApplicationUser> user = applicationUserRepository.findByLoginId(loginId);
-        return user.map(applicationUser -> applicationUser.getPassword().equals(password)).orElse(false);
+        // Use PasswordEncoder.matches to support encoded stored passwords.
+        // (This is the important change: previously a plain-string compare would
+        // fail when passwords in the DB are encoded or prefixed with an encoding
+        // id like {noop}.)
+        return user.map(applicationUser -> {
+            String stored = applicationUser.getPassword();
+            if (stored == null)
+                return false;
+            try {
+                // Compare plain password with stored (possibly encoded) password.
+                boolean matches = passwordEncoder.matches(password, stored);
+
+                // We log a masked representation of the stored value and the
+                // match result to help debug authentication failures during
+                // development. The full encoded password is never logged.
+                String masked = stored.length() <= 6 ? "***" : stored.substring(0, 4) + "***";
+                logger.debug("Password match check for user '{}': matches={} stored={}", loginId, matches, masked);
+                return matches;
+            } catch (Exception e) {
+                // If the PasswordEncoder throws (malformed value, unknown id,
+                // etc.) we fall back to a plain equals check. This fallback is
+                // only intended to assist with legacy seed data and is not
+                // recommended for production use.
+                boolean eq = stored.equals(password);
+                logger.debug("Password encoder failed for user '{}', falling back to plain equals: {}", loginId, eq);
+                return eq;
+            }
+        }).orElse(false);
     }
 
     public List<ApplicationUser> getAllUsers() {

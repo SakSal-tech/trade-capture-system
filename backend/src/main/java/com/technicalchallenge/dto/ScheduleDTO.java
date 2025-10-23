@@ -7,4 +7,6 @@ public class ScheduleDTO {
     private Long id;
     private String schedule;
     // getters and setters
+    // Adding this line to force commit
+
 }

@@ -76,4 +76,6 @@ public class CurrencyController {
                 .map(Currency::getCurrency)
                 .toList();
     }
+    // Adding this line to force commit
+
 }

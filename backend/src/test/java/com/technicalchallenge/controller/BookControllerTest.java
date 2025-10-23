@@ -7,7 +7,6 @@ import com.technicalchallenge.service.BookService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 // import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -18,9 +17,11 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(BookController.class)
+//@WebMvcTest(BookController.class)//tells Spring Boot to only load the web layer — specifically the controller(s) name.
+//It does not load the service, repository, or database layers.
 // @WithMockUser
-public class BookControllerTest {
+
+public class BookControllerTest extends BaseIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
@@ -56,5 +57,4 @@ public class BookControllerTest {
         mockMvc.perform(get("/api/books"))
                 .andExpect(status().isOk());
     }
-    // Add more tests for POST, PUT, DELETE as needed
 }

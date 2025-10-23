@@ -29,9 +29,9 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(TradeLegController.class)
+//@WebMvcTest(TradeLegController.class)
 // @WithMockUser
-public class TradeLegControllerTest {
+public class TradeLegControllerTest extends BaseIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -221,4 +221,5 @@ public class TradeLegControllerTest {
 
         verify(tradeLegService).deleteTradeLeg(1L);
     }
+
 }

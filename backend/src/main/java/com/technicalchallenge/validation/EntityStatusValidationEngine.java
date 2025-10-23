@@ -27,4 +27,6 @@ public class EntityStatusValidationEngine {
     public boolean validateEntityReferences(TradeDTO trade, TradeValidationResult result) {
         return entityValidator.validateEntityReferences(trade, result);
     }
+    // Adding this line to force commit
+
 }

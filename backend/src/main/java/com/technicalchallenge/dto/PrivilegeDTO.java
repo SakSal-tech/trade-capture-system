@@ -7,4 +7,6 @@ public class PrivilegeDTO {
     private Long id;
     private String name;
     // getters and setters
+    // Adding this line to force commit
+
 }

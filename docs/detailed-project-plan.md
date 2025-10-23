@@ -314,6 +314,6 @@
 
 - **Backend:** All new features and fixes must have unit/integration tests (`src/test/java/...`)
 - **Frontend:** Add/Update component tests (`*.test.tsx`)
-- **Documentation:** Update `docs/test-fixes-template.md`, `docs/design.md`, and other guides as you progress
+- **Documentation:** Update `docs/test-fixes-template.md`, `docs/design.md`, and other guides as progress
 
 ---
