@@ -68,7 +68,7 @@ public class TradeController {
      * Roles allowed: TRADER, SALES
      * MIDDLE_OFFICE and SUPPORT cannot create.
      *
-     * I’ve added an explicit call to populateReferenceDataByName()
+     * I've added an explicit call to populateReferenceDataByName()
      * so that the Mockito test in TradeControllerTest sees it invoked.
      */
     @PostMapping
@@ -76,7 +76,7 @@ public class TradeController {
     public ResponseEntity<TradeDTO> createTrade(@Valid @RequestBody TradeDTO tradeDTO) {
         Trade trade = tradeMapper.toEntity(tradeDTO);
 
-        // ✅ Explicitly called here to satisfy TradeControllerTest expectation
+        // Explicitly called here to satisfy TradeControllerTest expectation
         tradeService.populateReferenceDataByName(trade, tradeDTO);
 
         Trade savedTrade = tradeService.saveTrade(trade, tradeDTO);
@@ -114,7 +114,8 @@ public class TradeController {
      * Roles allowed: TRADER, SALES, MIDDLE_OFFICE
      * SUPPORT denied.
      *
-     * I’m catching RuntimeException here to return 404 cleanly if the trade doesn’t
+     * I am catching RuntimeException here to return 404 cleanly if the trade
+     * doesn't
      * exist.
      */
     @PatchMapping("/{id}")
@@ -154,7 +155,7 @@ public class TradeController {
      * Roles allowed: TRADER only.
      * SUPPORT denied.
      *
-     * I’ve wrapped this in try/catch for proper 404 handling.
+     * I've wrapped this in try/catch for proper 404 handling.
      */
     @PostMapping("/{id}/terminate")
     @PreAuthorize("hasRole('TRADER')")
@@ -173,8 +174,8 @@ public class TradeController {
      * Roles allowed: TRADER only.
      * SUPPORT denied.
      *
-     * I’ve changed this to return 204 (No Content) on success,
-     * and 404 if the trade doesn’t exist — matching test expectations.
+     * I've changed this to return 204 (No Content) on success,
+     * and 404 if the trade doesn't exist — matching test expectations.
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('TRADER')")

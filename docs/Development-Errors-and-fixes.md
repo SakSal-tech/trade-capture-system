@@ -9,7 +9,7 @@ Used jakarta.persistence.criteria.Predicate in the toPredicate method, not java.
 Adding the required @NonNull annotation to the parameters of the toPredicate method:
 Imported org.springframework.lang.NonNull and annotate Root<Trade> root, CriteriaQuery<?> query, and CriteriaBuilder criteriaBuilder in the anonymous inner class.
 
-### Problem
+### problem
 
 [ERROR] /C:/Users/saksa/cbfacademy/trade-capture-system/backend/src/main/java/com/technicalchallenge/service/TradeRsqlVisitor.java:[22,39] cannot find symbol  
 [ERROR] symbol: class AbstractRSQLVisitor
@@ -1230,7 +1230,7 @@ The security configuration (e.g., @PreAuthorize, @Secured, or similar annotation
 
 Date: 2025-10-17
 
-This document explains, in the first person, the work I carried out to get the failing tests back to green after Spring Security was restored. I describe the problems I saw, the root causes I identified, and the step-by-step solutions I implemented. I use a few Java snippets to illustrate configuration decisions.
+This document explains, the work I carried out to get the failing tests back to green after Spring Security was restored. I describe the problems I saw, the root causes I identified, and the step-by-step solutions I implemented. I use a few Java snippets to illustrate configuration decisions.
 
 ## Problem
 
@@ -1698,7 +1698,7 @@ Pros: quickly reveals non-auth test failures and simplifies triage. Cons: masks 
 
 # Phase 2 — Test security hardening and isolation
 
-This note documents the Phase 2 work I completed to remove the global, permissive test-security workaround and convert tests so they exercise the real authorisation and CSRF behaviour. It is written in the first person and explains the problem, the root cause, and the solution with minimal Java snippets that demonstrate the changes. The emphasis is on the why rather than the what.
+This note documents the Phase 2 work I completed to remove the global, permissive test-security workaround and convert tests so they exercise the real authorisation and CSRF behaviour. It explains the problem, the root cause, and the solution with minimal Java snippets that demonstrate the changes. The emphasis is on the why rather than the what.
 
 ## Problem
 
@@ -2610,7 +2610,7 @@ The bug was fully reproduced, diagnosed, and fixed.
 
 # Trade Capture System – Debugging Log (All 31+ failing tests to green)
 
-This log is a narrative of how I investigated and fixed more than thirty failing tests across the backend, written in first person and UK English. I include the original failure messages, the root cause I discovered, the solution I implemented with code snippets, and the impact on the codebase and test suite. I have grouped related failures so the story is readable and thorough.
+This log is a narrative of how I investigated and fixed more than thirty failing tests across the backend, I include the original failure messages, the root cause I discovered, the solution I implemented with code snippets, and the impact on the codebase and test suite. I have grouped related failures so the story is readable and thorough.
 
 ---
 
@@ -3518,3 +3518,92 @@ If anything regresses, my first checks will be: HTTP status layer, seed data ord
 ### Issues that still exist:
 
 After I thightened security and access rights and all 31 tests passed the problem seems have moved to frontendend that e.g traders now cannot access their tradeSumamry and it shows 403 on Swagger. I will investigate endpoints PreAuthorize roles
+
+### Problem
+
+2025-10-23T08:30:00 | Swagger AccessDenied / 403 responses across trade endpoints
+
+### Problem
+
+Endpoints that read or mutate trades and the trade dashboard started returning 403 (AccessDenied) despite an authenticated user being presentloggedin. The failing requests included:
+
+- GET /api/dashboard/summary?traderId=simon
+- GET /api/dashboard/daily-summary?traderId=simon
+- GET /api/trades
+- POST /api/trades
+- DELETE /api/trades/{id}
+
+All of the above returned an HTTP 403 with the default Spring Security HTML error page or a terse message rather than a clear JSON response.
+
+### Investigation and observations
+
+- Reproduced locally with seeded users 'simon' (trader) and 'joey' (trader). When logged in as 'joey' and requesting another trader's data (traderId=simon) the service returned 403 instead of the expected 200 or an explicit domain-level error.
+- Initial service-level checks used a permissive stub `hasPrivilege(...)` which at times returned true and at times produced inconsistent behaviour because of mismatches between authorities and roles used in tests (`ROLE_TRADE_VIEW` vs `TRADE_VIEW`).
+- At one point programmatic session creation in `AuthorizationController.login` was added to force session persistence; this change altered test semantics and was later reverted to avoid broader test breakage.
+
+### Root cause
+
+- Security checks existed in two places: controller-level `@PreAuthorize` expressions and programmatic checks inside `TradeDashboardService`. These were out of sync with test expectations and seed data. Some checks used raw authority strings (e.g. `TRADE_VIEW`) while tests used role-based annotations (e.g. `@WithMockUser(roles={"TRADE_VIEW"})`) which map to `ROLE_TRADE_VIEW` in Spring Security. This mismatch caused `isGranted` checks to fail and produced 403 responses.
+- The `hasPrivilege(String, String)` method in `TradeDashboardService` was a temporary permissive stub and lacked a DB-driven deny-by-default implementation. This left the system behaviour inconsistent during the refactor.
+- A ControllerAdvice for AccessDeniedException did not exist initially, so Spring returned an HTML error page which the frontend/tests did not expect.
+
+### Fixes applied (chronological, what was changed)
+
+- DatabaseUserDetailsService was created to bridge the application's domain user model and Spring Security's authentication/authorization model. The service loads `ApplicationUser` records from the database and converts the user's profile and DB-stored privileges into a set of Spring Security `GrantedAuthority` values. This ensures `@PreAuthorize` and other authority checks evaluate against the canonical, DB-driven set of roles and privileges.
+
+How it integrates into authentication
+
+- `SecurityConfig` wires a `DaoAuthenticationProvider` which delegates to a `UserDetailsService` when authenticating a username/password pair. `DatabaseUserDetailsService` implements `UserDetailsService` and is the application implementation used by the `DaoAuthenticationProvider`.
+- At login the `DaoAuthenticationProvider` calls `loadUserByUsername(loginId)`; the returned Spring Security `UserDetails` contains:
+  - username (loginId)
+  - stored password (must match configured `PasswordEncoder`)
+  - a set of `GrantedAuthority` instances representing both roles (`ROLE_...`) and privileges (e.g. `TRADE_VIEW`).
+
+Mapping conventions and rationale
+
+- Profile -> ROLE* mapping: the user's domain profile (`ApplicationUser.userProfile.userType`) is mapped into a `ROLE*`authority. Example: a profile value`TRADER`becomes`ROLE_TRADER`. The service also adds normalised aliases such as `ROLE_MIDDLE_OFFICE`when the profile contains`MO`or`MIDDLE` so controller checks that expect the canonical role succeed.
+- Privilege -> authority mapping: privileges stored in `UserPrivilege`/`Privilege` are mapped into plain authorities (for example `TRADE_VIEW`). Mapping them as plain authorities allows the codebase to use either `hasRole('TRADER')` or `hasAuthority('TRADE_VIEW')` depending on the check's intent. The service also adds aliases when the DB uses different names (for example `READ_TRADE` is aliased to `TRADE_VIEW`).
+- Deny-by-default: the service returns whatever authorities it can compute from the DB. If a user has no privileges recorded, the authority set may be empty (only role-derived authorities may be present). Programmatic checks that use `hasPrivilege(...)` must therefore be defensive and assume absence of an authority means deny.
+
+Why this mattered for the 403 problems
+
+- Tests and some controller expressions were using role-style configuration (`@WithMockUser(roles={"TRADE_VIEW"})`) which Spring maps to `ROLE_TRADE_VIEW`. The `DatabaseUserDetailsService` emits both plain privilege authorities and `ROLE_` prefixed roles for user profiles; however, where the DB stored a differently-named privilege (for example `READ_TRADE`) the security expressions were not matching until an alias was added. This mismatch between the strings the code expected and the strings actually present in `UserDetails` is the main cause of the earlier 403s.
+- The class contains debug logs that mask the stored password and print the computed authority set for each loaded user. These logs are intentionally present to diagnose AccessDenied issues during development; they make it straightforward to see why a particular `@PreAuthorize` check fails (for example, the required `TRADE_VIEW` authority might be absent).
+
+Interaction with other components
+
+- `ApplicationUserService`: `DatabaseUserDetailsService` calls the application service to fetch `ApplicationUser` by `loginId`. If the user is missing or inactive the service throws `UsernameNotFoundException` so Spring treats the account as unknown/disabled.
+- `UserPrivilegeService`: used to collect `UserPrivilege` links and map them to authority strings. For performance and clarity, prefer to add a `getByUserId(userId)` method in `UserPrivilegeService` (or a repository query) to avoid retrieving all links and filtering in memory.
+- `SecurityConfig` / `DaoAuthenticationProvider`: Security config wires this class into the authentication chain; password verification is performed by the `DaoAuthenticationProvider` using configured `PasswordEncoder`.
+- Controllers / Services: `@PreAuthorize` checks rely on the authorities provided by this service. Programmatic checks in services such as `TradeDashboardService` also consult the Authentication object populated by the login process; if the authority set is incomplete or misnamed the checks will deny access and produce the 403s observed.
+
+- Aligned controller-level and service-level checks so that permission forms used in tests and runtime are accepted. Service-side checks now accept either privilege authorities or role-mapped authorities (both `TRADE_VIEW` and `ROLE_TRADE_VIEW`) while the concrete `hasPrivilege(...)` implementation is prepared.
+- Reverted programmatic creation of an HTTP session in `AuthorizationController.login` to avoid changing the behaviour of existing integration tests. Authentication is still set in the SecurityContext but session creation is left to the framework.
+- Added an `ApiExceptionHandler` (@ControllerAdvice) to map AccessDeniedException to compact JSON responses with a clear message, `status:403`, `error: 'Forbidden'`, `message: 'You do not have the privilege to view other traders\' trade details'`, `timestamp`, and `path`. For POST and DELETE on `/api/trades` the message was made contextual to explain why the operation was rejected (for example, attempted create/delete without appropriate privilege). I have done this so users including traders can understand that is wrong.
+
+- Ammended a logical-delete in `TradeService.deleteTrade(Long)` so that DELETE requests mark `active=false`, set `deactivatedDate` and `tradeStatus=CANCELLED` instead of physically deleting rows. This prevents referential integrity issues and makes deleted trades invisible to normal queries.
+- Tightened `@PreAuthorize` on dashboard endpoints so a user with role TRADER may only request their own `traderId` (for example, joey requesting simon is denied) while accounts with TRADE_VIEW privilege or MIDDLE_OFFICE role can request other traders' summaries.
+- Updated integration tests and test data: increased sample trade rows
+- I also adjusted the summary window from 2 days to 7 days to reflect a weekly summary change and to ensure the test data covers the new period.
+- Harmonised checks to accept both the authority string and the role-mapped string to avoid test-induced 403s until `hasPrivilege(...)` is implemented properly.
+
+### Impact
+
+-Now no more 403, correct data
+
+- When logged in as 'joey' and requesting `/api/dashboard/summary?traderId=simon` the system now raises AccessDeniedException from the service guard and the `ApiExceptionHandler` returns a compact JSON 403 payload explaining that the logged-in user does not have the privilege to view other traders' trade details.
+- When logged in as 'simon' and requesting `/api/dashboard/summary?traderId=simon` the system returns 200 and the expected JSON summary (counts, notional, riskExposureSummary with delta and vega). The seed data confirms `delta=50000` and `vega=0` for simon in the example dataset.
+
+### Outstanding items
+
+- The `hasPrivilege(String username, String privilege)` helper in `TradeDashboardService` remains TODO: it currently accepts both authority forms for compatibility but must be replaced with a DB-driven deny-by-default check. This was intentionally left permissive during the refactor to avoid large-scale test breaks; implementing it is the next high priority.
+- Add focused integration tests that assert the full authorization matrix:
+  - TRADER role cannot view other trader summaries (403)
+  - TRADE_VIEW privilege or ROLE_TRADE_VIEW can view other trader summaries (200)
+  - MIDDLE_OFFICE role can view other trader summaries (200)
+
+Next steps and improvements
+
+- Implement a direct lookup in `UserPrivilegeService` such as `List<UserPrivilege> findByUserId(Long userId)` or a repository method to avoid scanning all privileges in memory.
+- Replace permissive `hasPrivilege(...)` stubs with DB-driven checks that consult the same authority names produced by `DatabaseUserDetailsService` (deny-by-default semantics).
+- Add unit tests for `DatabaseUserDetailsService` that assert specific sample users produce the expected `GrantedAuthority` set (role aliases + privilege aliases). This will prevent regressions when privilege names change.
