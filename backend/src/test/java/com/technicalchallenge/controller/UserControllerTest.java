@@ -21,9 +21,9 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(UserController.class)
+//@WebMvcTest(UserController.class)
 // @WithMockUser
-public class UserControllerTest {
+public class UserControllerTest extends BaseIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
@@ -68,5 +68,5 @@ public class UserControllerTest {
         mockMvc.perform(get("/api/users"))
                 .andExpect(status().isOk());
     }
-    // Add more tests for POST, PUT, DELETE as needed
+    // Adding this line to force commit
 }

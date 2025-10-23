@@ -18,4 +18,6 @@ public class CounterpartyDTO {
     private LocalDate createdDate;
     private LocalDate lastModifiedDate;
     private boolean active;
+    // Adding this line to force commit
+
 }

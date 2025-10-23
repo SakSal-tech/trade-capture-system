@@ -1,15 +1,15 @@
 package com.technicalchallenge.controller;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
  * These test verify that the controller endpoints for search,
@@ -19,10 +19,20 @@ import org.springframework.test.web.servlet.MockMvc;
  * These tests are not designed to re-test service logic (that is already
  * covered in unit tests) but to confirm that HTTP routing, parameter binding,
  * and JSON serialisation work end-to-end.
+ * 
+ * This class now extends BaseIntegrationTest, which means:
+ * - The full Spring Boot application context is loaded.
+ * - MockMvc is automatically configured.
+ * - All requests are authenticated using a mock user ("alice") with TRADER
+ * role.
+ * 
+ * If I need to test other user roles (like SUPPORT or SALES),
+ * I can override this default using @WithMockUser on a specific test or class.
  */
-@SpringBootTest
-@AutoConfigureMockMvc
-public class AdvanceSearchDashboardIntegrationTest {
+@WithMockUser(username = "testTrader", roles = { "TRADER" })
+@ActiveProfiles("test")
+
+public class AdvanceSearchDashboardIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;

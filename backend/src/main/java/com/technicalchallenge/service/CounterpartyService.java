@@ -28,4 +28,6 @@ public class CounterpartyService {
     public void deleteCounterparty(Long id) {
         counterpartyRepository.deleteById(id);
     }
+    // Adding this line to force commit
+
 }

@@ -36,9 +36,10 @@ public class CostCenterService {
     public void populateReferenceDataByName(CostCenter costCenter, CostCenterDTO dto) {
         if (dto.getSubDeskName() != null && !dto.getSubDeskName().isBlank()) {
             var subDesk = subDeskRepository.findAll().stream()
-                .filter(s -> s.getSubdeskName().equalsIgnoreCase(dto.getSubDeskName()))
-                .findFirst().orElse(null);
-            if (subDesk == null) throw new IllegalArgumentException("SubDesk '" + dto.getSubDeskName() + "' does not exist");
+                    .filter(s -> s.getSubdeskName().equalsIgnoreCase(dto.getSubDeskName()))
+                    .findFirst().orElse(null);
+            if (subDesk == null)
+                throw new IllegalArgumentException("SubDesk '" + dto.getSubDeskName() + "' does not exist");
             costCenter.setSubDesk(subDesk);
         }
         // If subDeskName is null or blank, do not modify the current subDesk
@@ -54,4 +55,6 @@ public class CostCenterService {
         logger.warn("Deleting cost center with id: {}", id);
         costCenterRepository.deleteById(id);
     }
+    // Adding this line to force commit
+
 }

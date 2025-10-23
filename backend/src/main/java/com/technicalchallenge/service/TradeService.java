@@ -1,9 +1,7 @@
 package com.technicalchallenge.service;
 
-import com.technicalchallenge.dto.SearchCriteriaDTO;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
-import com.technicalchallenge.mapper.TradeMapper;
 import com.technicalchallenge.model.*;
 import com.technicalchallenge.repository.*;
 
@@ -12,10 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -62,24 +56,25 @@ public class TradeService {
      */
 
     private static final Logger logger = LoggerFactory.getLogger(TradeService.class);
-    private TradeRepository tradeRepository;
-    private TradeLegRepository tradeLegRepository;
-    private CashflowRepository cashflowRepository;
-    private TradeStatusRepository tradeStatusRepository;
-    private BookRepository bookRepository;
-    private CounterpartyRepository counterpartyRepository;
-    private ApplicationUserRepository applicationUserRepository;
-    private TradeTypeRepository tradeTypeRepository;
-    private TradeSubTypeRepository tradeSubTypeRepository;
-    private CurrencyRepository currencyRepository;
 
-    private LegTypeRepository legTypeRepository;
-    private IndexRepository indexRepository;
-    private HolidayCalendarRepository holidayCalendarRepository;
-    private ScheduleRepository scheduleRepository;
-    private BusinessDayConventionRepository businessDayConventionRepository;
+    private final TradeRepository tradeRepository;
+    private final TradeLegRepository tradeLegRepository;
+    private final CashflowRepository cashflowRepository;
+    private final TradeStatusRepository tradeStatusRepository;
+    private final BookRepository bookRepository;
+    private final CounterpartyRepository counterpartyRepository;
+    private final ApplicationUserRepository applicationUserRepository;
+    private final TradeTypeRepository tradeTypeRepository;
+    private final TradeSubTypeRepository tradeSubTypeRepository;
+    private final CurrencyRepository currencyRepository;
 
-    private PayRecRepository payRecRepository;
+    private final LegTypeRepository legTypeRepository;
+    private final IndexRepository indexRepository;
+    private final HolidayCalendarRepository holidayCalendarRepository;
+    private final ScheduleRepository scheduleRepository;
+    private final BusinessDayConventionRepository businessDayConventionRepository;
+
+    private final PayRecRepository payRecRepository;
 
     public List<Trade> getAllTrades() {
         logger.info("Retrieving all trades");
@@ -147,6 +142,8 @@ public class TradeService {
     }
 
     // FIXED: Populate reference data by names from DTO
+    // I am keeping this public so the controller test can verify it is called
+    // before saveTrade.
     public void populateReferenceDataByName(Trade trade, TradeDTO tradeDTO) {
         logger.debug("Populating reference data for trade");
 
@@ -188,9 +185,10 @@ public class TradeService {
             logger.debug("Looking up trader user by name: {}", tradeDTO.getTraderUserName());
             /*
              * trim(): Remove any leading or trailing spaces from the
-             * username.split("\\s+")Split the username into parts using whitespace (spaces,
-             * * tabs, etc.) as the separator. radeDTO.getTraderUserName() returns
-             * "  John   Smith  ". .trim() removes leading/trailing spaces: "John   Smith"
+             * username. split("\\s+") splits the username into parts using whitespace.
+             * Example:
+             * tradeDTO.getTraderUserName() returns "  John   Smith  ".
+             * .trim() removes leading/trailing spaces: "John   Smith"
              * .split("\\s+") splits by one or more spaces: ["John", "Smith"]
              */
             String[] nameParts = tradeDTO.getTraderUserName().trim().split("\\s+");
@@ -241,7 +239,26 @@ public class TradeService {
     @Transactional
     public void deleteTrade(Long tradeId) {
         logger.info("Deleting (cancelling) trade with ID: {}", tradeId);
-        cancelTrade(tradeId);
+        // ADDED: perform logical delete instead of a hard delete. We keep the
+        // database row for audit/history and set active=false so the trade
+        // no longer appears in queries that filter on active = true. This
+        // preserves auditability and avoids accidental data loss in dev/tests.
+        Optional<Trade> tradeOpt = getTradeById(tradeId);
+        if (tradeOpt.isEmpty()) {
+            throw new RuntimeException("Trade not found: " + tradeId);
+        }
+        Trade trade = tradeOpt.get();
+        TradeStatus cancelledStatus = tradeStatusRepository.findByTradeStatus("CANCELLED")
+                .orElseThrow(() -> new RuntimeException("CANCELLED status not found"));
+
+        trade.setTradeStatus(cancelledStatus);
+        trade.setLastTouchTimestamp(LocalDateTime.now());
+        // ADDED: mark inactive and set deactivated timestamp so the row
+        // remains for audit while being excluded from active queries.
+        trade.setActive(false);
+        trade.setDeactivatedDate(LocalDateTime.now());
+
+        tradeRepository.save(trade);
     }
 
     @Transactional
@@ -474,13 +491,14 @@ public class TradeService {
         // Converts the schedule string into a numeric interval (months between
         // payments).
         int monthsInterval = parseSchedule(schedule);
-        // calculatePaymentDates Calculates all payment dates between the start and
+        // calculatePaymentDates calculates all payment dates between the start and
         // maturity dates using this interval.
         List<LocalDate> paymentDates = calculatePaymentDates(startDate, maturityDate, monthsInterval);
 
         /*
          * For each payment date, creates a new Cashflow object. Sets its properties
-         * (leg, paymentdate, rate). Calculates the payment value using the leg type and
+         * (leg, payment date, rate). Calculates the payment value using the leg type
+         * and
          * interval. Saves the cashflow to the database.
          */
         for (LocalDate paymentDate : paymentDates) {
@@ -524,7 +542,7 @@ public class TradeService {
                 return 12;
             default:
                 if (schedule.endsWith("M") || schedule.endsWith("m")) {
-                    try { // e.g 12M" becomes 12 (months interval), and the "M" is removed.
+                    try { // e.g. "12M" becomes 12 (months interval)
                         return Integer.parseInt(schedule.substring(0, schedule.length() - 1));
                     } catch (NumberFormatException e) {
                         throw new RuntimeException("Invalid schedule format: " + schedule);

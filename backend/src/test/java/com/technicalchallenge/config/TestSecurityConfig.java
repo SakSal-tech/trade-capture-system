@@ -2,66 +2,102 @@ package com.technicalchallenge.config;
 
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
-import org.springframework.security.web.SecurityFilterChain;
+// import org.springframework.security.crypto.password.PasswordEncoder;
+// import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
-/*
- * Test-only security configuration.
+/**
+ * TestSecurityConfig
  *
- * - Integration tests need a predictable auth setup without hitting real user stores.
- * - We provide in-memory users and a SecurityFilterChain that mirrors production-style
- *   constraints (authenticated by default) while remaining test-friendly.
+ * This configuration is only loaded during tests (because
+ * of @TestConfiguration).
+ * It defines a minimal, isolated security setup for integration and controller
+ * tests
+ * so that Spring Boot can create a SecurityFilterChain without requiring
+ * real authentication or complex user setup.
  *
- * Why the bean is renamed:
- * - The main application config (SecurityConfig) also declares a bean named "securityFilterChain".
- * - When tests load the full Spring context, both beans would be present and Spring refuses
- *   duplicate bean names, throwing BeanDefinitionOverrideException.
- * - We fix that by explicitly naming the test bean "testSecurityFilterChain".
- *   This avoids clashing with the app bean named "securityFilterChain".
- *
- * Notes:
- * - @TestConfiguration ensures this class is only considered in test contexts.
- * - Remember If  the 'test' profile and also have GlobalTestSecurityConfig activate
- *   contributing a SecurityFilterChain, make sure its bean name is different too,
- *   or only include one of the two configs in a given test.
+ * It’s safe for tests but should never be used in production.
  */
 @TestConfiguration
-@EnableMethodSecurity
 public class TestSecurityConfig {
 
+    /**
+     * Defines an in-memory user details service for tests.
+     *
+     * - Uses InMemoryUserDetailsManager, which stores users only in memory (not
+     * persistent).
+     * - Adds a single test user with:
+     * username: "testuser"
+     * password: "password"
+     * role: "USER"
+     *
+     * This allows tests that rely on authentication (e.g. @WithMockUser)
+     * to pass when a user context is required.
+     */
     @Bean
-    public UserDetailsService userDetailsService() {
-        InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
-        manager.createUser(User.withUsername("testTrader").password("{noop}pw").roles("TRADER").build());
-        manager.createUser(User.withUsername("supportUser").password("{noop}pw").roles("SUPPORT").build());
-        manager.createUser(User.withUsername("viewerUser").password("{noop}pw").roles("TRADE_VIEW").build());
-        return manager;
+    public org.springframework.security.core.userdetails.UserDetailsService userDetailsService() {
+        var mgr = new org.springframework.security.provisioning.InMemoryUserDetailsManager();
+        mgr.createUser(org.springframework.security.core.userdetails.User
+                .withUsername("testuser")
+                .password("password")
+                .roles("USER")
+                .build());
+        return mgr;
     }
 
-    // Bean renamed to avoid clash with the main app's securityFilterChain
-    @Bean(name = "testSecurityFilterChain")
-    public SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
-        http
-                // Require authentication for meaningful role tests
-                .authorizeHttpRequests(authz -> authz.anyRequest().authenticated())
-                // Disable CSRF so POST/DELETE in tests never 403
-                .csrf(csrf -> csrf.disable())
-                // Disable real login mechanisms
-                .httpBasic(b -> b.disable())// disables HTTP Basic authentication (the browser popup / Authorization:
-                                            // Basic)
-                .formLogin(f -> f.disable());// disables the standard form login (the username/password HTML form
-                                             // handler).
-        return http.build();
+    /**
+     * Password encoder used for the test user.
+     *
+     * - Uses NoOpPasswordEncoder, which means passwords are stored and compared as
+     * plain text.
+     * - This avoids needing encoded passwords like {bcrypt} or {noop}.
+     * - Perfectly fine for tests, but NEVER use in production code.
+     */
+    @Bean
+    public org.springframework.security.crypto.password.PasswordEncoder passwordEncoder() {
+        return org.springframework.security.crypto.password.NoOpPasswordEncoder.getInstance();
+    }
 
-        /*
-         * Future improvement notes for myself: Remember to use an alternative
-         * authentication mechanism (e.g., JWT filters, OAuth2, custom authentication
-         * filters) is configured, otherwise the application may become unauthenticated
-         * or unreachable
-         */
+    /**
+     * Defines a simple SecurityFilterChain for the test environment.
+     *
+     * - Permits access to endpoints commonly used in tests or dev tools:
+     * /h2-console/**, /actuator/**, /api-docs/**, /v3/api-docs/**,
+     * /swagger-ui/**, /swagger-ui.html
+     *
+     * - Requires authentication for all other endpoints.
+     * - Disables CSRF protection for the H2 console (to allow browser access).
+     * - Sets frame options to SAMEORIGIN so the H2 console can render properly.
+     * - Enables both HTTP Basic Auth and form login with default settings,
+     * making it easier for tests or Swagger UI to authenticate when needed.
+     *
+     * This configuration ensures that Spring Security does not block
+     * integration tests or H2 console access, while still simulating
+     * a minimal authentication layer.
+     */
+    @Bean
+    public org.springframework.security.web.SecurityFilterChain testSecurityFilterChain(
+            org.springframework.security.config.annotation.web.builders.HttpSecurity http) throws Exception {
+
+        http
+                // Configure which requests are allowed without authentication
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/h2-console/**", "/actuator/**", "/api-docs/**", "/v3/api-docs/**",
+                                "/swagger-ui/**", "/swagger-ui.html")
+                        .permitAll() // allow public access to these paths
+                        .anyRequest().authenticated()) // all other endpoints require authentication
+
+                // Disable CSRF protection for the H2 console so it works in tests
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/h2-console/**"))
+
+                // Allow frames from the same origin (needed for H2 console)
+                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
+
+                // Enable HTTP Basic authentication for simplicity
+                .httpBasic(org.springframework.security.config.Customizer.withDefaults())
+
+                // Enable form login with default settings
+                .formLogin(org.springframework.security.config.Customizer.withDefaults());
+
+        return http.build();
     }
 }

@@ -1,9 +1,15 @@
 package com.technicalchallenge.validation;
 
+import org.springframework.stereotype.Component;
+
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.model.UserProfile;
 
+@Component
 public class UserPrivilegeValidator {
+    // ADDED: Made this a Spring component to allow injection into the
+    // UserPrivilegeValidationEngine. This improves testability and avoids
+    // direct instantiation (new) spread across the codebase.
 
     // Accepts user performing the action, tradeDto which represents the trade and
     // the action being requested and result with validation and errors
@@ -150,5 +156,6 @@ public class UserPrivilegeValidator {
         }
 
     }
+    // Adding this line to force commit
 
 }

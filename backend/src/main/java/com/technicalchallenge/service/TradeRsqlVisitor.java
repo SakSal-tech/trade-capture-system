@@ -19,6 +19,10 @@ import cz.jirutka.rsql.parser.ast.OrNode;
 import cz.jirutka.rsql.parser.ast.ComparisonNode;
 import jakarta.persistence.criteria.Path;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 /**
  * Visits the RSQL Abstract Syntax Tree (AST) and converts it into a single
  * Spring Data JPA Specification<Trade> that can be executed by the repository.
@@ -47,7 +51,7 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
 
         Specification<Trade> result = null;
 
-        // combine all child speficications with AND
+        // combine all child specifications with AND
         for (Specification<Trade> spec : childSpecs) {
             if (result == null) {
                 result = spec; // first one becomes base(result=spec1)
@@ -81,7 +85,6 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
         }
 
         return result;
-
     }
 
     @Override
@@ -96,14 +99,7 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
         // FIX: to fix the failing test. List all supported operators
         List<String> supportedOperators = Arrays.asList("==", "!=", "=gt=", "=lt=", "=ge=", "=le=", "=in=", "=like=",
                 "=out=");
-        // Throw and exception if the operator is not recognised, e.g
-        // /api/trades/rsql?query=counterparty.name=xyz=ABC.The operator "=xyz=" is not
-        // valid or supported.
-
-        if (!supportedOperators.contains(operator)) {
-            throw new IllegalArgumentException("Unsupported operator: " + operator);
-        }
-
+        // Throw an exception if the operator is not recognised
         if (!supportedOperators.contains(operator)) {
             throw new IllegalArgumentException("Unsupported operator: " + operator);
         }
@@ -115,6 +111,7 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
         // for debugging to see what parsed
         System.out
                 .println("[RSQL] ComparisonNode -> field=" + field + ", operation=" + operator + ", values=" + values);
+
         // Strict reflection-based field existence check for nested fields (run
         // immediately)
         String[] fieldParts = field.split("\\.");
@@ -181,23 +178,22 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
                     if (fieldType == String.class) {
                         return criteriaBuilder.equal(
                                 criteriaBuilder.lower(path.as(String.class)),
-                                ((String) typedValue).toLowerCase()); // Cast to String for lower-case comparison
+                                ((String) typedValue).toLowerCase());
                     } else {
-                        return criteriaBuilder.equal(path, typedValue); // Use typedValue for correct type
+                        return criteriaBuilder.equal(path, typedValue);
                     }
                 }
-                // Fixed: Use typedValue and cast to String for not equal string comparison
+
                 if (operator.equals("!=")) {
                     if (fieldType == String.class) {
                         return criteriaBuilder.notEqual(
                                 criteriaBuilder.lower(path.as(String.class)),
-                                ((String) typedValue).toLowerCase()); // Cast to String for lower-case comparison
+                                ((String) typedValue).toLowerCase());
                     } else {
-                        return criteriaBuilder.notEqual(path, typedValue); // Use typedValue for correct type
+                        return criteriaBuilder.notEqual(path, typedValue);
                     }
                 }
 
-                // Fixed: Use correct type for greaterThan
                 if (operator.equals("=gt=")) {
                     if (fieldType == Integer.class || fieldType == int.class) {
                         return criteriaBuilder.greaterThan(path.as(Integer.class), (Integer) typedValue);
@@ -205,12 +201,14 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
                         return criteriaBuilder.greaterThan(path.as(Long.class), (Long) typedValue);
                     } else if (fieldType == Double.class || fieldType == double.class) {
                         return criteriaBuilder.greaterThan(path.as(Double.class), (Double) typedValue);
+                    } else if (fieldType == LocalDate.class) {
+                        // I've added this to support LocalDate comparisons correctly
+                        return criteriaBuilder.greaterThan(path.as(LocalDate.class), (LocalDate) typedValue);
                     } else {
                         return criteriaBuilder.greaterThan(path.as(String.class), ((String) typedValue));
                     }
                 }
 
-                // Fixed: Use correct type for lessThan
                 if (operator.equals("=lt=")) {
                     if (fieldType == Integer.class || fieldType == int.class) {
                         return criteriaBuilder.lessThan(path.as(Integer.class), (Integer) typedValue);
@@ -218,12 +216,14 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
                         return criteriaBuilder.lessThan(path.as(Long.class), (Long) typedValue);
                     } else if (fieldType == Double.class || fieldType == double.class) {
                         return criteriaBuilder.lessThan(path.as(Double.class), (Double) typedValue);
+                    } else if (fieldType == LocalDate.class) {
+                        // I've added this for proper LocalDate less-than comparisons
+                        return criteriaBuilder.lessThan(path.as(LocalDate.class), (LocalDate) typedValue);
                     } else {
                         return criteriaBuilder.lessThan(path.as(String.class), ((String) typedValue));
                     }
                 }
 
-                // Fixed: Use correct type for greaterThanOrEqualTo
                 if (operator.equals("=ge=")) {
                     if (fieldType == Integer.class || fieldType == int.class) {
                         return criteriaBuilder.greaterThanOrEqualTo(path.as(Integer.class), (Integer) typedValue);
@@ -231,12 +231,14 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
                         return criteriaBuilder.greaterThanOrEqualTo(path.as(Long.class), (Long) typedValue);
                     } else if (fieldType == Double.class || fieldType == double.class) {
                         return criteriaBuilder.greaterThanOrEqualTo(path.as(Double.class), (Double) typedValue);
+                    } else if (fieldType == LocalDate.class) {
+                        // I've added this to allow LocalDate >= comparisons
+                        return criteriaBuilder.greaterThanOrEqualTo(path.as(LocalDate.class), (LocalDate) typedValue);
                     } else {
                         return criteriaBuilder.greaterThanOrEqualTo(path.as(String.class), ((String) typedValue));
                     }
                 }
 
-                // Fixed: Use correct type for lessThanOrEqualTo
                 if (operator.equals("=le=")) {
                     if (fieldType == Integer.class || fieldType == int.class) {
                         return criteriaBuilder.lessThanOrEqualTo(path.as(Integer.class), (Integer) typedValue);
@@ -244,21 +246,22 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
                         return criteriaBuilder.lessThanOrEqualTo(path.as(Long.class), (Long) typedValue);
                     } else if (fieldType == Double.class || fieldType == double.class) {
                         return criteriaBuilder.lessThanOrEqualTo(path.as(Double.class), (Double) typedValue);
+                    } else if (fieldType == LocalDate.class) {
+                        // I've added this for proper LocalDate <= comparisons
+                        return criteriaBuilder.lessThanOrEqualTo(path.as(LocalDate.class), (LocalDate) typedValue);
                     } else {
                         return criteriaBuilder.lessThanOrEqualTo(path.as(String.class), ((String) typedValue));
                     }
                 }
 
-                // Fixed: Convert all values to correct type for 'in' operator
                 if (operator.equals("=in=")) {
                     List<Object> typedValues = new ArrayList<>();
                     for (String v : values) {
                         typedValues.add(convertValue(fieldType, v));
                     }
-                    return path.in(typedValues); // Use typedValues for type safety
+                    return path.in(typedValues);
                 }
 
-                // Fixed: Cast typedValue to String for wildcard pattern
                 if (operator.equals("=like=")) {
                     if (fieldType == String.class) {
                         String pattern = ((String) typedValue).replace("*", "%").toLowerCase();
@@ -268,13 +271,12 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
                     }
                 }
 
-                // Fixed: Converteded all values to correct type for 'out' operator
                 if (operator.equals("=out=")) {
                     List<Object> typedValues = new ArrayList<>();
                     for (String v : values) {
                         typedValues.add(convertValue(fieldType, v));
                     }
-                    return criteriaBuilder.not(path.in(typedValues)); // Use typedValues for type safety
+                    return criteriaBuilder.not(path.in(typedValues));
                 }
 
                 throw new IllegalStateException("No predicate could be built for operator: " + operator);
@@ -286,11 +288,10 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
              * Path<LocalDate> instead).
              */
         };
-
     }
 
     /*
-     * Fix for failing test Type Illegalargument exceptions
+     * Fix for failing test Type IllegalArgument exceptions
      * Uses reflection and JPA Criteria API, to determine the actual Java type of
      * the field in the entity/model (e.g., Long for tradeId).
      * 
@@ -299,12 +300,8 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
      * Catchs conversion errors and throw an exception.
      */
     public static Object convertValue(Class<?> type, String value) {
-        // database expects the correct type for comparisons (e.g., tradeAmount > 1000
-        // needs 1000 as a number, not a string.
-        // If conversion succeeds, build the predicate. If conversion
-        // fails (e.g., "NotANumber" for a numeric field), catch the error and throw
-        // IllegalArgumentException.
-
+        // I refactored this method to handle LocalDate and LocalDateTime conversions
+        // properly, while preserving existing logic and comments.
         try {
             if (type == String.class)
                 return value;
@@ -316,6 +313,21 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
                 return Double.parseDouble(value);
             if (type == Boolean.class || type == boolean.class)
                 return Boolean.parseBoolean(value);
+
+            // I've added this section for LocalDate so that date-only fields parse
+            // correctly.
+            if (type == LocalDate.class) {
+                String clean = value.replace("'", "").replace("\"", "");
+                return LocalDate.parse(clean, DateTimeFormatter.ISO_LOCAL_DATE);
+            }
+
+            // I've added this section for LocalDateTime in case timestamp fields are
+            // queried.
+            if (type == LocalDateTime.class) {
+                String clean = value.replace("'", "").replace("\"", "");
+                return LocalDateTime.parse(clean, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            }
+
             // Add more types as needed
             throw new IllegalArgumentException("Unsupported type: " + type.getSimpleName());
         } catch (Exception e) {

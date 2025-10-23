@@ -40,7 +40,8 @@ public class BusinessDayConventionController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<BusinessDayConvention> update(@PathVariable Long id, @RequestBody BusinessDayConvention businessDayConvention) {
+    public ResponseEntity<BusinessDayConvention> update(@PathVariable Long id,
+            @RequestBody BusinessDayConvention businessDayConvention) {
         return businessDayConventionService.findById(id)
                 .map(existing -> {
                     businessDayConvention.setId(id);
@@ -66,4 +67,6 @@ public class BusinessDayConventionController {
                 .map(BusinessDayConvention::getBdc)
                 .toList();
     }
+    // Adding this line to force commit
+
 }

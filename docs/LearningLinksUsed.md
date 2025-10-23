@@ -207,6 +207,8 @@ https://www.youtube.com/watch?v=qpSasUow1XI
 
 - **Spring Security: Getting the Current User (Baeldung):**
 
-## Notes
+### Using Mockito ArgumentCaptor
 
-Last updated: October 2025
+https://www.baeldung.com/mockito-argumentcaptor
+
+https://site.mockito.org/javadoc/current/org/mockito/ArgumentCaptor.html
