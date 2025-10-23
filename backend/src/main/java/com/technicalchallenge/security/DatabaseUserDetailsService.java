@@ -115,14 +115,17 @@ public class DatabaseUserDetailsService implements UserDetailsService {
 
         // Attempt to collect privilege-based authorities for this user
         try {
-            // Retrieve all user-privilege links from the service
-            List<UserPrivilege> userPrivileges = userPrivilegeService.getAllUserPrivileges();
+            // Retrieve privilege links for this user specifically to avoid
+            // loading the entire user_privilege table into memory. Use the
+            // helper on UserPrivilegeService which performs a focused query
+            // by loginId (backed by a repository finder). This speeds startup
+            // and lowers memory pressure in production. // ADDED: Replace broad scan with
+            // precise finder
+            List<UserPrivilege> userPrivileges = userPrivilegeService
+                    .findPrivilegesByUserLoginId(appUser.getLoginId());
 
-            // Filter the links to those belonging to this user and map to names
-            List<String> names = userPrivileges.stream()
-                    .filter(Objects::nonNull) // skip null entries
-                    .filter(up -> up.getUserId() != null) // require userId on link
-                    .filter(up -> Objects.equals(up.getUserId(), appUser.getId())) // belong to this user
+            // Map to privilege names; the finder already scopes to this user
+            List<String> names = userPrivileges.stream().filter(Objects::nonNull)
                     .map(UserPrivilege::getPrivilege) // get Privilege object
                     .filter(Objects::nonNull) // skip if no Privilege
                     .map(Privilege::getName) // privilege name string

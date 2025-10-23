@@ -575,7 +575,7 @@ public class TradeService {
      * trade leg and the payment interval (in months).
      */
     private BigDecimal calculateCashflowValue(TradeLeg leg, int monthsInterval) {
-        if (leg.getLegRateType() == null) { // If the leg’s rate type is not set, the method returns zero, prevents
+        if (leg.getLegRateType() == null) { // If the leg's rate type is not set, the method returns zero, prevents
             return BigDecimal.ZERO; // calculation errors and signals missing data.
         }
 

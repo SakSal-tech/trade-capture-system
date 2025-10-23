@@ -66,6 +66,12 @@ public class TradeDashboardServiceTest {
         // Mark as lenient to avoid UnnecessaryStubbingException
         org.mockito.Mockito.lenient().when(privilegeValidationEngine.validateUserPrivilegeBusinessRules(any(), any()))
                 .thenReturn(allow());
+        // Lenient default for DB-backed privilege lookup: emulate that the
+        // current user has TRADE_VIEW so existing tests that don't assert
+        // authorization behavior continue to pass. Individual tests may
+        org.mockito.Mockito.lenient()
+                .when(userPrivilegeService.findPrivilegesByUserLoginIdAndPrivilegeName(anyString(), anyString()))
+                .thenReturn(List.of(new com.technicalchallenge.model.UserPrivilege()));
     }
 
     @Mock
@@ -73,6 +79,10 @@ public class TradeDashboardServiceTest {
 
     @Mock
     private TradeMapper tradeMapper;
+
+    // NEW MOCK: simulate DB-backed privilege lookups used by the service
+    @Mock
+    private com.technicalchallenge.service.UserPrivilegeService userPrivilegeService;
 
     // NEW MOCK: Added to simulate validation behavior for privilege enforcement
     @Mock

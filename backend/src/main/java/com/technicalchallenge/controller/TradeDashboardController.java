@@ -48,7 +48,7 @@ public class TradeDashboardController {
             @RequestParam(required = false) String counterparty,
             @RequestParam(required = false) String book) {
 
-        // I’ve changed this to match service signature: it now builds a
+        // I've changed this to match service signature: it now builds a
         // SearchCriteriaDTO.
         SearchCriteriaDTO criteria = new SearchCriteriaDTO();
         criteria.setCounterparty(counterparty);
@@ -63,7 +63,7 @@ public class TradeDashboardController {
      *
      * Roles allowed: TRADER, MIDDLE_OFFICE, SUPPORT
      * The tests expect JSON with a "content" key (Page<TradeDTO> response),
-     * so I’ve wrapped the result in a PageImpl since the service returns a List.
+     * so I've wrapped the result in a PageImpl since the service returns a List.
      */
     /**
      * Advanced filter with pagination (used by dashboard table views).
@@ -125,7 +125,10 @@ public class TradeDashboardController {
      * 403).
      */
     @GetMapping("/my-trades")
-    @PreAuthorize("hasRole('TRADER')")
+    // Only allow users with role TRADER to call this endpoint and require that
+    // the requested traderId matches the authenticated user. This prevents a
+    // trader from reading another trader's list by supplying a different id.
+    @PreAuthorize("hasRole('TRADER') and #traderId != null and #traderId.equalsIgnoreCase(authentication.name)")
     public ResponseEntity<List<TradeDTO>> getMyTrades(@RequestParam String traderId) {
         List<TradeDTO> trades = tradeDashboardService.getTradesByTrader(traderId);
         return ResponseEntity.ok(trades);
@@ -163,7 +166,9 @@ public class TradeDashboardController {
     // this PreAuthorize will deny the request because #traderId !=
     // authentication.name. This prevents accidental or malicious access to
     // another trader's data at the controller layer.
-    @PreAuthorize("hasAnyRole('MIDDLE_OFFICE') or hasAuthority('TRADE_VIEW') or hasRole('TRADE_VIEW') or (#traderId != null and #traderId.equalsIgnoreCase(authentication.name))")
+    // Conservative rule: only MIDDLE_OFFICE or users with TRADE_VIEW_ALL may view
+    // other traders' summaries. A TRADER may view only their own summary.
+    @PreAuthorize("hasAnyRole('MIDDLE_OFFICE') or hasAuthority('TRADE_VIEW_ALL') or (#traderId != null and #traderId.equalsIgnoreCase(authentication.name))")
     public ResponseEntity<?> getTradeSummary(@RequestParam String traderId) {
         Object summary = tradeDashboardService.getTradeSummary(traderId);
         return ResponseEntity.ok(summary);
@@ -183,7 +188,10 @@ public class TradeDashboardController {
     // MIDDLE_OFFICE and users with TRADE_VIEW can request other traders.
     // Example: logged-in 'joey' cannot request traderId='simon' unless they
     // have the TRADE_VIEW privilege or are MIDDLE_OFFICE.
-    @PreAuthorize("hasAnyRole('MIDDLE_OFFICE') or hasAuthority('TRADE_VIEW') or hasRole('TRADE_VIEW') or (#traderId != null and #traderId.equalsIgnoreCase(authentication.name))")
+    // Same conservative semantics as /summary: require MIDDLE_OFFICE or
+    // TRADE_VIEW_ALL to view other traders' daily summaries; traders can view
+    // only their own.
+    @PreAuthorize("hasAnyRole('MIDDLE_OFFICE') or hasAuthority('TRADE_VIEW_ALL') or (#traderId != null and #traderId.equalsIgnoreCase(authentication.name))")
     public ResponseEntity<?> getDailySummary(@RequestParam(required = false) String traderId) {
         if (traderId == null || traderId.isBlank()) {
             // I have added a clear 400 response here since SummaryIntegrationTest

@@ -22,12 +22,12 @@ import com.technicalchallenge.validation.UserPrivilegeValidationEngine;
  * Focused authentication/authorization unit tests for TradeDashboardService.
  *
  * - This test class isolates the privilege-checking behaviour (the
- *   service-level `hasPrivilege(...)` logic) so to validate short-circuit
- *   rules (SecurityContext authorities), the DB-backed privilege fallback,
- *   and the test-friendly permissive path that keeps unit tests stable.
- * - Keeping these checks isolated makes it easier to reason about security
- *   semantics (role vs authority mapping) without coupling to repository data
- *   returned by other integration tests.
+ *   service-level `hasPrivilege(...)` logic) so we can validate short-circuit
+ *   rules (SecurityContext authorities) and the DB-backed privilege fallback.
+ * - The service now uses a deny-by-default approach and requires a
+ *   mocked UserPrivilegeService for DB lookups in unit tests. Tests must
+ *   explicitly provide the privilege service behavior instead of relying on
+ *   any permissive null-service shortcuts.
  */
 public class TradeDashboardServiceAuthTest {
 
@@ -78,14 +78,6 @@ public class TradeDashboardServiceAuthTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
 
         assertDoesNotThrow(() -> dashboardService.searchTrades(new com.technicalchallenge.dto.SearchCriteriaDTO()));
-    }
-
-    @Test
-    void whenNoSecurityContext_andNoServices_thenPermits() throws Exception {
-        // create a new service where both userPrivilegeService and
-        // privilegeValidationEngine are null
-        TradeDashboardService svc = new TradeDashboardService(tradeRepository, tradeMapper, null, null);
-        assertDoesNotThrow(() -> svc.searchTrades(new com.technicalchallenge.dto.SearchCriteriaDTO()));
     }
 
     @Test
