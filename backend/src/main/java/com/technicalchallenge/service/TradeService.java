@@ -1,9 +1,7 @@
 package com.technicalchallenge.service;
 
-import com.technicalchallenge.dto.SearchCriteriaDTO;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
-import com.technicalchallenge.mapper.TradeMapper;
 import com.technicalchallenge.model.*;
 import com.technicalchallenge.repository.*;
 
@@ -12,10 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

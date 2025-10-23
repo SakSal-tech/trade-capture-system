@@ -23,6 +23,7 @@ import java.time.LocalDate;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
+import org.mockito.Mockito;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,6 +79,9 @@ public class SummaryIntegrationTest extends BaseIntegrationTest {
         private TradeStatusRepository tradeStatusRepository;
 
         private static final String SUMMARY_ENDPOINT = "/api/dashboard/daily-summary";
+
+        @MockBean
+        private com.technicalchallenge.service.UserPrivilegeService userPrivilegeService;
 
         // Setup method to seed test data before each test
         @BeforeEach
@@ -143,6 +147,15 @@ public class SummaryIntegrationTest extends BaseIntegrationTest {
                 tradeRepository.save(yesterdayTrade);
                 // of 1 (I created only one
                 // instance of trade)
+
+                // Ensure the DB-backed privilege check used by the service allows
+                // the test user to perform TRADE_VIEW so requests reach the
+                // controller and exercise parameter validation / aggregation.
+                // We use a lenient Mockito stub so other tests may override it.
+                Mockito.lenient().when(userPrivilegeService.findPrivilegesByUserLoginIdAndPrivilegeName(
+                                org.mockito.ArgumentMatchers.anyString(),
+                                org.mockito.ArgumentMatchers.eq("TRADE_VIEW")))
+                                .thenReturn(java.util.List.of(new com.technicalchallenge.model.UserPrivilege()));
         }
 
         @DisplayName("Summary endpoint returns correct trade counts when multiple trades exist for today")
@@ -272,19 +285,23 @@ public class SummaryIntegrationTest extends BaseIntegrationTest {
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.todaysTradeCount").value(1));
 
-                // Perform request and assert for other trader
+                // Perform request for other trader. Security guard forbids viewing
+                // another trader's dashboard for a plain TRADER user, so expect
+                // 403 Forbidden here. If the test needs to validate allowed
+                // behaviour for elevated roles, add a separate test that uses
+                // WithMockUser with ROLE_MIDDLE_OFFICE or TRADE_VIEW_ALL.
                 mockMvc.perform(get(SUMMARY_ENDPOINT).param("traderId", "otherTrader"))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.todaysTradeCount").value(1));
+                                .andExpect(status().isForbidden());
         }
 
         @DisplayName("Summary endpoint returns zero trade count for invalid trader")
         @Test
         void testSummaryEndpointInvalidTrader() throws Exception {
+                // Requesting a summary for an arbitrary/non-existent trader is
+                // treated as an attempt to view another trader's data and will
+                // be forbidden for non-privileged callers.
                 mockMvc.perform(get(SUMMARY_ENDPOINT).param("traderId", "nonExistentTrader"))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.todaysTradeCount").value(0))
-                                .andExpect(jsonPath("$.historicalComparisons[*].tradeCount").value(0));
+                                .andExpect(status().isForbidden());
         }
 
         @DisplayName("Summary endpoint returns correct trade counts for trades with different statuses")

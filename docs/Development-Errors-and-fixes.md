@@ -3663,3 +3663,31 @@ Notes and follow-ups
 
 - Build and test suite green after updating tests.
 - Manual curl-based verification confirms TRADER cannot fetch another trader's dashboard; elevated roles can.
+
+### Problem — UserPrivilegeIntegrationTest: integration vs unit confusion
+
+theproblem was that the userprivilege meant to be an integration test but I made a mistake and got confused between integration and unit testing as I mocked some of the tests, therefore it was hitting the controller. therefore I was not sure if the integraion is working all though different layers controller-service-repository-data.
+
+Solution
+
+- Converted the original test into a proper integration test that persists required fixtures (books, counterparties, trades) and uses the business `tradeId` for controller requests. Removed mocks that masked repository/service behaviour. Where unit-like isolation was still required, the `UserPrivilegeService` is explicitly mocked to provide the needed privilege results so tests remain deterministic. Added `@Transactional` + `@Rollback` to ensure test isolation and avoid seed-data collisions.
+- Ensured test authentication is explicit (either `@WithMockUser` or programmatic login with session persistence) and that CSRF tokens are supplied for mutating requests. Verified that the test exercises controller → service → repository paths and asserts on the business-level trade id and JSON response structure.
+
+Impact
+
+- The test now validates the full stack behaviour and catches integration-level issues (missing reference data, incorrect id-type usage, security context persistence). It prevented a false sense of correctness that had previously come from over-mocked unit-style tests. A small amount of added test setup (fixtures and explicit privilege stubbing) made the test slower but far more trustworthy.
+
+### Problem — SummaryIntegrationTest: proper integration test with one mock added
+
+Problem
+
+- `SummaryIntegrationTest` was a proper integration test that exercised controller→service→repo. During the refactor a single `@MockBean` was added for `UserPrivilegeService` to make privilege responses deterministic when authorization decisions were not under test.
+
+### Solution
+
+- Kept the class as an integration test (full Spring context, real repositories) but explicitly documented and centralised the one mock (`UserPrivilegeService`) in the test class setup. The mock is a lenient stub that returns the minimal privilege set required for tests that should succeed, and is used to assert negative cases (expect 403) where privilege denial is the behaviour under test.
+- Added explanatory comments in the test to make the intent clear: the mock isolates privilege lookup while still exercising all other layers.
+
+Impact
+
+- This approach preserves the integration-level coverage (real DB, mapping, DTOs, and controllers) while making test outcomes deterministic for authorization-related branches. The single mock reduces flakiness from DB privilege seeding without sacrificing the value of an end-to-end integration test.

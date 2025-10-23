@@ -72,6 +72,22 @@ public class TradeDashboardServiceTest {
         org.mockito.Mockito.lenient()
                 .when(userPrivilegeService.findPrivilegesByUserLoginIdAndPrivilegeName(anyString(), anyString()))
                 .thenReturn(List.of(new com.technicalchallenge.model.UserPrivilege()));
+
+        // Ensure SecurityContext is cleared so the service's defensive
+        // "view other trader" guard doesn't pick up a stale authentication
+        // from other tests. Unit tests should set authentication explicitly
+        // when needed.
+        // Instead of leaving the context empty (which causes defensive
+        // checks on "view other trader" to fail when tests call methods
+        // with an explicit traderId), populate a permissive authentication
+        // that has the TRADE_VIEW_ALL authority so unit tests can exercise
+        // aggregation logic without hitting role-based denials. Individual
+        // tests that need to assert denial can override this behaviour.
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+                .setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        "test-system", null,
+                        java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                "TRADE_VIEW_ALL"))));
     }
 
     @Mock

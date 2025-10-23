@@ -7,9 +7,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
-import java.util.stream.Collectors;
-
 /**
  * Simple debugging endpoint that returns the current authenticated principal
  * and authorities. Useful to verify that login produced a server-side

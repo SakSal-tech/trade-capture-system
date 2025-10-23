@@ -76,6 +76,5 @@ public class PayRecController {
                 .map(PayRec::getPayRec)
                 .toList();
     }
-    // Adding this line to force commit
 
 }
