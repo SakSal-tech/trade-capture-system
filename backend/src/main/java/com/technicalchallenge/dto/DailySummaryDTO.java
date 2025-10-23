@@ -27,6 +27,14 @@ public class DailySummaryDTO {
     // expectations. See Development-Errors-and-fixes.md for details.
     private List<DailyComparisonSummary> historicalComparisons;
 
+    // Labeled fields to make it explicit whether values are 'all-time' or
+    // 'weekly' aggregates. These help the UI show both totals and recent
+    // activity side-by-side.
+    private Map<String, Long> allTimeTradesByStatus;
+    private Map<String, BigDecimal> allTimeNotionalByCurrency;
+    private Map<String, Long> weeklyTradesByStatus;
+    private Map<String, BigDecimal> weeklyNotionalByCurrency;
+
     @Setter
     @Getter
     public static class BookActivitySummary {

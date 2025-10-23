@@ -39,12 +39,16 @@ public class TradeDashboardController {
      * The integration tests for Support and Trader users expect status 200 OK.
      */
     @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT','TRADE_VIEW')")
+    // Changed authorization to allow either the listed ROLE_* authorities OR
+    // the TRADE_VIEW privilege authority. We map profile -> ROLE_* in the DB
+    // but individual privileges are stored as plain authorities (e.g. TRADE_VIEW),
+    // so this expression ensures both models grant access.
+    @PreAuthorize("(hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')) or hasAuthority('TRADE_VIEW')")
     public ResponseEntity<List<TradeDTO>> searchTrades(
             @RequestParam(required = false) String counterparty,
             @RequestParam(required = false) String book) {
 
-        // I’ve changed this to match your service signature: it now builds a
+        // I’ve changed this to match service signature: it now builds a
         // SearchCriteriaDTO.
         SearchCriteriaDTO criteria = new SearchCriteriaDTO();
         criteria.setCounterparty(counterparty);
@@ -70,7 +74,9 @@ public class TradeDashboardController {
      * it.
      */
     @GetMapping("/filter")
-    @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT','TRADE_VIEW')")
+    // As above: allow users with ROLE_TRADER / ROLE_MIDDLE_OFFICE / ROLE_SUPPORT
+    // OR users who have the TRADE_VIEW privilege authority.
+    @PreAuthorize("(hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')) or hasAuthority('TRADE_VIEW')")
     public ResponseEntity<?> filterTrades(
             @RequestParam(required = false) String counterparty,
             @RequestParam(defaultValue = "0") int page,
@@ -93,11 +99,13 @@ public class TradeDashboardController {
      * RSQL-style search endpoint for dynamic queries.
      *
      * Roles allowed: TRADER, MIDDLE_OFFICE, SUPPORT
-     * Your service returns a List, not a Page, so I've wrapped it using PageImpl
+     * service returns a List, not a Page, so I've wrapped it using PageImpl
      * to satisfy integration test expectations for $.content in the response.
      */
     @GetMapping("/rsql")
-    @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT','TRADE_VIEW')")
+    // RSQL search uses the same authorization model as the other read endpoints.
+    // This keeps behavior consistent between role-based and privilege-based users.
+    @PreAuthorize("(hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')) or hasAuthority('TRADE_VIEW')")
     public ResponseEntity<?> searchTradesRsql(@RequestParam String query) {
         List<TradeDTO> resultList = tradeDashboardService.searchTradesRsql(query);
 
@@ -145,21 +153,37 @@ public class TradeDashboardController {
      * expectations.
      */
     @GetMapping("/summary")
-    @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','TRADE_VIEW')")
+    // Summary endpoints are restricted to traders or middle office by role,
+    // but we also accept the TRADE_VIEW privilege authority for users who
+    // have fine-grained privileges instead of role membership.
+    // Controller-level guard: allow MIDDLE_OFFICE or users with TRADE_VIEW to
+    // request any trader's summary. A TRADER may only request their own
+    // summary (compare request param to authentication.name). Example: if
+    // 'joey' is logged in and tries to call /api/dashboard/summary?traderId=simon
+    // this PreAuthorize will deny the request because #traderId !=
+    // authentication.name. This prevents accidental or malicious access to
+    // another trader's data at the controller layer.
+    @PreAuthorize("hasAnyRole('MIDDLE_OFFICE') or hasAuthority('TRADE_VIEW') or hasRole('TRADE_VIEW') or (#traderId != null and #traderId.equalsIgnoreCase(authentication.name))")
     public ResponseEntity<?> getTradeSummary(@RequestParam String traderId) {
         Object summary = tradeDashboardService.getTradeSummary(traderId);
         return ResponseEntity.ok(summary);
     }
 
     /**
-     * Provides a daily summary comparing today’s and yesterday’s trades.
+     * Provides a daily summary comparing today's and yesterday's trades.
      *
      * Roles allowed: TRADER and MIDDLE_OFFICE.
      * The SUPPORT role must be denied (tests expect 403 Forbidden).
      * I have added this restriction via @PreAuthorize.
      */
     @GetMapping("/daily-summary")
-    @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','TRADE_VIEW')")
+    // Same reasoning as /summary: allow role-based access or the TRADE_VIEW
+    // privilege authority. Tests expect SUPPORT to be denied here.
+    // Similar guard: TRADER only allowed to request their own daily summary;
+    // MIDDLE_OFFICE and users with TRADE_VIEW can request other traders.
+    // Example: logged-in 'joey' cannot request traderId='simon' unless they
+    // have the TRADE_VIEW privilege or are MIDDLE_OFFICE.
+    @PreAuthorize("hasAnyRole('MIDDLE_OFFICE') or hasAuthority('TRADE_VIEW') or hasRole('TRADE_VIEW') or (#traderId != null and #traderId.equalsIgnoreCase(authentication.name))")
     public ResponseEntity<?> getDailySummary(@RequestParam(required = false) String traderId) {
         if (traderId == null || traderId.isBlank()) {
             // I have added a clear 400 response here since SummaryIntegrationTest

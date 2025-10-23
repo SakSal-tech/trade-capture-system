@@ -3,13 +3,14 @@ package com.technicalchallenge.config;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.context.annotation.Bean;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails; // removed
-//unused import
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+// removed unused imports (we wire a DatabaseUserDetailsService via DaoAuthenticationProvider)
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
+// Authentication provider classes
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import com.technicalchallenge.security.DatabaseUserDetailsService;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 
 /**
  * SecurityConfig
@@ -67,6 +68,21 @@ public class SecurityConfig {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
+    // Create a DaoAuthenticationProvider that wires DatabaseUserDetailsService
+    // and the application's PasswordEncoder. This tells Spring Security how to
+    // load users (from DB) and how to check/encode passwords.
+    @Bean
+    public DaoAuthenticationProvider daoAuthenticationProvider(DatabaseUserDetailsService userDetailsService,
+            PasswordEncoder passwordEncoder) {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        // Set the custom UserDetailsService that loads users from the DB
+        provider.setUserDetailsService(userDetailsService);
+        // Set the PasswordEncoder bean so presented passwords are checked
+        // using the same encoding strategy as stored passwords
+        provider.setPasswordEncoder(passwordEncoder);
+        return provider;
+    }
+
     /**
      * Configures HTTP security for the entire application.
      *
@@ -87,19 +103,37 @@ public class SecurityConfig {
      */
     @Bean
     public org.springframework.security.web.SecurityFilterChain securityFilterChain(
-            org.springframework.security.config.annotation.web.builders.HttpSecurity http) throws Exception {
+            org.springframework.security.config.annotation.web.builders.HttpSecurity http,
+            DaoAuthenticationProvider authProvider) throws Exception {
         http
                 // Globally allow all requests (temporary for dev/testing)
                 .authorizeHttpRequests(authz -> authz
                         .anyRequest().permitAll())
                 // Disable CSRF for non-browser API access
                 .csrf(csrf -> csrf.disable())
-                .httpBasic(httpBasic -> httpBasic.disable()) // Disable HTTP Basic authentication prompts
-                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable())
-                // Disable Spring Security's default form login
-                // .formLogin(form -> form.disable())
-                );
+                // Register the DaoAuthenticationProvider so authentication attempts
+                // (for example from Basic auth) will use the DB-backed service.
+                .authenticationProvider(authProvider)
+                // Enable HTTP Basic for Swagger/curl testing; this makes it easy to
+                // provide credentials (Authorization header) from the client/UI.
+                .httpBasic(org.springframework.security.config.Customizer.withDefaults())
+                // Disable form-based login to avoid browser redirect loops to /login
+                .formLogin(form -> form.disable())
+                // Keep H2 console working in a frame by disabling frameOptions
+                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()));
         // Build and return the configured security chain
         return http.build();
+    }
+
+    /**
+     * Expose the AuthenticationManager from the configuration so other beans
+     * (for example controllers performing programmatic login) can authenticate
+     * credentials using the same providers we registered
+     * (DaoAuthenticationProvider).
+     */
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
+            throws Exception {
+        return authenticationConfiguration.getAuthenticationManager();
     }
 }

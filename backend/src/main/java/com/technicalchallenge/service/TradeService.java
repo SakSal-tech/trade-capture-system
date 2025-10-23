@@ -244,7 +244,26 @@ public class TradeService {
     @Transactional
     public void deleteTrade(Long tradeId) {
         logger.info("Deleting (cancelling) trade with ID: {}", tradeId);
-        cancelTrade(tradeId);
+        // ADDED: perform logical delete instead of a hard delete. We keep the
+        // database row for audit/history and set active=false so the trade
+        // no longer appears in queries that filter on active = true. This
+        // preserves auditability and avoids accidental data loss in dev/tests.
+        Optional<Trade> tradeOpt = getTradeById(tradeId);
+        if (tradeOpt.isEmpty()) {
+            throw new RuntimeException("Trade not found: " + tradeId);
+        }
+        Trade trade = tradeOpt.get();
+        TradeStatus cancelledStatus = tradeStatusRepository.findByTradeStatus("CANCELLED")
+                .orElseThrow(() -> new RuntimeException("CANCELLED status not found"));
+
+        trade.setTradeStatus(cancelledStatus);
+        trade.setLastTouchTimestamp(LocalDateTime.now());
+        // ADDED: mark inactive and set deactivated timestamp so the row
+        // remains for audit while being excluded from active queries.
+        trade.setActive(false);
+        trade.setDeactivatedDate(LocalDateTime.now());
+
+        tradeRepository.save(trade);
     }
 
     @Transactional
