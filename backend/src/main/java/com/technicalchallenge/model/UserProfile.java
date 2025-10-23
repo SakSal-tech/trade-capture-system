@@ -1,6 +1,5 @@
 package com.technicalchallenge.model;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 import jakarta.persistence.*;

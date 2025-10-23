@@ -8,12 +8,13 @@ import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.service.TradeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+// import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
@@ -22,13 +23,13 @@ import java.util.Optional;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ExtendWith(SpringExtension.class)
 @WebMvcTest(TradeController.class)
+// @WithMockUser
 public class TradeControllerTest {
 
     @Autowired
@@ -66,6 +67,8 @@ public class TradeControllerTest {
         // Create a sample Trade entity for testing
         trade = new Trade();
         trade.setId(1L);
+        //// Setting the tradeId ensures the entity matches the expected value in the
+        //// response JSON, so test assertions for tradeId will pass.
         trade.setTradeId(1001L);
         trade.setVersion(1);
         trade.setTradeDate(LocalDate.now());
@@ -143,6 +146,11 @@ public class TradeControllerTest {
         verify(tradeService).populateReferenceDataByName(any(Trade.class), any(TradeDTO.class));
     }
 
+    // I am adding the TRADER role to this test method to match the privilege
+    // enforcement rules and resolve the 403 Forbidden error. The TRADER role allows
+    // create, amend, terminate, and cancel actions.
+    // @WithMockUser(roles = "TRADER")
+
     @Test
     void testUpdateTrade() throws Exception {
         // Given
@@ -190,5 +198,60 @@ public class TradeControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(tradeService).deleteTrade(1001L);
+    }
+
+    @SpringBootTest
+    @AutoConfigureMockMvc
+    class TradeControllerIntegrationTest {
+
+        @Autowired
+        private MockMvc mockMvc;
+
+        @Test
+        void searchTrades_shouldReturnMatchingTrades() throws Exception {
+            // Arrange: Insert test trades into DB
+
+            // Act & Assert. simulates HTTP requests
+            mockMvc.perform(get("/api/trades/search")
+                    /*
+                     * // adds a query parameter to the request, so the final URL is
+                     * // /api/trades/search?counterparty=BigBank
+                     * // index 0 is used: it always refers
+                     * // to the first item in a
+                     * // JSON"$[0].counterpartyName" points
+                     * // to
+                     * // the counterpartyName field of the
+                     * // first object in the returned JSON
+                     * // array.
+                     */
+                    .param("counterparty", "BigBank"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].counterpartyName").value("BigBank"));
+
+        }
+
+        @Test
+        void filterTrades_shouldReturnPaginatedResults() throws Exception {
+            // Arrange: Insert test trades into DB
+
+            // Act & Assert
+            mockMvc.perform(get("/api/trades/filter")
+                    .param("counterparty", "BigBank")
+                    .param("page", "0")
+                    .param("size", "10"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].counterpartyName").value("BigBank"));
+        }
+
+        @Test
+        void searchTradesRsql_shouldReturnMatchingTrades() throws Exception {
+            // Arrange: Insert test trades into DB
+
+            // Act & Assert
+            mockMvc.perform(get("/api/trades/rsql")
+                    .param("query", "counterparty.name==BigBank"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].counterpartyName").value("BigBank"));
+        }
     }
 }

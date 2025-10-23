@@ -8,8 +8,6 @@ import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
-
 @Component
 public class CostCenterMapper {
     @Autowired
@@ -28,8 +26,8 @@ public class CostCenterMapper {
         CostCenter entity = modelMapper.map(dto, CostCenter.class);
         if (dto.getSubDeskName() != null) {
             SubDesk subDesk = subDeskRepository.findAll().stream()
-                .filter(sd -> dto.getSubDeskName().equals(sd.getSubdeskName()))
-                .findFirst().orElse(null);
+                    .filter(sd -> dto.getSubDeskName().equals(sd.getSubdeskName()))
+                    .findFirst().orElse(null);
             entity.setSubDesk(subDesk);
         }
         return entity;

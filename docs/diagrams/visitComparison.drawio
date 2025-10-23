@@ -1,0 +1,196 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36" version="28.2.5">
+  <diagram name="TradeRsqlVisitor-visitComparisonNode-Detailed" id="g8A7V73arij8U4FVnlGF">
+    <mxGraphModel grid="1" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-1" value="Start visit(ComparisonNode)" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="40" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-2" value="Extract field, operator, values" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="120" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-3" value="Check operator supported?" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="200" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-4" value="Throw exception" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcccc;" vertex="1" parent="1">
+          <mxGeometry x="320" y="200" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-5" value="Split field by &#39;.&#39; to get fieldParts" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="280" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-6" value="For each part in fieldParts" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="360" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-7" value="Field exists in class? (reflection)" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="440" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-8" value="Throw exception" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcccc;" vertex="1" parent="1">
+          <mxGeometry x="320" y="440" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-9" value="If traversing, check type not primitive/String/Number/Enum" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="520" width="320" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-10" value="If invalid, throw exception" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcccc;" vertex="1" parent="1">
+          <mxGeometry x="440" y="520" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-11" value="Update currentClass to field type" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="600" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-12" value="End For" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="680" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-13" value="Traverse path in entity using fieldParts" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="740" width="320" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-14" value="Get field type" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="820" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-15" value="Convert value(s) to correct type" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="900" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-16" value="Operator switch/case" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="980" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-17" value="== : equal (case-insensitive for strings)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="980" width="320" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-18" value="!= : notEqual (case-insensitive for strings)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="1020" width="320" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-19" value="=gt= : greaterThan" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="1060" width="320" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-20" value="=lt= : lessThan" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="1100" width="320" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-21" value="=ge= : greaterThanOrEqualTo" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="1140" width="320" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-22" value="=le= : lessThanOrEqualTo" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="1180" width="320" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-23" value="=in= : in (all values converted)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="1220" width="320" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-24" value="=like= : like (wildcard, case-insensitive)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="1260" width="320" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-25" value="=out= : not in (all values converted)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="1300" width="320" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-26" value="No operator match: throw exception" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcccc;" vertex="1" parent="1">
+          <mxGeometry x="320" y="1340" width="320" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-27" value="Return built predicate/specification" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="1380" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-28" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-1" target="amvDgr3dbpt1cwhVNGuG-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-29" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-2" target="amvDgr3dbpt1cwhVNGuG-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-3" target="amvDgr3dbpt1cwhVNGuG-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-31" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-3" target="amvDgr3dbpt1cwhVNGuG-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-5" target="amvDgr3dbpt1cwhVNGuG-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-33" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-6" target="amvDgr3dbpt1cwhVNGuG-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-7" target="amvDgr3dbpt1cwhVNGuG-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-35" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-7" target="amvDgr3dbpt1cwhVNGuG-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-36" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-9" target="amvDgr3dbpt1cwhVNGuG-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-37" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-9" target="amvDgr3dbpt1cwhVNGuG-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-38" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-11" target="amvDgr3dbpt1cwhVNGuG-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-39" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-12" target="amvDgr3dbpt1cwhVNGuG-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-40" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-13" target="amvDgr3dbpt1cwhVNGuG-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-41" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-14" target="amvDgr3dbpt1cwhVNGuG-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-42" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-15" target="amvDgr3dbpt1cwhVNGuG-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-43" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-16" target="amvDgr3dbpt1cwhVNGuG-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-44" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-16" target="amvDgr3dbpt1cwhVNGuG-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-45" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-16" target="amvDgr3dbpt1cwhVNGuG-19">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-46" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-16" target="amvDgr3dbpt1cwhVNGuG-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-47" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-16" target="amvDgr3dbpt1cwhVNGuG-21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-48" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-16" target="amvDgr3dbpt1cwhVNGuG-22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-49" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-16" target="amvDgr3dbpt1cwhVNGuG-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-50" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-16" target="amvDgr3dbpt1cwhVNGuG-24">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-51" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-16" target="amvDgr3dbpt1cwhVNGuG-25">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-52" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-16" target="amvDgr3dbpt1cwhVNGuG-26">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-53" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-17" target="amvDgr3dbpt1cwhVNGuG-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-54" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-18" target="amvDgr3dbpt1cwhVNGuG-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-55" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-19" target="amvDgr3dbpt1cwhVNGuG-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-56" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-20" target="amvDgr3dbpt1cwhVNGuG-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-57" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-21" target="amvDgr3dbpt1cwhVNGuG-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-58" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-22" target="amvDgr3dbpt1cwhVNGuG-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-59" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-23" target="amvDgr3dbpt1cwhVNGuG-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-60" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-24" target="amvDgr3dbpt1cwhVNGuG-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-61" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-25" target="amvDgr3dbpt1cwhVNGuG-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="amvDgr3dbpt1cwhVNGuG-62" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="amvDgr3dbpt1cwhVNGuG-26" target="amvDgr3dbpt1cwhVNGuG-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

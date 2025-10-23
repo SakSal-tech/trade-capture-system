@@ -6,11 +6,10 @@ import com.technicalchallenge.model.Book;
 import com.technicalchallenge.service.BookService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+// import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -19,8 +18,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@ExtendWith(SpringExtension.class)
 @WebMvcTest(BookController.class)
+// @WithMockUser
 public class BookControllerTest {
     @Autowired
     private MockMvc mockMvc;
@@ -39,7 +38,6 @@ public class BookControllerTest {
         book.setActive(true);
         book.setVersion(1);
         book.setCostCenter(null);
-
 
         BookDTO bookDTO = new BookDTO();
         bookDTO.setBookName("Book Name");

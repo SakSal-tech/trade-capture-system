@@ -8,8 +8,6 @@ import com.technicalchallenge.model.TradeLeg;
 import com.technicalchallenge.model.Cashflow;
 import com.technicalchallenge.model.Book;
 import com.technicalchallenge.model.Counterparty;
-import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -20,8 +18,20 @@ import java.util.stream.Collectors;
 @Component
 public class TradeMapper {
 
-    @Autowired
-    private ModelMapper modelMapper;
+    /*
+     * FIX: Removed @Autowired from toDto(Trade trade)
+     * 
+     * Explanation:
+     * - @Autowired is used by Spring for dependency injection of beans.
+     * - Here, it incorrectly marked a normal mapper method as an injection point.
+     * - This caused Spring to fail on startup, trying to inject a bean of type
+     * Trade.
+     * - Trade is a JPA entity, not a Spring-managed bean.
+     * 
+     * Result:
+     * The application context now loads correctly.
+     * The mapper works as intended (pure object conversion logic).
+     */
 
     public TradeDTO toDto(Trade trade) {
         if (trade == null) {
