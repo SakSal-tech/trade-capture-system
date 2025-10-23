@@ -23,12 +23,10 @@ public class AuthInfoController {
     public ResponseEntity<?> me() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null) {
-            return ResponseEntity.ok(Map.of("authenticated", false));
+            return ResponseEntity.ok("");
         }
 
-        return ResponseEntity.ok(Map.of(
-                "authenticated", auth.isAuthenticated(),
-                "principal", auth.getName(),
-                "authorities", auth.getAuthorities().stream().map(Object::toString).collect(Collectors.toList())));
+        // Return just the username string for simplicity (used by UI/login flows)
+        return ResponseEntity.ok(auth.getName());
     }
 }

@@ -38,6 +38,18 @@ public class UserPrivilegeService {
         logger.warn("Deleting user privilege with id: {}", id);
         userPrivilegeRepository.deleteById(id);
     }
-    // Adding this line to force commit
+
+    // New helper: fetch privileges for a user by loginId (case-insensitive)
+    public List<UserPrivilege> findPrivilegesByUserLoginId(String loginId) {
+        logger.debug("Retrieving privileges for user loginId: {}", loginId);
+        return userPrivilegeRepository.findByUser_LoginIdIgnoreCase(loginId);
+    }
+
+    // New helper: fetch privileges for a user by loginId and privilege name
+    public List<UserPrivilege> findPrivilegesByUserLoginIdAndPrivilegeName(String loginId, String privilegeName) {
+        logger.debug("Retrieving privileges for user {} and privilege {}", loginId, privilegeName);
+        return userPrivilegeRepository.findByUser_LoginIdIgnoreCaseAndPrivilege_NameIgnoreCase(loginId,
+                privilegeName);
+    }
 
 }

@@ -307,7 +307,9 @@ Updated the stubbing to return a TradeDTO with counterpartyName set to "BigBank"
 
 ### Problem
 
-The method findAll(Example<Trade>) is ambiguous for the type TradeRepository
+### Security / Authorization fixes
+
+2025-10-23T10:30:00 | TradeDashboardService.java, TradeDashboardController.java, AuthorizationController.java, AuthInfoController.java, ApiExceptionHandler.java | Fix: deny-by-default service-level guard, friendly 403 JSON responses, logical-delete semantics for trades, and session persistence for programmatic login
 
 ### Cause:
 
@@ -3607,3 +3609,57 @@ Next steps and improvements
 - Implement a direct lookup in `UserPrivilegeService` such as `List<UserPrivilege> findByUserId(Long userId)` or a repository method to avoid scanning all privileges in memory.
 - Replace permissive `hasPrivilege(...)` stubs with DB-driven checks that consult the same authority names produced by `DatabaseUserDetailsService` (deny-by-default semantics).
 - Add unit tests for `DatabaseUserDetailsService` that assert specific sample users produce the expected `GrantedAuthority` set (role aliases + privilege aliases). This will prevent regressions when privilege names change.
+
+#### Problem
+
+A logged-in trader (for example, joey) could view another trader's (simon) dashboard summary. Programmatic login flow sometimes resulted in subsequent requests being evaluated as anonymous (ROLE_ANONYMOUS). There were also permissive, test-only shortcuts in the service layer that allowed bypassing the intended privilege model. Deletes were physical deletes rather than logical (cancel) so cancelled trades still appeared in some views.
+
+### Root cause
+
+- The authoritative check lived only at controller-level (@PreAuthorize) while a permissive helper/service allowed bypass in some service flows.
+- hasPrivilege(...) implemented a permissive early-return (test-only) path and did not deny-by-default if no explicit privilege was found.
+- Programmatic login authenticated the user but did not persist the SecurityContext into the HTTP session, so clients that did not preserve cookies appeared anonymous on subsequent requests.
+- Trade delete logic performed hard deletes instead of marking trades as CANCELLED/inactive.
+
+### solutions
+
+Added another layer of security to the Spring Security and Controller access right.
+
+- TradeDashboardService.hasPrivilege(...) — rewritten to a deny-by-default implementation:
+  - Short-circuits on existing SecurityContext authorities (ROLE\_\* and privileged authorities).
+  - Falls back to DB lookup via UserPrivilegeService.findPrivilegesByUserLoginIdAndPrivilegeName(user, privilege).
+  - Returns false if no matching authority/row found.
+  - Adds diagnostic debug logging for ownership and authority checks (reduce in prod later).
+- Defensive guard added to fetchTradesForTraderWithoutPrivilegeCheck(...) so callers cannot request another trader's data without elevated privilege.
+- TradeDashboardController — tightened @PreAuthorize expressions so TRADER-level users may only request their own traderId; MIDDLE_OFFICE / SUPERUSER / TRADE_VIEW_ALL can view others.
+- AuthorizationController.login(...) — after successful authentication, persists SecurityContext into the HTTP session using:
+  request.getSession(true).setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, SecurityContextHolder.getContext());
+  This makes programmatic login usable when the client preserves the JSESSIONID cookie.
+- AuthInfoController (/api/me) — simplified to return username string for simpler client checks during debugging.
+- Added ControllerAdvice (ApiExceptionHandler) to map AccessDeniedException / AccessDeniedHandler responses to a compact JSON 403: {timestamp,status,error,message,path} instead of an HTML error page.
+- Trade delete operations changed to logical delete (mark trade status CANCELLED and/or set active=false) so cancelled trades are hidden from active queries rather than physically removed.
+- Removed the permissive test-only shortcut in hasPrivilege and updated tests to explicitly mock UserPrivilegeService where a lenient default was previously assumed.
+
+Tests & verification
+
+- Updated unit and integration tests that relied on the permissive behavior. Where the authorization decision wasn't under test, tests now explicitly mock UserPrivilegeService to return the needed privileges.
+- Added (recommended) negative integration test to assert that a TRADER cannot view another trader's summary. (If not yet present, this is the next high-priority test to add.)
+- Manual verification performed with curl:
+  - Programmatic login + cookie reuse (sessions):
+    - curl -i -c cookies.txt -X POST "http://localhost:8080/api/login/simon?Authorization=password"
+    - curl -i -b cookies.txt "http://localhost:8080/api/me" # returns "simon"
+  - HTTP Basic per-request authentication (convenient for quick checks):
+    - curl -i -u simon:password "http://localhost:8080/api/dashboard/summary?traderId=simon" # 200
+    - curl -i -u simon:password "http://localhost:8080/api/dashboard/summary?traderId=joey" # 403 JSON
+
+Notes and follow-ups
+
+- Logging added for debugging should be reduced to INFO/WARN in production to avoid leaking sensitive data.
+- Sweep other helper methods named \*WithoutPrivilegeCheck and either remove them or add defensive authorization checks/caller contracts.
+- Add an automated integration test that covers the programmatic login (session cookie) scenario to prevent regressions.
+- Consider exposing a small `/api/me/details` debug endpoint (admin-only) if richer debugging info is required during investigations.
+
+### Impact
+
+- Build and test suite green after updating tests.
+- Manual curl-based verification confirms TRADER cannot fetch another trader's dashboard; elevated roles can.

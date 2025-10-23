@@ -202,7 +202,7 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
                     } else if (fieldType == Double.class || fieldType == double.class) {
                         return criteriaBuilder.greaterThan(path.as(Double.class), (Double) typedValue);
                     } else if (fieldType == LocalDate.class) {
-                        // I’ve added this to support LocalDate comparisons correctly
+                        // I've added this to support LocalDate comparisons correctly
                         return criteriaBuilder.greaterThan(path.as(LocalDate.class), (LocalDate) typedValue);
                     } else {
                         return criteriaBuilder.greaterThan(path.as(String.class), ((String) typedValue));
@@ -217,7 +217,7 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
                     } else if (fieldType == Double.class || fieldType == double.class) {
                         return criteriaBuilder.lessThan(path.as(Double.class), (Double) typedValue);
                     } else if (fieldType == LocalDate.class) {
-                        // I’ve added this for proper LocalDate less-than comparisons
+                        // I've added this for proper LocalDate less-than comparisons
                         return criteriaBuilder.lessThan(path.as(LocalDate.class), (LocalDate) typedValue);
                     } else {
                         return criteriaBuilder.lessThan(path.as(String.class), ((String) typedValue));
@@ -232,7 +232,7 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
                     } else if (fieldType == Double.class || fieldType == double.class) {
                         return criteriaBuilder.greaterThanOrEqualTo(path.as(Double.class), (Double) typedValue);
                     } else if (fieldType == LocalDate.class) {
-                        // I’ve added this to allow LocalDate >= comparisons
+                        // I've added this to allow LocalDate >= comparisons
                         return criteriaBuilder.greaterThanOrEqualTo(path.as(LocalDate.class), (LocalDate) typedValue);
                     } else {
                         return criteriaBuilder.greaterThanOrEqualTo(path.as(String.class), ((String) typedValue));
@@ -247,7 +247,7 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
                     } else if (fieldType == Double.class || fieldType == double.class) {
                         return criteriaBuilder.lessThanOrEqualTo(path.as(Double.class), (Double) typedValue);
                     } else if (fieldType == LocalDate.class) {
-                        // I’ve added this for proper LocalDate <= comparisons
+                        // I've added this for proper LocalDate <= comparisons
                         return criteriaBuilder.lessThanOrEqualTo(path.as(LocalDate.class), (LocalDate) typedValue);
                     } else {
                         return criteriaBuilder.lessThanOrEqualTo(path.as(String.class), ((String) typedValue));
@@ -314,14 +314,14 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
             if (type == Boolean.class || type == boolean.class)
                 return Boolean.parseBoolean(value);
 
-            // I’ve added this section for LocalDate so that date-only fields parse
+            // I've added this section for LocalDate so that date-only fields parse
             // correctly.
             if (type == LocalDate.class) {
                 String clean = value.replace("'", "").replace("\"", "");
                 return LocalDate.parse(clean, DateTimeFormatter.ISO_LOCAL_DATE);
             }
 
-            // I’ve added this section for LocalDateTime in case timestamp fields are
+            // I've added this section for LocalDateTime in case timestamp fields are
             // queried.
             if (type == LocalDateTime.class) {
                 String clean = value.replace("'", "").replace("\"", "");
