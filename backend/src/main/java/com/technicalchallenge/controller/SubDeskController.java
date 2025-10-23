@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,7 +64,6 @@ public class SubDeskController {
         subDeskService.deleteSubDesk(id);
         return ResponseEntity.noContent().build();
     }
-
 
     @GetMapping("/values")
     public List<String> getAllSubDeskNames() {

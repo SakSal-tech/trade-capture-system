@@ -1,7 +1,9 @@
 package com.technicalchallenge.service;
 
+import com.technicalchallenge.dto.SearchCriteriaDTO;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
+import com.technicalchallenge.mapper.TradeMapper;
 import com.technicalchallenge.model.*;
 import com.technicalchallenge.repository.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,11 +20,15 @@ import org.mockito.quality.Strictness; // FIX: import for lenient strictness
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Page;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT) // FIX: Prevent UnnecessaryStubbingException across tests with
@@ -40,6 +46,9 @@ class TradeServiceTest {
 
     @Mock
     private TradeStatusRepository tradeStatusRepository;
+
+    @Mock
+    private TradeMapper tradeMapper;
 
     // FIX: These are present in TradeService; keeping them mocked avoids NPE if
     // future tests touch them.
@@ -106,7 +115,7 @@ class TradeServiceTest {
     @Test
     void testCreateTrade_Success() {
         // Given
-        // FIX: createTrade() validates reference data → must provide
+        // FIX: createTrade() validates reference data, must provide
         // book/counterparty/status
         tradeDTO.setBookName("TestBook"); // FIX: required by service reference lookup
         tradeDTO.setCounterpartyName("TestCounterparty"); // FIX: required by service reference lookup
@@ -211,7 +220,7 @@ class TradeServiceTest {
         // Mocks the repository call so that looking up trade ID 100001, returns
         // Optional.of(existing) instead of hitting the DB.
         when(tradeRepository.findByTradeIdAndActiveTrue(100001L)).thenReturn(Optional.of(existing));
-        // Creates a new, empty TradeStatus object you'll use as a stubbed return value
+        // Creates a new, empty TradeStatus object to use as a stubbed return value
         TradeStatus amended = new TradeStatus();
         // Sets a fake primary key (long 40) on that status, simulating a persisted row.
         amended.setId(40L);
@@ -296,4 +305,5 @@ class TradeServiceTest {
         verify(cashflowRepository, times(12)).save(any(Cashflow.class));// Cashflow.class any instance of the Cashflow
                                                                         // type
     }
+
 }

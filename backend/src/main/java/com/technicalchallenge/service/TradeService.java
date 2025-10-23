@@ -1,17 +1,24 @@
 package com.technicalchallenge.service;
 
+import com.technicalchallenge.dto.SearchCriteriaDTO;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
+import com.technicalchallenge.mapper.TradeMapper;
 import com.technicalchallenge.model.*;
 import com.technicalchallenge.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
+
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.modelmapper.internal.bytebuddy.agent.builder.AgentBuilder.InitializationStrategy.SelfInjection.Split;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -20,44 +27,59 @@ import java.util.Optional;
 
 @Service
 @Transactional
-/*The service receives a DTO (from the controller), uses the mapper to convert it to an entity, and then processes or saves the entity. When returning data, the service uses the mapper to convert entities back to DTOs for the controller to send as a response. */
-public class TradeService {
-    private static final Logger logger = LoggerFactory.getLogger(TradeService.class);
+@AllArgsConstructor
 
-    @Autowired
+/*
+ * The service receives a DTO (from the controller), uses the mapper to convert
+ * it to an entity, and then processes or saves the entity. When returning data,
+ * the service uses the mapper to convert entities back to DTOs for the
+ * controller to send as a response.
+ */
+public class TradeService {
+    /*
+     * FIX: Replaced manual constructor with Lombok @AllArgsConstructor
+     *
+     * - Removed:
+     * TradeService(TradeMapper tradeMapper) { this.tradeMapper = tradeMapper; }
+     * because it only initialized one dependency (tradeMapper),
+     * leaving all other @Autowired repositories null during tests.
+     *
+     * - Added:
+     * 
+     * @AllArgsConstructor
+     * which generates a constructor including ALL dependencies (mapper +
+     * repositories).
+     * This allows both:
+     * 1. Spring Boot to perform constructor-based dependency injection at runtime.
+     * 2. Mockito's @InjectMocks to inject all @Mock fields in unit tests.
+     *
+     * - Also removed @Autowired from individual fields,
+     * since constructor injection via @AllArgsConstructor makes them redundant.
+     *
+     * Result:
+     * Eliminates NullPointerExceptions in unit tests and improves testability +
+     * clarity.
+     */
+
+    private static final Logger logger = LoggerFactory.getLogger(TradeService.class);
     private TradeRepository tradeRepository;
-    @Autowired
     private TradeLegRepository tradeLegRepository;
-    @Autowired
     private CashflowRepository cashflowRepository;
-    @Autowired
     private TradeStatusRepository tradeStatusRepository;
-    @Autowired
     private BookRepository bookRepository;
-    @Autowired
     private CounterpartyRepository counterpartyRepository;
-    @Autowired
     private ApplicationUserRepository applicationUserRepository;
-    @Autowired
     private TradeTypeRepository tradeTypeRepository;
-    @Autowired
     private TradeSubTypeRepository tradeSubTypeRepository;
-    @Autowired
     private CurrencyRepository currencyRepository;
-    @Autowired
+
     private LegTypeRepository legTypeRepository;
-    @Autowired
     private IndexRepository indexRepository;
-    @Autowired
     private HolidayCalendarRepository holidayCalendarRepository;
-    @Autowired
     private ScheduleRepository scheduleRepository;
-    @Autowired
     private BusinessDayConventionRepository businessDayConventionRepository;
-    @Autowired
+
     private PayRecRepository payRecRepository;
-    @Autowired
-    private AdditionalInfoService additionalInfoService;
 
     public List<Trade> getAllTrades() {
         logger.info("Retrieving all trades");
@@ -68,7 +90,7 @@ public class TradeService {
         logger.debug("Retrieving trade by id: {}", tradeId);
         return tradeRepository.findByTradeIdAndActiveTrue(tradeId);
     }
- 
+
     @Transactional
     public Trade createTrade(TradeDTO tradeDTO) {
         logger.info("Creating new trade with ID: {}", tradeDTO.getTradeId());
@@ -164,7 +186,13 @@ public class TradeService {
         // Handle trader user by name or ID with enhanced logging
         if (tradeDTO.getTraderUserName() != null) {
             logger.debug("Looking up trader user by name: {}", tradeDTO.getTraderUserName());
-            /* trim(): Remove any leading or trailing spaces from the username.split("\\s+")Split the username into parts using whitespace (spaces, tabs, etc.) as the separator. radeDTO.getTraderUserName() returns "  John   Smith  ". .trim() removes leading/trailing spaces: "John   Smith" .split("\\s+") splits by one or more spaces: ["John", "Smith"] */
+            /*
+             * trim(): Remove any leading or trailing spaces from the
+             * username.split("\\s+")Split the username into parts using whitespace (spaces,
+             * * tabs, etc.) as the separator. radeDTO.getTraderUserName() returns
+             * "  John   Smith  ". .trim() removes leading/trailing spaces: "John   Smith"
+             * .split("\\s+") splits by one or more spaces: ["John", "Smith"]
+             */
             String[] nameParts = tradeDTO.getTraderUserName().trim().split("\\s+");
             if (nameParts.length >= 1) {
                 String firstName = nameParts[0];
@@ -443,12 +471,18 @@ public class TradeService {
         if (leg.getCalculationPeriodSchedule() != null) {
             schedule = leg.getCalculationPeriodSchedule().getSchedule();
         }
-        // Converts the schedule string into a numeric interval (months between payments).
+        // Converts the schedule string into a numeric interval (months between
+        // payments).
         int monthsInterval = parseSchedule(schedule);
-        //calculatePaymentDates Calculates all payment dates between the start and maturity dates using this interval.
+        // calculatePaymentDates Calculates all payment dates between the start and
+        // maturity dates using this interval.
         List<LocalDate> paymentDates = calculatePaymentDates(startDate, maturityDate, monthsInterval);
 
-            /*For each payment date, creates a new Cashflow object. Sets its properties (leg, paymentdate, rate). Calculates the payment value using the leg type and interval. Saves the cashflow to the database. */
+        /*
+         * For each payment date, creates a new Cashflow object. Sets its properties
+         * (leg, paymentdate, rate). Calculates the payment value using the leg type and
+         * interval. Saves the cashflow to the database.
+         */
         for (LocalDate paymentDate : paymentDates) {
             Cashflow cashflow = new Cashflow();
             cashflow.setTradeLeg(leg);
@@ -512,27 +546,58 @@ public class TradeService {
 
         return dates;
     }
-    /* Calculates the payment value for a cashflow, based on the properties of a trade leg and the payment interval (in months). */
+
+    /*
+     * Calculates the payment value for a cashflow, based on the properties of a
+     * trade leg and the payment interval (in months).
+     */
     private BigDecimal calculateCashflowValue(TradeLeg leg, int monthsInterval) {
-        if (leg.getLegRateType() == null) { // If the leg’s rate type is not set, the method returns zero, prevents calculation errors and signals missing data.
-            return BigDecimal.ZERO;
+        if (leg.getLegRateType() == null) { // If the leg's rate type is not set, the method returns zero, prevents
+                                            // calculation errors and signals missing data.
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_EVEN);// REFACRORED:format number to 2 decimal places
+                                                                       // using banker's rounding
         }
 
         String legType = leg.getLegRateType().getType();
-        // Notional is the principal amount or face value on which interest payments are calculated in a financial contract (like a loan, bond, or swap). For "Fixed" legs, the cashflow value is calculated as:Cashflow = Notional * Rate * Months /12. This formula annualises the rate and scales it by the payment interval(This ensures the payment matches the correct portion of the annual interest for the interval.To calculate the payment for a period shorter than a year, you multiply the notional by the annual rate, then adjust for the fraction of the year covered by the payment interval (e.g., for a quarterly payment, you use 3/12 of the annual rate). The result is wrapped in a BigDecimal for precision.
-        if ("Fixed".equals(legType)) {
-            double notional = leg.getNotional().doubleValue();
-            double rate = leg.getRate();
-            double months = monthsInterval;
+        // Notional is the principal amount or face value on which interest payments are
+        // calculated in a financial contract (like a loan, bond, or swap). For "Fixed"
+        // legs, the cashflow value is calculated as:Cashflow = Notional * Rate * Months
+        // /12. This formula annualises the rate and scales it by the payment
+        // interval(This ensures the payment matches the correct portion of the annual
+        // interest for the interval.To calculate the payment for a period shorter than
+        // a year, multiply the notional by the annual rate, then adjust for the
+        // fraction of the year covered by the payment interval (e.g., for a quarterly
+        // payment, use 3/12 of the annual rate). The result is wrapped in a
+        // BigDecimal for precision.
+        // REFACTORED: changed .equals to equalsIgnoreCase to make the leg-type checks
+        // case-insensitive, if the database or test says "fixed" or "FIXED", this
+        // fails.
+        if ("Fixed".equalsIgnoreCase(legType)) {
+            // REFACTORED changed double to BigDecimal for money to stay as BigDecimal to
+            // avoid floating-point drift, loses precision and to avoid null notionals by
+            // using 0 instead to avoid a NullPointerException.
+            BigDecimal notional = (leg.getNotional() == null) ? BigDecimal.ZERO : leg.getNotional();
+            // REFACTORED TO FIX THE 100x bug
+            BigDecimal rawRate = BigDecimal.valueOf(leg.getRate());
+            // If the rate > 1 (like 3.5), it assumes it's a percentage and divides by 100.
+            // If the rate ≤ 1 (like 0.035), it assumes it's already a decimal and leaves it
+            // as-is.
+            BigDecimal rateDecimal = (rawRate.compareTo(BigDecimal.ONE) > 0) ? rawRate.divide(BigDecimal.valueOf(100))
+                    : rawRate;
+            // Converts months into fraction e.g 3 months into 0.25 a quarter, keeping 10
+            // decimal places
+            BigDecimal yearFraction = BigDecimal.valueOf(monthsInterval).divide(BigDecimal.valueOf(12), 10,
+                    RoundingMode.HALF_EVEN);// month/12 e.g 3/12 = 0.25 as BigDecimal
+            // 10,000,000 * 0.035 * (3 / 12) = 87,500
+            BigDecimal result = notional.multiply(rateDecimal).multiply(yearFraction).setScale(2,
+                    RoundingMode.HALF_EVEN);
 
-            double result = (notional * rate * months) / 12;
-
-            return BigDecimal.valueOf(result);
-        } else if ("Floating".equals(legType)) { //For "Floating" legs, the method currently returns zero. 
-            return BigDecimal.ZERO;
+            return result;
+        } else if ("Floating".equalsIgnoreCase(legType)) { // For "Floating" legs, the method currently returns zero.
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_EVEN);
         }
-
-        return BigDecimal.ZERO;
+        // Fallback for unknown leg types return 0,0
+        return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_EVEN);
     }
 
     private void validateReferenceData(Trade trade) {
@@ -551,4 +616,5 @@ public class TradeService {
     private Long generateNextTradeId() {
         return 10000L + tradeRepository.count();
     }
+
 }

@@ -577,7 +577,7 @@ Additionally, the JSON response sometimes didn’t contain `"tradeId"`, which ca
 ### Solution
 
 1. Updated the test to use `.andExpect(status().isCreated())` instead of `.isOk()`.
-2. Set `trade.setTradeId(1001L);` in the test setup to ensure that the entity has the expected ID before being mapped back to a DTO.
+2. Set `trade.setTradeId(1001L);` in the test setup to ensure that the entity has the expected ID before being mapped back to a DTO. The controller maps the Trade entity to a DTO for the response. If tradeId is not set on the entity, the response JSON will be missing tradeId, causing tests that assert on this field to fail. Setting tradeId here guarantees the response includes the correct value for test verification.
 
 ### Impact
 
@@ -585,7 +585,7 @@ Additionally, the JSON response sometimes didn’t contain `"tradeId"`, which ca
 - Ensures that the response payload always contains `tradeId`, making the test stable.
 - Improves consistency between the controller, service, and test expectations.
 
-# Test Failure in TradeControllerTest.testUpdateTrade – Missing tradeId in JSON Response
+## Test Failure in TradeControllerTest.testUpdateTrade – Missing tradeId in JSON Response
 
 ### Problem
 
@@ -658,11 +658,13 @@ if (leg == null) {
 
 Finally I added legs to trade before amendment in the test class setup
 
-````java eg = new TradeLeg();
+```java eg = new TradeLeg();
 leg.setLegId(1L);
-trade.setTradeLegs(Arrays.asList(leg)); ```
+trade.setTradeLegs(Arrays.asList(leg));
+```
 
 ### Impact
+
 Now trade object had a leg which shows the null issue
 
 ## BookServiceTest – NullPointerException due to missing BookMapper dependency
@@ -705,32 +707,36 @@ This ensured that BookService`could safely use its mapping logic during tests wi
 - The test suite now fully validates `BookService` without runtime errors, confirming that book retrieval, saving, and non-existent lookups behave as expected.
 
 ## Actuator Health Check – Missing spring-boot-starter-actuator dependency
+
 ### Problem
 
-return 404 — the actuator endpoints simply aren’t registered
+```java
+ return 404
 
-### Root cause
-Backend API won't start after fixing all errors there is no spring-boot-starter-actuator dependency in the dependencies list. That’s why requests to /actuator/health .
+```
+
+the actuator endpoints simply aren’t registered
+
+### Root Cause
+
+Backend API won't start after fixing all errors there is no spring-boot-starter-actuator dependency in the dependencies list. That’s why requests to /actuator/health.
 
 ### Solution
 
 I had to add this dependency to pass the health check to the POM file
+
+```java
 <dependency>
 <groupId>org.springframework.boot</groupId>
 <artifactId>spring-boot-starter-actuator</artifactId>
 </dependency>
+```
 
 #### Impact
 
 http://localhost:8080/actuator → show a JSON with all endpoints.
 
 http://localhost:8080/actuator/health → show {"status":"UP"}.
-
-````
-
-```
-
-```
 
 ### Impact
 
@@ -741,12 +747,7 @@ http://localhost:8080/actuator/health → show {"status":"UP"}.
 
 ### all tests now pass and I merged all branches to main and tested mvn clean test
 
-[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.481 s -- in com.technicalchallenge.service.TradeServiceTest
-[INFO] Running com.technicalchallenge.service.UserServiceTest
-2025-10-02T11:12:05.144+01:00 WARN 13448 --- [ main] c.t.service.ApplicationUserService : Deleting user with id: 3
-2025-10-02T11:12:05.147+01:00 INFO 13448 --- [ main] c.t.service.ApplicationUserService : Saving user: com.technicalchallenge.model.ApplicationUser@5fc82de5
-2025-10-02T11:12:05.150+01:00 DEBUG 13448 --- [ main] c.t.service.ApplicationUserService : Retrieving user by id: 99
-2025-10-02T11:12:05.152+01:00 DEBUG 13448 --- [ main] c.t.service.ApplicationUserService : Retrieving user by id: 1
+```java
 [INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.018 s -- in com.technicalchallenge.service.UserServiceTest
 [INFO]
 [INFO] Results:
@@ -759,16 +760,20 @@ http://localhost:8080/actuator/health → show {"status":"UP"}.
 [INFO] Total time: 29.757 s
 [INFO] Finished at: 2025-10-02T11:12:05+01:00
 [INFO] -------------------------------------
+```
 
 ## Problems after all tests passed and api is not starting.
 
 I have problems that I need to fix. Mostly warnings but some are stopping the api to run
 
-## Main serious issue is `java Expected Domain ID type is 'com.technicalchallenge.model.UserPrivilegeId' ` from UserPrivilegeRepository.
+### Main serious issue is
+
+`java Expected Domain ID type is 'com.technicalchallenge.model.UserPrivilegeId' `
+from UserPrivilegeRepository.
 
 ### Root cause
 
-I clicked the error and The UserPrivilegeRepository is declared with the wrong ID type, Spring Data JPA is failing to start the application context (which means your API won't run).
+I clicked the error and The UserPrivilegeRepository is declared with the wrong ID type, Spring Data JPA is failing to start the application context (which means the API won't run).
 public interface UserPrivilegeRepository extends JpaRepository<UserPrivilege, Long> {}
 
 I then checked the UserPrivilege. java class to check the type of the UserPrivilege is and it seems that it is marked by @IdClass. It seems that primary key is not just a Long, but a composite key class called UserPrivilegeId.
@@ -789,6 +794,7 @@ public class UserPrivilege {
 The repository must declare that composite ID type, not `Long. I changed the repository interface to use the composite key type instead of Long.
 More errors appeared from userPrivilege service and controller and I had to change the type in those methods which had ID as a parameter.
 
-```java public interface UserPrivilegeRepository extends JpaRepository<UserPrivilege, UserPrivilegeId> {
+```java
+public interface UserPrivilegeRepository extends JpaRepository<UserPrivilege, UserPrivilegeId> {
 }
 ```
