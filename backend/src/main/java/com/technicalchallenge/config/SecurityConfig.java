@@ -92,7 +92,7 @@ public class SecurityConfig {
      * - `.csrf(csrf -> csrf.disable())` → disables CSRF protection to prevent
      * token errors when using API tools like Postman or Swagger.
      *
-     * - `.formLogin(form -> form.disable())` → disables Spring Security’s default
+     * - `.formLogin(form -> form.disable())` → disables Spring Security's default
      * form login page, preventing browser redirection to /login.
      *
      * - `.httpBasic(httpBasic -> httpBasic.disable())` → disables browser pop-ups

@@ -212,3 +212,82 @@ https://www.youtube.com/watch?v=qpSasUow1XI
 https://www.baeldung.com/mockito-argumentcaptor
 
 https://site.mockito.org/javadoc/current/org/mockito/ArgumentCaptor.html
+
+### Spring Security and UserDetails resources
+
+Spring Security Reference — Authentication and UserDetailsService
+https://docs.spring.io/spring-security/reference/servlet/authentication/passwords/userdetailsservice.html
+(Official reference for the UserDetails and UserDetailsService contract and how DaoAuthenticationProvider uses them.)
+
+DaoAuthenticationProvider (official reference)
+https://docs.spring.io/spring-security/reference/servlet/authentication/dao.html
+(Explains DaoAuthenticationProvider, how it uses a UserDetailsService and a PasswordEncoder, and the authentication flow.)
+
+Spring Security Reference — Testing support
+https://docs.spring.io/spring-security/reference/servlet/test/index.html
+(Official testing chapter covering @WithMockUser, @WithUserDetails and MockMvc helpers.)
+
+Spring Boot Reference — Security auto-configuration
+https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/#boot-features-security
+(Explains how Spring Boot configures security by default and how to override the UserDetailsService and PasswordEncoder.)
+
+Spring guide: Securing a web application
+https://spring.io/guides/gs/securing-web/
+(A short, practical walkthrough of how security pieces fit together in a simple app.)
+
+Baeldung — Custom UserDetailsService
+https://www.baeldung.com/spring-security-userdetailsservice
+(Practical examples of loading users from a database and common pitfalls.)
+
+Baeldung — JDBC authentication / JdbcUserDetailsManager
+https://www.baeldung.com/spring-security-jdbc-authentication
+(Shows an out-of-the-box JDBC approach if you prefer not to write a custom service.)
+
+Baeldung — Testing Spring Security (@WithMockUser vs @WithUserDetails)
+https://www.baeldung.com/spring-security-test-withmockuser-withuserdetails
+(Explains differences between mock users and loading actual UserDetails in integration tests.)
+
+CSRF reference (official)
+https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html
+(Explains CSRF protection, how tokens work and how to handle CSRF in tests.)
+
+Swagger + security practical guide (Baeldung)
+https://www.baeldung.com/spring-boot-swagger-security
+(How to allow Swagger UI/OpenAPI endpoints in non-production profiles while keeping them protected in production.)
+
+Password encoding and encoders (official)
+https://docs.spring.io/spring-security/reference/servlet/authentication/passwords/
+(Best practices for PasswordEncoder and seeding encoded test users.)
+
+OWASP Authentication Cheat Sheet
+https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
+(Security best practices for authentication and account handling; useful background for design decisions.)
+
+Logging, SLF4J and LoggerFactory resources
+SLF4J project site
+https://www.slf4j.org/
+(Official site and rationale for using SLF4J as a logging façade.)
+
+SLF4J LoggerFactory Javadoc (slf4j-api 2.0.9)
+https://www.javadoc.io/doc/org.slf4j/slf4j-api/2.0.9/org/slf4j/LoggerFactory.html
+(API docs for LoggerFactory.getLogger and binding notes.)
+
+Logback manual (recommended SLF4J implementation)
+https://logback.qos.ch/manual/index.html
+(Configuration, appenders, encoders and MDC usage.)
+
+Log4j 2 manual (alternative implementation)
+https://logging.apache.org/log4j/2.x/manual/index.html
+(Advanced features and configuration for projects that prefer Log4j.)
+
+Baeldung — SLF4J and Logback introduction
+https://www.baeldung.com/slf4j-logback
+(Examples of creating loggers, parameterised logging and configuration.)
+
+Baeldung — Logging best practices
+https://www.baeldung.com/java-logging-best-practices
+(Avoid string concatenation, use parameterised logging, MDC, and configuration tips.)
+
+javadoc.io (searchable Javadoc hosting)
+https://www.javadoc.io/
+(Quick access to Javadoc for SLF4J, Logback and other logging APIs by version.)
