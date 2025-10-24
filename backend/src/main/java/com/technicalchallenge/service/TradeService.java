@@ -25,11 +25,47 @@ import java.util.stream.Collectors;
 @Transactional
 @AllArgsConstructor
 
-/*
- * The service receives a DTO (from the controller), uses the mapper to convert
- * it to an entity, and then processes or saves the entity. When returning data,
- * the service uses the mapper to convert entities back to DTOs for the
- * controller to send as a response.
+/**
+ * TradeService - Core service for trade lifecycle operations.
+ * 
+ * <p>This service handles the complete lifecycle of trades including creation,
+ * amendment, cancellation, and termination. It integrates user privilege checking
+ * to ensure proper authorization for all operations.
+ * 
+ * <h3>Key Features:</h3>
+ * <ul>
+ *   <li>Trade CRUD operations with versioning support</li>
+ *   <li>Database-backed user privilege validation</li>
+ *   <li>Reference data population from DTOs</li>
+ *   <li>Automated cashflow generation for trade legs</li>
+ *   <li>Logical delete (soft delete) for audit compliance</li>
+ * </ul>
+ * 
+ * <h3>Security Model:</h3>
+ * <p>User privileges are validated using a multi-layered approach:
+ * <ol>
+ *   <li><b>SecurityContext Check</b>: Quick validation against Spring Security authorities</li>
+ *   <li><b>Role-Based Authorization</b>: Standard roles (TRADER, MIDDLE_OFFICE, etc.) mapped to privileges</li>
+ *   <li><b>Database Privilege Lookup</b>: Fallback to UserPrivilegeService for fine-grained control</li>
+ * </ol>
+ * 
+ * <h3>Privilege Requirements:</h3>
+ * <ul>
+ *   <li><b>TRADE_CREATE</b>: Required for {@link #createTrade(TradeDTO)} - Granted to TRADER, SALES</li>
+ *   <li><b>TRADE_AMEND</b>: Required for {@link #amendTrade(Long, TradeDTO)} - Granted to TRADER, SALES, MIDDLE_OFFICE</li>
+ *   <li><b>TRADE_CANCEL</b>: Required for {@link #cancelTrade(Long)}, {@link #deleteTrade(Long)} - Granted to TRADER only</li>
+ *   <li><b>TRADE_TERMINATE</b>: Required for {@link #terminateTrade(Long)} - Granted to TRADER only</li>
+ * </ul>
+ * 
+ * <p><b>Note:</b> SUPERUSER role has access to all operations.
+ * 
+ * <h3>DTO-Entity Mapping:</h3>
+ * <p>The service receives DTOs from controllers, converts them to entities for processing,
+ * and converts back to DTOs when returning data. Reference data (books, counterparties, etc.)
+ * is populated by name or ID lookup.
+ * 
+ * @see UserPrivilegeService
+ * @see TradeDashboardService
  */
 public class TradeService {
     /*
