@@ -379,7 +379,7 @@ public class TradeDashboardServiceTest {
 
         Page<TradeDTO> page = tradeDashboardService.filterTrades(criteria, 0, size);
         assertEquals(1, page.getContent().size());
-        assertEquals(99L, page.getContent().getFirst().getTradeId());
+        assertEquals(99L, page.getContent().get(0).getTradeId());
     }
 
     static Stream<String> rsqlQueries() {
