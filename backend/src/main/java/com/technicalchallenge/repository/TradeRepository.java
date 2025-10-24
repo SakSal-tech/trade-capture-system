@@ -18,6 +18,9 @@ public interface TradeRepository extends JpaRepository<Trade, Long>, JpaSpecific
     // Existing methods
     List<Trade> findByTradeId(Long tradeId);
 
+    List<Trade> findAllByTradeIdIn(List<Long> tradeIds);// In means match any value from the given list returns all
+                                                        // trades where trade_id is either 1, 2, or 3.
+
     @Query("SELECT MAX(t.tradeId) FROM Trade t")
     Optional<Long> findMaxTradeId();
 
