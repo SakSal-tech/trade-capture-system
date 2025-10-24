@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -17,6 +19,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -74,6 +77,7 @@ public class TradeService {
     private final BusinessDayConventionRepository businessDayConventionRepository;
 
     private final PayRecRepository payRecRepository;
+    private final UserPrivilegeService userPrivilegeService;
 
     public List<Trade> getAllTrades() {
         logger.info("Retrieving all trades");
@@ -88,6 +92,13 @@ public class TradeService {
     @Transactional
     public Trade createTrade(TradeDTO tradeDTO) {
         logger.info("Creating new trade with ID: {}", tradeDTO.getTradeId());
+
+        // Privilege validation: only users with TRADE_CREATE privilege allowed
+        String currentUser = resolveCurrentUser();
+        if (!currentUser.isEmpty() && !hasPrivilege(currentUser, "TRADE_CREATE")) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Insufficient privileges to create trades");
+        }
 
         // Generate trade ID if not provided
         if (tradeDTO.getTradeId() == null) {
@@ -238,6 +249,14 @@ public class TradeService {
     @Transactional
     public void deleteTrade(Long tradeId) {
         logger.info("Deleting (cancelling) trade with ID: {}", tradeId);
+        
+        // Privilege validation: only users with TRADE_CANCEL privilege allowed
+        String currentUser = resolveCurrentUser();
+        if (!currentUser.isEmpty() && !hasPrivilege(currentUser, "TRADE_CANCEL")) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Insufficient privileges to cancel trades");
+        }
+        
         // ADDED: perform logical delete instead of a hard delete. We keep the
         // database row for audit/history and set active=false so the trade
         // no longer appears in queries that filter on active = true. This
@@ -263,6 +282,13 @@ public class TradeService {
     @Transactional
     public Trade amendTrade(Long tradeId, TradeDTO tradeDTO) {
         logger.info("Amending trade with ID: {}", tradeId);
+
+        // Privilege validation: only users with TRADE_AMEND privilege allowed
+        String currentUser = resolveCurrentUser();
+        if (!currentUser.isEmpty() && !hasPrivilege(currentUser, "TRADE_AMEND")) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Insufficient privileges to amend trades");
+        }
 
         Optional<Trade> existingTradeOpt = getTradeById(tradeId);
         if (existingTradeOpt.isEmpty()) {
@@ -310,6 +336,13 @@ public class TradeService {
     public Trade terminateTrade(Long tradeId) {
         logger.info("Terminating trade with ID: {}", tradeId);
 
+        // Privilege validation: only users with TRADE_TERMINATE privilege allowed
+        String currentUser = resolveCurrentUser();
+        if (!currentUser.isEmpty() && !hasPrivilege(currentUser, "TRADE_TERMINATE")) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Insufficient privileges to terminate trades");
+        }
+
         Optional<Trade> tradeOpt = getTradeById(tradeId);
         if (tradeOpt.isEmpty()) {
             throw new RuntimeException("Trade not found: " + tradeId);
@@ -328,6 +361,13 @@ public class TradeService {
     @Transactional
     public Trade cancelTrade(Long tradeId) {
         logger.info("Cancelling trade with ID: {}", tradeId);
+
+        // Privilege validation: only users with TRADE_CANCEL privilege allowed
+        String currentUser = resolveCurrentUser();
+        if (!currentUser.isEmpty() && !hasPrivilege(currentUser, "TRADE_CANCEL")) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Insufficient privileges to cancel trades");
+        }
 
         Optional<Trade> tradeOpt = getTradeById(tradeId);
         if (tradeOpt.isEmpty()) {
@@ -609,6 +649,145 @@ public class TradeService {
     // NEW METHOD: Generate the next trade ID (sequential)
     private Long generateNextTradeId() {
         return 10000L + tradeRepository.count();
+    }
+
+    /**
+     * Database-driven privilege check to authorize trade operations.
+     * 
+     * This method implements deny-by-default security for trade operations:
+     * - First checks SecurityContext authorities for quick authorization
+     * - Falls back to database privilege lookup via UserPrivilegeService
+     * - Supports role-based aliases (ROLE_TRADER, ROLE_MIDDLE_OFFICE, etc.)
+     * 
+     * @param user The username/loginId to check privileges for
+     * @param privilege The privilege name to check (e.g., "TRADE_CREATE", "TRADE_AMEND")
+     * @return true if the user has the privilege, false otherwise
+     */
+    private boolean hasPrivilege(String user, String privilege) {
+        // Deny-by-default for invalid inputs
+        if (user == null || user.isBlank() || privilege == null || privilege.isBlank()) {
+            return false;
+        }
+
+        // Check SecurityContext authorities first (quick path)
+        try {
+            Authentication authentication = SecurityContextHolder.getContext() != null
+                    ? SecurityContextHolder.getContext().getAuthentication()
+                    : null;
+            
+            if (authentication != null) {
+                String authName = authentication.getName();
+                String auths = authentication.getAuthorities().stream()
+                        .map(Object::toString)
+                        .collect(Collectors.joining(","));
+                logger.debug(
+                        "hasPrivilege check for user='{}' privilege='{}' authentication.name='{}' authorities={}",
+                        user, privilege, authName, auths);
+            }
+            
+            if (authentication != null && authentication.getAuthorities() != null) {
+                boolean hasAuthority = authentication.getAuthorities().stream().anyMatch(a -> {
+                    String ga = a.getAuthority();
+                    if (ga == null) return false;
+                    
+                    // Direct match or role-mapped privilege
+                    if (ga.equalsIgnoreCase(privilege) || ga.equalsIgnoreCase("ROLE_" + privilege)) {
+                        return true;
+                    }
+                    
+                    // Allow standard roles to count for trade privileges
+                    return isRoleAuthorizedForPrivilege(ga, privilege);
+                });
+                
+                if (hasAuthority) {
+                    logger.debug("hasPrivilege short-circuit: authority matched for user='{}' privilege='{}'",
+                            user, privilege);
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Error checking SecurityContext authorities", e);
+        }
+
+        // Fall back to database privilege lookup
+        try {
+            List<UserPrivilege> matches = userPrivilegeService
+                    .findPrivilegesByUserLoginIdAndPrivilegeName(user, privilege);
+            
+            if (matches != null && !matches.isEmpty()) {
+                logger.debug("hasPrivilege DB match: user='{}' privilege='{}' matches={}",
+                        user, privilege, matches.size());
+                return true;
+            } else {
+                logger.debug("hasPrivilege DB no-match: user='{}' privilege='{}'", user, privilege);
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to read user privileges from DB for user {}: {}", user, e.getMessage());
+            return false;
+        }
+
+        // Deny by default
+        logger.debug("hasPrivilege final decision: DENY for user='{}' privilege='{}'", user, privilege);
+        return false;
+    }
+
+    /**
+     * Helper method to determine if a role grants a specific privilege.
+     * Maps standard roles to trade operation privileges.
+     */
+    private boolean isRoleAuthorizedForPrivilege(String role, String privilege) {
+        if (role == null || privilege == null) return false;
+        
+        String upperRole = role.toUpperCase();
+        String upperPrivilege = privilege.toUpperCase();
+        
+        // SUPERUSER has all privileges
+        if ("ROLE_SUPERUSER".equals(upperRole)) {
+            return true;
+        }
+        
+        // Map privileges to authorized roles
+        switch (upperPrivilege) {
+            case "TRADE_VIEW":
+                // TRADER, MIDDLE_OFFICE, and SUPPORT can view trades
+                return "ROLE_TRADER".equals(upperRole) 
+                    || "ROLE_MIDDLE_OFFICE".equals(upperRole)
+                    || "ROLE_SUPPORT".equals(upperRole);
+                    
+            case "TRADE_CREATE":
+                // Only TRADER and SALES can create trades
+                return "ROLE_TRADER".equals(upperRole) 
+                    || "ROLE_SALES".equals(upperRole);
+                    
+            case "TRADE_AMEND":
+            case "TRADE_UPDATE":
+                // TRADER, SALES, and MIDDLE_OFFICE can amend trades
+                return "ROLE_TRADER".equals(upperRole)
+                    || "ROLE_SALES".equals(upperRole)
+                    || "ROLE_MIDDLE_OFFICE".equals(upperRole);
+                    
+            case "TRADE_CANCEL":
+            case "TRADE_TERMINATE":
+                // Only TRADER can cancel/terminate trades
+                return "ROLE_TRADER".equals(upperRole);
+                
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Resolves the current authenticated user's loginId from SecurityContext.
+     * Returns empty string if no authentication is present (e.g., in tests).
+     */
+    private String resolveCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext() != null
+                ? SecurityContextHolder.getContext().getAuthentication()
+                : null;
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "";
+        }
+        return authentication.getName();
     }
 
 }

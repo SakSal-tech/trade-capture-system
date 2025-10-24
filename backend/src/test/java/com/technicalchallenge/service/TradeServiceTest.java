@@ -79,6 +79,9 @@ class TradeServiceTest {
 
     @Mock
     private AdditionalInfoService additionalInfoService;
+    
+    @Mock
+    private UserPrivilegeService userPrivilegeService;
 
     @InjectMocks
     private TradeService tradeService;
