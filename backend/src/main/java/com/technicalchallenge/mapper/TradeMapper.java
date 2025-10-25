@@ -3,35 +3,33 @@ package com.technicalchallenge.mapper;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
 import com.technicalchallenge.dto.CashflowDTO;
+import com.technicalchallenge.dto.AdditionalInfoDTO; // NEW: Needed to work with AdditionalInfo
 import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.model.TradeLeg;
 import com.technicalchallenge.model.Cashflow;
 import com.technicalchallenge.model.Book;
 import com.technicalchallenge.model.Counterparty;
+import com.technicalchallenge.service.AdditionalInfoService; // NEW: Injected to pull settlement instructions
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
-// Mapper class converting data between DTOs and entities. Putting mapping code inside the controller works for small projects, 
-// but it quickly becomes messy and hard to maintain as application grows
+/**
+ * TradeMapper
+ *
+ * Converts between Trade entities and TradeDTOs.
+ * This version also enriches TradeDTO with settlement instructions
+ * stored in the AdditionalInfo table.
+ */
 @Component
 public class TradeMapper {
 
-    /*
-     * FIX: Removed @Autowired from toDto(Trade trade)
-     * 
-     * Explanation:
-     * - @Autowired is used by Spring for dependency injection of beans.
-     * - Here, it incorrectly marked a normal mapper method as an injection point.
-     * - This caused Spring to fail on startup, trying to inject a bean of type
-     * Trade.
-     * - Trade is a JPA entity, not a Spring-managed bean.
-     * 
-     * Result:
-     * The application context now loads correctly.
-     * The mapper works as intended (pure object conversion logic).
-     */
+    // Gives mapper access to settlement data stored in AdditionalInfo table
+    @Autowired
+    private AdditionalInfoService additionalInfoService;
 
     public TradeDTO toDto(Trade trade) {
         if (trade == null) {
@@ -39,6 +37,8 @@ public class TradeMapper {
         }
 
         TradeDTO dto = new TradeDTO();
+
+        // --- Basic trade details mapping ---
         dto.setId(trade.getId());
         dto.setTradeId(trade.getTradeId());
         dto.setVersion(trade.getVersion());
@@ -53,27 +53,31 @@ public class TradeMapper {
         dto.setActive(trade.getActive());
         dto.setCreatedDate(trade.getCreatedDate());
 
+        // --- Book information mapping ---
         if (trade.getBook() != null) {
             dto.setBookId(trade.getBook().getId());
             dto.setBookName(trade.getBook().getBookName());
         }
 
+        // --- Counterparty mapping ---
         if (trade.getCounterparty() != null) {
             dto.setCounterpartyId(trade.getCounterparty().getId());
             dto.setCounterpartyName(trade.getCounterparty().getName());
         }
 
+        // --- Trader and inputter user mapping ---
         if (trade.getTraderUser() != null) {
             dto.setTraderUserId(trade.getTraderUser().getId());
             dto.setTraderUserName(trade.getTraderUser().getFirstName() + " " + trade.getTraderUser().getLastName());
         }
 
-        if (trade.getTradeInputterUser() != null) { // Fixed field name
+        if (trade.getTradeInputterUser() != null) {
             dto.setTradeInputterUserId(trade.getTradeInputterUser().getId());
             dto.setInputterUserName(
                     trade.getTradeInputterUser().getFirstName() + " " + trade.getTradeInputterUser().getLastName());
         }
 
+        // --- Trade type, subtype, and status mapping ---
         if (trade.getTradeType() != null) {
             dto.setTradeTypeId(trade.getTradeType().getId());
             dto.setTradeType(trade.getTradeType().getTradeType());
@@ -89,7 +93,7 @@ public class TradeMapper {
             dto.setTradeStatus(trade.getTradeStatus().getTradeStatus());
         }
 
-        // Map trade legs
+        // --- Map trade legs ---
         if (trade.getTradeLegs() != null) {
             List<TradeLegDTO> legDTOs = trade.getTradeLegs().stream()
                     .map(this::tradeLegToDto)
@@ -97,6 +101,25 @@ public class TradeMapper {
             dto.setTradeLegs(legDTOs);
         }
 
+        // ADDED: Settlement Instructions Integration
+        // Pull settlement instructions from AdditionalInfo table
+        List<AdditionalInfoDTO> infos = additionalInfoService.searchByKey("SETTLEMENT_INSTRUCTIONS");
+
+        // Loop through all "SETTLEMENT_INSTRUCTIONS" entries
+        for (AdditionalInfoDTO info : infos) {
+            // Only consider records belonging to Trade entities with matching ID
+            if ("TRADE".equalsIgnoreCase(info.getEntityType())
+                    && info.getEntityId() != null
+                    && info.getEntityId().equals(trade.getTradeId())) {
+
+                // Attach the settlement instruction text to the TradeDTO
+                dto.setSettlementInstructions(info.getFieldValue());
+                break; // Stop after the first match once I find the record that belongs to this
+                       // specific trade
+            }
+        }
+
+        // Return the complete DTO to controller
         return dto;
     }
 
@@ -120,23 +143,24 @@ public class TradeMapper {
         trade.setActive(dto.getActive());
         trade.setCreatedDate(dto.getCreatedDate());
 
-        // FIX: Add lightweight placeholder objects for Book and Counterparty
-        // This ensures to not lose bookName/counterpartyName when mapping.
-        // The service (populateReferenceDataByName) will replace them with managed
-        // entities.
+        // --- Lightweight references for Book and Counterparty ---
         if (dto.getBookName() != null) {
             Book book = new Book();
             book.setBookName(dto.getBookName());
             trade.setBook(book);
         }
+
         if (dto.getCounterpartyName() != null) {
             Counterparty cp = new Counterparty();
             cp.setName(dto.getCounterpartyName());
             trade.setCounterparty(cp);
         }
 
+        // Note: Do NOT set settlementInstructions here — they belong to AdditionalInfo
         return trade;
     }
+
+    // --- Supporting mappers for TradeLeg and Cashflow remain unchanged ---
 
     public TradeLegDTO tradeLegToDto(TradeLeg leg) {
         if (leg == null) {
@@ -160,7 +184,7 @@ public class TradeMapper {
 
         if (leg.getIndex() != null) {
             dto.setIndexId(leg.getIndex().getId());
-            dto.setIndexName(leg.getIndex().getIndex()); // Fixed: setIndex() -> setIndexName()
+            dto.setIndexName(leg.getIndex().getIndex());
         }
 
         if (leg.getHolidayCalendar() != null) {
@@ -188,7 +212,6 @@ public class TradeMapper {
             dto.setPayReceiveFlag(leg.getPayReceiveFlag().getPayRec());
         }
 
-        // Map cashflows
         if (leg.getCashflows() != null) {
             List<CashflowDTO> cashflowDTOs = leg.getCashflows().stream()
                     .map(this::cashflowToDto)
@@ -208,7 +231,6 @@ public class TradeMapper {
         leg.setLegId(dto.getLegId());
         leg.setNotional(dto.getNotional());
         leg.setRate(dto.getRate());
-
         return leg;
     }
 
@@ -218,7 +240,7 @@ public class TradeMapper {
         }
 
         CashflowDTO dto = new CashflowDTO();
-        dto.setId(cashflow.getId()); // Fixed field name
+        dto.setId(cashflow.getId());
         dto.setLegId(cashflow.getTradeLeg() != null ? cashflow.getTradeLeg().getLegId() : null);
         dto.setPaymentValue(cashflow.getPaymentValue());
         dto.setValueDate(cashflow.getValueDate());
@@ -226,7 +248,8 @@ public class TradeMapper {
         dto.setPayRec(cashflow.getPayRec() != null ? cashflow.getPayRec().getPayRec() : null);
         dto.setPaymentType(cashflow.getPaymentType() != null ? cashflow.getPaymentType().getType() : null);
         dto.setPaymentBusinessDayConvention(
-                cashflow.getPaymentBusinessDayConvention() != null ? cashflow.getPaymentBusinessDayConvention().getBdc()
+                cashflow.getPaymentBusinessDayConvention() != null
+                        ? cashflow.getPaymentBusinessDayConvention().getBdc()
                         : null);
         dto.setCreatedDate(cashflow.getCreatedDate());
         dto.setActive(cashflow.getActive());

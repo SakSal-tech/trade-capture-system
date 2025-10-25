@@ -66,7 +66,7 @@ but it keeps returning an empty result, even though I have data in the H2 databa
 - I checked field names in Trade, TradeStatus and CounterParty entities.
 - I verified that the RSQL query matches the actual field names and values in the database.
 - I tried both uppercase and lowercase values in the RSQL query, and also implemented case-insensitive matching in the RSQL visitor using `criteriaBuilder.lower()` and `value.toLowerCase()` for string comparisons.
-- I confirmed that the code uses the correct JPA Criteria API types (Predicate, Path) and that all required annotations (@NonNull) are present.
+- I confirmed that the code uses the correct JPA Criteria API types (Predicate, Pathand that all required annotations (@NonNullare present.
 - I checked that the RSQLVisitor implementation correctly navigates nested fields and supports all major operators (==, !=, =in=, =out=, etc.).
 - I added debug output to print the parsed RSQL nodes and query execution results.
 
@@ -87,7 +87,7 @@ Despite all these changes and checks, the endpoint still returns empty results. 
 - Further debug the Specification logic and check for any subtle mapping issues between entity fields and DTOs.
 - Consider adding more detailed logging to the repository and service layers to trace the exact query being executed.
 - Review the H2 database contents and schema for any unexpected data or mapping issues.
-  2025-10-07T12:00:00 | Line 179 | TradeController.java | The method searchTradesRsql(SearchCriteriaDTO) in the type TradeService is not applicable for the arguments (String)
+  2025-10-07T12:00:00 | Line 179 | TradeController.java | The method searchTradesRsql(SearchCriteriaDTOin the type TradeService is not applicable for the arguments (String)
   2025-10-07T12:00:00 | Line 703 | TradeService.java | The return type is incompatible with Specification<Trade>.toPredicate(Root<Trade>, CriteriaQuery<?>, CriteriaBuilder)
   2025-10-07T12:00:00 | Line 705 | TradeService.java | Type mismatch: cannot convert from jakarta.persistence.criteria.Predicate to java.util.function.Predicate
   2025-10-09T17:00:00 | RSQL Search | Final fix and successful output
@@ -118,7 +118,7 @@ After these final changes, the RSQL endpoint now returns the correct output and 
   location: package cz.jirutka.rsql.parser.ast
 `
 
-RSQL parser did not recognize the wildcard/like operator (`=like=`) in queries such as `counterparty.name=like=*bank*`. This caused errors like `Unknown operator: =like=` and prevented wildcard search functionality.
+RSQL parser did not recognize the wildcard/like operator (`=like=`in queries such as `counterparty.name=like=*bank*`. This caused errors like `Unknown operator: =like=` and prevented wildcard search functionality.
 
 ### Solution
 
@@ -132,7 +132,7 @@ operators.add(LIKE);
 RSQLParser parser = new RSQLParser(operators);
 ```
 
-- Used a `Set` (specifically a `HashSet`) to ensure each operator is unique and to provide fast lookup and insertion. This is important for operator registration, so user does not accidentally register the same operator multiple times and the parser can efficiently check available operators.
+- Used a `Set` (specifically a `HashSet`to ensure each operator is unique and to provide fast lookup and insertion. This is important for operator registration, so user does not accidentally register the same operator multiple times and the parser can efficiently check available operators.
 - Created a new `RSQLParser` instance with the updated set of operators so it recognizes the new `=like=` operator.
 - Updated the RSQL visitor logic to handle the `=like=` operator and perform SQL `LIKE` queries using wildcards.
 - Added validation and handling for the `=like=` operator in the RSQL visitor class, ensuring case-insensitive wildcard matching. Example:
@@ -144,7 +144,7 @@ RSQLParser parser = new RSQLParser(operators);
         .replace('*', '%')
         .toLowerCase(); // Make the search case-insensitive
 
-    // Apply LOWER() to both sides (field + search text)
+    // Apply LOWER(to both sides (field + search text)
     return criteriaBuilder.like(
         criteriaBuilder.lower(path.as(String.class)),
         pattern);
@@ -167,7 +167,7 @@ RSQLParser parser = new RSQLParser(operators);
 
 ### Solution
 
-- After confirming the test can fail, I restored the correct assertion (`assertNotNull(spec, ...)`) and code.
+- After confirming the test can fail, I restored the correct assertion (`assertNotNull(spec, ...)`and code.
 - This process proved that my test is not a false positive and will correctly report errors if the code breaks in the future.
 
 ### Outcome
@@ -184,11 +184,11 @@ Unit tests for TradeRsqlVisitor did not throw an exception for unsupported RSQL 
 
 ### Root Cause
 
-The visitor logic only threw exceptions for unsupported operators in the toPredicate method, not in the visit(ComparisonNode) method. As a result, invalid operators could be processed without error until later, or even return null, which is unsafe.
+The visitor logic only threw exceptions for unsupported operators in the toPredicate method, not in the visit(ComparisonNodemethod. As a result, invalid operators could be processed without error until later, or even return null, which is unsafe.
 
 ### Solution
 
-Added a check for supported operators at the start of visit(ComparisonNode) in TradeRsqlVisitor.
+Added a check for supported operators at the start of visit(ComparisonNodein TradeRsqlVisitor.
 Now throws IllegalArgumentException immediately for unsupported operators, ensuring invalid queries are rejected early.
 Replaced any return null in toPredicate with an exception for safety and clarity.
 Updated unit tests to expect exceptions for invalid operators and verify correct error handling.
@@ -204,7 +204,7 @@ Tests now fail as expected for unsupported operators, and the codebase is more r
 
 ### Problem 1: Type Mismatch Conversion Error
 
-The test method for RSQL visitor failed when a query value did not match the expected Java type of the model field. For example, passing a string value 'NotANumber' for a numeric field (e.g., tradeId of type Long) caused a conversion error:
+The test method for RSQL visitor failed when a query value did not match the expected Java type of the model field. For example, passing a string value 'NotANumber' for a numeric field (e.g., tradeId of type Longcaused a conversion error:
 
 ```java
 Object typedValue = convertValue(fieldType, values.get(0));
@@ -221,14 +221,14 @@ IllegalArgumentException: Invalid value 'NotANumber' for type Long
 Added robust type conversion and error handling in the utility method:
 
 ```java
-public static Object convertValue(Class<?> type, String value) {
+public static Object convertValue(Class<?> type, String value{
     try {
-        if (type == String.class) return value;
-        if (type == Integer.class || type == int.class) return Integer.parseInt(value);
-        if (type == Long.class || type == long.class) return Long.parseLong(value);
+        if (type == String.classreturn value;
+        if (type == Integer.class || type == int.classreturn Integer.parseInt(value);
+        if (type == Long.class || type == long.classreturn Long.parseLong(value);
         // ...other types
         throw new IllegalArgumentException("Unsupported type: " + type.getSimpleName());
-    } catch (Exception e) {
+    } catch (Exception e{
         throw new IllegalArgumentException("Invalid value '" + value + "' for type " + type.getSimpleName());
     }
 }
@@ -248,7 +248,7 @@ Mockito.when(path.getJavaType()).thenReturn(Long.class); // Generics error
 Resulted in:
 
 ```
-The method thenReturn(Path<Object>) is not applicable for the arguments (Path<Long>)
+The method thenReturn(Path<Object>is not applicable for the arguments (Path<Long>)
 Type safety: Unchecked cast from Path to Path<Long>
 ```
 
@@ -258,9 +258,9 @@ Resolved by using raw type casting and method-level suppression for unchecked wa
 
 ```java
 @SuppressWarnings({"unchecked", "rawtypes"})
-void testVisitComparisonNode_unexpectedValueType() {
-    Path rawPath = (Path) path;
-    Class rawClass = (Class) Long.class;
+void testVisitComparisonNode_unexpectedValueType({
+    Path rawPath = (Pathpath;
+    Class rawClass = (ClassLong.class;
     Mockito.when(root.get(Mockito.eq("tradeId"))).thenReturn(rawPath);
     Mockito.when(path.getJavaType()).thenReturn(rawClass);
     // ...rest of test
@@ -277,12 +277,12 @@ This allows the test to compile and run, while still verifying the correct excep
 - All tests now pass, confirming robust handling of edge cases in RSQL visitor logic.
 
 // Utility Method Explanation
-The `convertValue` utility method is designed to convert a string value from an RSQL query into the correct Java type expected by the model field. This ensures type safety when building JPA predicates. The method checks the field's type (e.g., `Long`, `Integer`, `String`) and parses the value accordingly. If the value cannot be converted, it throws an `IllegalArgumentException`.
+The `convertValue` utility method is designed to convert a string value from an RSQL query into the correct Java type expected by the model field. This ensures type safety when building JPA predicates. The method checks the field's type (e.g., `Long`, `Integer`, `String`and parses the value accordingly. If the value cannot be converted, it throws an `IllegalArgumentException`.
 
 Usage in the RSQL visitor:
 
 - In the Specification's `toPredicate` method, after determining the field type using JPA Criteria API (`path.getJavaType()`), the code calls `convertValue(fieldType, values.get(0))` to convert the query value to the correct type before building the predicate.
-- This guarantees that comparisons (e.g., `tradeId == 123`) are performed with the correct types, preventing runtime errors and ensuring robust query handling.
+- This guarantees that comparisons (e.g., `tradeId == 123`are performed with the correct types, preventing runtime errors and ensuring robust query handling.
 
 Example usage:
 
@@ -299,7 +299,7 @@ Test failure in testSearchTrades_FilterByCounterparty - AssertionFailedError: ex
 
 ### Cause:
 
-The mock for tradeMapper.toDto(any(Trade.class)) returned a new TradeDTO with no fields set, so counterpartyName was null in the result.
+The mock for tradeMapper.toDto(any(Trade.class)returned a new TradeDTO with no fields set, so counterpartyName was null in the result.
 
 ### Solution:
 
@@ -313,7 +313,7 @@ Updated the stubbing to return a TradeDTO with counterpartyName set to "BigBank"
 
 ### Cause:
 
-Mockito stubbing for findAll(any()) was ambiguous because TradeRepository inherits multiple overloaded findAll methods from its parent interfaces.
+Mockito stubbing for findAll(any()was ambiguous because TradeRepository inherits multiple overloaded findAll methods from its parent interfaces.
 
 ### Solution:
 
@@ -329,9 +329,9 @@ TradeServiceTest
 
 ### Root Cause:
 
-The test called tradeService.filterTrades(criteria, 0, 10).getContent(), but the repository/service mock did not return a valid Page<Trade>, resulting in a null value and a NullPointerException when .getContent() was called.
-getContent() is a method on the Spring Data Page object. It returns the actual list of items (e.g., List<TradeDTO>) for the current page, extracted from the paginated result. For example, if the query returns a page containing 10 trades, getContent() will return a List<TradeDTO> with those 10 trades.
-In the test, the repository/service mock did not return a valid Page object—so the result of filterTrades(...) was null. When called .getContent() on this null value, it caused a NullPointerException. The fix is to ensure the mock returns a real (non-null) Page object, so getContent() can safely return the expected list of results.
+The test called tradeService.filterTrades(criteria, 0, 10).getContent(), but the repository/service mock did not return a valid Page<Trade>, resulting in a null value and a NullPointerException when .getContent(was called.
+getContent(is a method on the Spring Data Page object. It returns the actual list of items (e.g., List<TradeDTO>for the current page, extracted from the paginated result. For example, if the query returns a page containing 10 trades, getContent(will return a List<TradeDTO> with those 10 trades.
+In the test, the repository/service mock did not return a valid Page object—so the result of filterTrades(...was null. When called .getContent(on this null value, it caused a NullPointerException. The fix is to ensure the mock returns a real (non-nullPage object, so getContent(can safely return the expected list of results.
 
 ### Solution:
 
@@ -352,7 +352,7 @@ Added an OR condition to the validation logic to check both maturity date agains
 
 ```java
 if ((trade.getTradeMaturityDate().isBefore(trade.getTradeStartDate())
-     || (trade.getTradeStartDate().isBefore(trade.getTradeDate())))) {
+     || (trade.getTradeStartDate().isBefore(trade.getTradeDate()))){
     // fail validation
 }
 ```
@@ -365,14 +365,14 @@ This ensures that the test passes and both business rules are enforced.
 
 ## Cause
 
-Called .equals() on a null pay/receive flag in TradeLegDTO, resulting in a NullPointerException during validation.
+Called .equals(on a null pay/receive flag in TradeLegDTO, resulting in a NullPointerException during validation.
 
 ## Solution
 
-Added explicit null checks before calling .equals() on pay/receive flags in TradeLegValidator:
+Added explicit null checks before calling .equals(on pay/receive flags in TradeLegValidator:
 
 ```java
-if (leg1.getPayReceiveFlag() != null && leg2.getPayReceiveFlag() != null) {
+if (leg1.getPayReceiveFlag(!= null && leg2.getPayReceiveFlag(!= null{
     // compare flags
 }
 ```
@@ -388,7 +388,7 @@ Validation logic did not correctly check for opposite pay/receive flags, causing
 ### Solution
 
 Refactored validation to use:
-if (!leg1.getPayReceiveFlag().equals(leg2.getPayReceiveFlag())) {
+if (!leg1.getPayReceiveFlag().equals(leg2.getPayReceiveFlag()){
 // valid: flags are opposite
 }
 
@@ -444,12 +444,12 @@ NullPointerException: Cannot invoke "java.util.List.iterator()" because the retu
 
 Same as above: The test did not initialize the `tradeLegs` field in `TradeDTO`, leading to a NullPointerException during validation.
 I had `validateTradeLeg(tradeDTO.getLegs(), errors);`
-The validation engine always called validateTradeLeg, even if tradeDTO.getLegs() was null or empty, which could cause NullPointerExceptions.
+The validation engine always called validateTradeLeg, even if tradeDTO.getLegs(was null or empty, which could cause NullPointerExceptions.
 
 ## Solution
 
 Validation engine now only calls leg validation if `tradeLegs` is present (not null and not empty), preventing this error in date-only tests.
-`if (tradeDTO.getLegs() != null && !tradeDTO.getLegs().isEmpty()) {
+`if (tradeDTO.getLegs(!= null && !tradeDTO.getLegs().isEmpty(){
     validateTradeLeg(tradeDTO.getLegs(), errors);
 }
 //`
@@ -541,12 +541,12 @@ Test stubbing errors in TradeDashboardServiceTest for overloaded repository meth
 **Error:**
 
 ```
-The method findAll(Example<Trade>) is ambiguous for the type TradeRepository
+The method findAll(Example<Trade>is ambiguous for the type TradeRepository
 ```
 
 ### Solution
 
-- Mockito stubbing for findAll(any()) was ambiguous because TradeRepository inherits multiple overloaded findAll methods.
+- Mockito stubbing for findAll(any()was ambiguous because TradeRepository inherits multiple overloaded findAll methods.
 - Fixed by making the stubbing explicit for the Specification overload:
 
 ```java
@@ -567,7 +567,7 @@ AssertionFailedError: expected: <BigBank> but was: <null>
 
 ### Solution
 
-- The mock for tradeMapper.toDto(any(Trade.class)) returned a new TradeDTO with no fields set, so counterpartyName was null in the result.
+- The mock for tradeMapper.toDto(any(Trade.class)returned a new TradeDTO with no fields set, so counterpartyName was null in the result.
 - Fixed by updating the stubbing to return a TradeDTO with counterpartyName set to "BigBank":
 
 ```java
@@ -589,7 +589,7 @@ org.junit.jupiter.api.AssertionFailedError: Expected exception to be thrown, but
 ### Solution
 
 - The privilege validation mock did not throw an exception for invalid privileges.
-- Fixed by updating the mock to throw AccessDeniedException when privilegeResult.isValid() is false:
+- Fixed by updating the mock to throw AccessDeniedException when privilegeResult.isValid(is false:
 
 ```java
 when(privilegeValidationEngine.validateUserPrivilegeBusinessRules(any(), any()))
@@ -599,7 +599,7 @@ when(privilegeValidationEngine.validateUserPrivilegeBusinessRules(any(), any()))
 And in the test, used assertThrows:
 
 ```java
-assertThrows(AccessDeniedException.class, () -> service.getTradeSummary("traderId"));
+assertThrows(AccessDeniedException.class, (-> service.getTradeSummary("traderId"));
 ```
 
 ---
@@ -623,7 +623,7 @@ expected: <2> but was: <0>
 
 ### Outcome
 
-All errors and test failures today (from 10am) were resolved by:
+All errors and test failures today (from 10amwere resolved by:
 
 - Careful incremental patching and manual code review
 - Improving test stubbing and DTO setup
@@ -670,7 +670,7 @@ Affected test methods:
 
 ### Remedies and Solutions Tried
 
-- Verified and updated all test methods to use the correct endpoint path (`/api/dashboard/summary`) and parameter name (`traderId`).
+- Verified and updated all test methods to use the correct endpoint path (`/api/dashboard/summary`and parameter name (`traderId`).
 - Ensured test data setup in `@BeforeEach` creates trades for today and yesterday, with correct trader, book, and counterparty.
 - Checked controller mapping and DTO structure to confirm expected fields.
 - Attempted incremental patching of test methods to match endpoint and parameter names.
@@ -728,7 +728,7 @@ public class TradeDashboardService {
 }
 ```
 
-_The addition of `@Service` (or `@Component`) registers the class as a Spring bean, making it available for dependency injection._
+_The addition of `@Service` (or `@Component`registers the class as a Spring bean, making it available for dependency injection._
 
 ### Solution
 
@@ -736,7 +736,7 @@ Added `@Service` and `@Transactional` annotations to `TradeDashboardService`, al
 
 ---
 
-## Failure 2: Endpoint Not Found (HTTP 404) and Endpoint Name Change
+## Failure 2: Endpoint Not Found (HTTP 404and Endpoint Name Change
 
 ### Problem
 
@@ -768,7 +768,7 @@ _Both the endpoint path and parameter name were corrected to match the controlle
 
 ### Solution
 
-Updated the test methods to use the correct endpoint path (`/api/dashboard/daily-summary`) and parameter name (`traderId`), matching the controller's mapping. This resolved the HTTP 404 errors and ensured the tests were targeting the correct endpoint.
+Updated the test methods to use the correct endpoint path (`/api/dashboard/daily-summary`and parameter name (`traderId`), matching the controller's mapping. This resolved the HTTP 404 errors and ensured the tests were targeting the correct endpoint.
 
 ---
 
@@ -838,7 +838,7 @@ The service was patched to always return a zeroed summary object for consistency
 ```java
 // TradeDashboardService.java
 List<DailySummaryDTO.DailyComparisonSummary> historicalComparison = new ArrayList<>();
-if (!yesterdayTradeDtos.isEmpty()) {
+if (!yesterdayTradeDtos.isEmpty(){
     DailySummaryDTO.DailyComparisonSummary yesterdaySummary = new DailySummaryDTO.DailyComparisonSummary();
     // ...populate summary...
     historicalComparison.add(yesterdaySummary);
@@ -896,7 +896,7 @@ After applying all solutions, all integration tests in `SummaryIntegrationTest` 
 Node root = parser.parse(query); `
 The test passed a string like "=INVALID" or something similarly malformed.
 
-The RSQL parser reached the end of the input (<EOF> = End Of File) without finding a valid RSQL expression.
+The RSQL parser reached the end of the input (<EOF> = End Of Filewithout finding a valid RSQL expression.
 
 So the parser threw a TokenMgrError, which Spring wrapped in a ServletException and returned a 500 error to the test.That’s why the test is counted as an error, not a failure.
 
@@ -905,7 +905,7 @@ So the parser threw a TokenMgrError, which Spring wrapped in a ServletException 
 I added catch RSQLParserException in the service RSQLSearch method and return null or an empty list:
 `try {
         // ...existing parsing logic...
-    } catch (cz.jirutka.rsql.parser.RSQLParserException e) {
+    } catch (cz.jirutka.rsql.parser.RSQLParserException e{
         return null; // or Collections.emptyList();
     }
     `
@@ -927,9 +927,9 @@ I added catch RSQLParserException in the service RSQLSearch method and return nu
 Ensured the controller returns a 400 Bad Request when the service returns null. With this fix, the test will pass, as the endpoint now responds with a client error for invalid queries.
 
 `@GetMapping("/rsql")
-public ResponseEntity<List<TradeDTO>> searchTradesRsql(@RequestParam String query) {
+public ResponseEntity<List<TradeDTO>> searchTradesRsql(@RequestParam String query{
     List<TradeDTO> trades = tradeDashboardService.searchTradesRsql(query);
-    if (trades == null) {
+    if (trades == null{
         return ResponseEntity.badRequest().body(null);
     }
     return ResponseEntity.ok(trades);
@@ -1019,7 +1019,7 @@ After implementing advanced validation and RSQL filtering in the trade capture s
    These configurations create beans such as `JwtDecoder`, `OAuth2LoginAuthenticationFilter`, and `BearerTokenAuthenticationFilter`.  
    During integration tests, no OAuth2 credentials or issuer URIs are defined, so Spring fails to build the context.
 
-   Disabling only the first two (which we did initially) was not enough — OAuth2 configs were still being loaded, causing startup failure.
+   Disabling only the first two (which we did initiallywas not enough — OAuth2 configs were still being loaded, causing startup failure.
 
 2. **Duplicate Data Loading**
 
@@ -1085,7 +1085,7 @@ public class TestSecurityConfig {
 
     // I added this so any beans requiring PasswordEncoder during tests can still run.
     @Bean
-    public PasswordEncoder passwordEncoder() {
+    public PasswordEncoder passwordEncoder({
         return new BCryptPasswordEncoder();
     }
 }
@@ -1122,7 +1122,7 @@ In each integration test class, I added the following lines to the `@BeforeEach`
 
 ```java
 @BeforeEach
-void setup() {
+void setup({
     // I delete all data first to avoid duplicate key issues between tests.
     tradeRepository.deleteAll();
     bookRepository.deleteAll();
@@ -1146,7 +1146,7 @@ try {
     Node rootNode = new RSQLParser().parse(query);
     Specification<Trade> spec = rootNode.accept(new TradeRsqlVisitor());
     return tradeRepository.findAll(spec);
-} catch (RSQLParserException e) {
+} catch (RSQLParserException e{
     // I changed this to return 400 instead of 200 for invalid RSQL syntax
     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid RSQL query");
 }
@@ -1162,7 +1162,7 @@ To match the test expectations of `$.content`, I updated the controller endpoint
 
 ```java
 @GetMapping("/filter")
-public ResponseEntity<Map<String, Object>> filterTrades(...) {
+public ResponseEntity<Map<String, Object>> filterTrades(...{
     List<Trade> trades = tradeService.filterTrades(criteria);
     Map<String, Object> response = new HashMap<>();
     response.put("content", trades);
@@ -1204,7 +1204,7 @@ rg.springframework.boot.test.autoconfigure.web.reactive.WebTestClientAutoConfigu
 
 ### Root cause
 
-Tst failures are mostly HTTP 401 (Unauthorized) and 403 (Forbidden) errors, which means Spring Security is now active and blocking requests that lack proper authentication or authorization.
+Tst failures are mostly HTTP 401 (Unauthorizedand 403 (Forbiddenerrors, which means Spring Security is now active and blocking requests that lack proper authentication or authorization.
 
 The previous exclusion of Spring Security auto-configurations was removed (to fix bean errors), so now security is enforced for all endpoints—even in tests.
 Most of the controller/service tests do not provide authentication or the required user roles, so requests are denied.
@@ -1222,13 +1222,13 @@ The failing tests are for endpoints that modify or delete data (e.g., testDelete
 Common Cause:
 
 The mock user provided by @WithMockUser does not have the correct roles/authorities for these endpoints.
-The security configuration (e.g., @PreAuthorize, @Secured, or similar annotations) on these controller methods likely restricts access to users with specific roles.
+The security configuration (e.g., @PreAuthorize, @Secured, or similar annotationson these controller methods likely restricts access to users with specific roles.
 
 ### Solution
 
 1. Attempt 1: @WithMockUser has been added to all controller test classes.
    This should provide mock authentication and should resolve the 401/403 errors in the controller tests.
-2. Attempt 2: For each failing test, I added @WithMockUser(roles = "TRADER") to simulate a user with full privileges, ensuring the test can access create, amend, terminate, and cancel endpoints.
+2. Attempt 2: For each failing test, I added @WithMockUser(roles = "TRADER"to simulate a user with full privileges, ensuring the test can access create, amend, terminate, and cancel endpoints.
 
 Date: 2025-10-17
 
@@ -1238,7 +1238,7 @@ This document explains, the work I carried out to get the failing tests back to 
 
 When Spring Security was re-enabled, a large number of integration and controller tests began failing. The failures fell into three main categories:
 
-- HTTP-level security failures (401 Unauthorized and 403 Forbidden) on many controller endpoints.
+- HTTP-level security failures (401 Unauthorized and 403 Forbiddenon many controller endpoints.
 - ApplicationContext failures in a small number of integration tests (for example `SummaryIntegrationTest`), often caused by test auto-configuration or management/actuator security wiring that the test context did not expect.
 - Business-logic / validation failures on endpoints that create domain objects (for example trade creation returning 400 Bad Request due to missing legs or missing seeded references).
 
@@ -1254,9 +1254,9 @@ I traced the failures to a small set of underlying causes:
 
 2. Test slices and `@WebMvcTest` contexts sometimes attempted to auto-configure management/actuator security beans or production security beans that were not present in the slice — leading to ApplicationContext load errors.
 
-3. Some tests attempted to create reference data (Book, Counterparty) programmatically while the project already seeded the H2 test database via `data.sql`. This caused primary-key and unique index violations.
+3. Some tests attempted to create reference data (Book, Counterpartyprogrammatically while the project already seeded the H2 test database via `data.sql`. This caused primary-key and unique index violations.
 
-4. A few payloads used by tests did not satisfy DTO or domain validation (for example trade payloads missing a required second leg) so they correctly triggered 400 responses.
+4. A few payloads used by tests did not satisfy DTO or domain validation (for example trade payloads missing a required second legso they correctly triggered 400 responses.
 
 To illustrate, here's a typical failing MockMvc call before fixes:
 
@@ -1282,8 +1282,8 @@ My immediate priority was to stop the noisy 401/403 failures so I could focus on
 For controller slice tests that target controller logic only, I applied the slice pattern:
 
 - Add `@AutoConfigureMockMvc(addFilters = false)` to the test class so MockMvc does not register servlet filters (including the Security filter chain).
-- Add `@WithMockUser(username = "alice", roles = {"TRADER"})` at class level where appropriate so method-level checks (if present) still see a principal.
-- Add `.with(csrf())` to mutating MockMvc calls (POST/PUT/DELETE) as a best practice for when filters are enabled.
+- Add `@WithMockUser(username = "alice", roles = {"TRADER"})` at class level where appropriate so method-level checks (if presentstill see a principal.
+- Add `.with(csrf())` to mutating MockMvc calls (POST/PUT/DELETEas a best practice for when filters are enabled.
 
 Example class-level annotations:
 
@@ -1302,13 +1302,13 @@ To quickly silence 401/403 failures across the whole test suite during triage, I
 
 `backend/src/test/java/com/technicalchallenge/config/GlobalTestSecurityConfig.java` (test-scope only)
 
-This class registers a `SecurityFilterChain` in the test ApplicationContext that permits all requests and (optionally) disables CSRF. A minimal example:
+This class registers a `SecurityFilterChain` in the test ApplicationContext that permits all requests and (optionallydisables CSRF. A minimal example:
 
 ```java
 @TestConfiguration
 public class GlobalTestSecurityConfig {
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain filterChain(HttpSecurity httpthrows Exception {
         http.csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();
@@ -1347,7 +1347,7 @@ For tests that intentionally imported smaller slices (e.g. `@WebMvcTest`), I pre
 
 ### Result of Phase 1
 
-After the changes above I was able to make the focused `UserPrivilegeIntegrationTest` pass in isolation (31 tests, 0 failures) and then re-run the full suite repeatedly to clean up remaining issues. The final full-suite run completed successfully (153 tests, 0 failures) in my last verification step.
+After the changes above I was able to make the focused `UserPrivilegeIntegrationTest` pass in isolation (31 tests, 0 failuresand then re-run the full suite repeatedly to clean up remaining issues. The final full-suite run completed successfully (153 tests, 0 failuresin my last verification step.
 
 ## The two test security configs — why both exist
 
@@ -1365,14 +1365,14 @@ I recommend the following sequence to restore meaningful security coverage in te
 2. For each controller/integration test that should exercise security, either:
    - Remove `addFilters = false`, import `TestSecurityConfig` and use `@WithMockUser` or `.with(user(...))` and `.with(csrf())`; or
    - Keep `addFilters = false` for strict controller slices, but use `@WithMockUser`/`.with(user(...))` and explicitly test method-level `@PreAuthorize` behaviours.
-3. Add a small end-to-end smoke test (filters enabled) that authenticates and hits a protected endpoint to ensure CI exercises the real `SecurityFilterChain`.
+3. Add a small end-to-end smoke test (filters enabledthat authenticates and hits a protected endpoint to ensure CI exercises the real `SecurityFilterChain`.
 
 ## Next step
 
 - All changes described are test-only: they live in `src/test/java` and do not affect production code.
 - `GlobalTestSecurityConfig` must be removed before merging to main; otherwise it will mask security regressions.
 
-Phase 2: Remove the global permit-all and convert one controller test to use TestSecurityConfig + @WithMockUser + .with(csrf()) to demonstrate proper authorization testing. - Remove `GlobalTestSecurityConfig` and convert one controller test to be fully security-aware using `TestSecurityConfig` (Phase 2 demo), or
+Phase 2: Remove the global permit-all and convert one controller test to use TestSecurityConfig + @WithMockUser + .with(csrf()to demonstrate proper authorization testing. - Remove `GlobalTestSecurityConfig` and convert one controller test to be fully security-aware using `TestSecurityConfig` (Phase 2 demo), or
 
 # Test Fix Log — UserPrivilegeIntegrationTest
 
@@ -1385,11 +1385,11 @@ This log records the problems encountered while restoring Spring Security and ge
 - Keep security enabled during tests to learn correct testing patterns; don't disable it globally.
 - Provide a test-only security configuration that creates in-memory users and a minimal SecurityFilterChain (so authentication and method security work in tests without bootstrapping full production security beans).
 - Use CSRF tokens for mutating MockMvc requests in tests: .with(csrf()).
-- Prefer using seeded test data that's already present (via data.sql) or create test fixtures carefully, avoiding ID collisions with the seed dataset.
+- Prefer using seeded test data that's already present (via data.sqlor create test fixtures carefully, avoiding ID collisions with the seed dataset.
 
 ### Problem
 
-- Many integration tests failed after Spring Security was re-enabled. Failures were mostly 401 (Unauthorized) and 403 (Forbidden) for protected endpoints.
+- Many integration tests failed after Spring Security was re-enabled. Failures were mostly 401 (Unauthorizedand 403 (Forbiddenfor protected endpoints.
 - Some tests also triggered ApplicationContext load errors related to Actuator/management security auto-configuration.
 - After addressing security, a remaining failure surfaced during trade creation: the controller returned 400 Bad Request with messages like:
   - "Error creating trade: Trade must have exactly 2 legs"
@@ -1400,12 +1400,12 @@ This log records the problems encountered while restoring Spring Security and ge
 
 - 401 / 403 failures:
 
-  - Tests did not simulate authenticated users or provide CSRF tokens for mutating requests. With Spring Security back on, MockMvc requests that change state (POST/PATCH/DELETE) need CSRF, and protected endpoints need an authenticated SecurityContext.
+  - Tests did not simulate authenticated users or provide CSRF tokens for mutating requests. With Spring Security back on, MockMvc requests that change state (POST/PATCH/DELETEneed CSRF, and protected endpoints need an authenticated SecurityContext.
   - The test slice tried to auto-configure actuator/management security which expects beans not present in the test context. This caused ApplicationContext wiring errors.
 
 - 400 failures during trade creation:
 
-  - The business logic enforces DTO validation (e.g., trade must have two legs) and domain-level preconditions (book and counterparty must exist) before creating a trade.
+  - The business logic enforces DTO validation (e.g., trade must have two legsand domain-level preconditions (book and counterparty must existbefore creating a trade.
   - The test payloads initially lacked required fields and legs, causing DTO and service-level validation to fail.
 
 - Database duplication / referential integrity errors:
@@ -1415,10 +1415,10 @@ This log records the problems encountered while restoring Spring Security and ge
 
 1. Test security infra
 
-   - Created a `TestSecurityConfig` (test-only @TestConfiguration) that:
+   - Created a `TestSecurityConfig` (test-only @TestConfigurationthat:
      - Enables method level security (@EnableMethodSecurity).
      - Declares an in-memory `UserDetailsService` with test users and the roles needed by tests (e.g., `TRADE_CREATE`, `TRADE_EDIT`, `TRADE_VIEW`, `BOOK_VIEW`, `TRADER`, etc.).
-     - Declares a minimal `SecurityFilterChain` that requires authentication for requests, disables formLogin/httpBasic (so tests control auth), and keeps CSRF enabled (so MockMvc must use .with(csrf()) for mutating requests).
+     - Declares a minimal `SecurityFilterChain` that requires authentication for requests, disables formLogin/httpBasic (so tests control auth), and keeps CSRF enabled (so MockMvc must use .with(csrf()for mutating requests).
    - Imported `TestSecurityConfig` into the failing test class with `@Import(TestSecurityConfig.class)`.
 
 ````markdown
@@ -1433,7 +1433,7 @@ This log records the problems encountered while restoring Spring Security and ge
 - Keep security enabled during tests to learn correct testing patterns; don't disable it globally.
 - Provide a test-only security configuration that creates in-memory users and a minimal SecurityFilterChain (so authentication and method security work in tests without bootstrapping full production security beans).
 - Use CSRF tokens for mutating MockMvc requests in tests: .with(csrf()).
-- Prefer using seeded test data that's already present (via data.sql) or create test fixtures carefully, avoiding ID collisions with the seed dataset.
+- Prefer using seeded test data that's already present (via data.sqlor create test fixtures carefully, avoiding ID collisions with the seed dataset.
 
 Example — request using a CSRF token and mock user in MockMvc:
 
@@ -1449,7 +1449,7 @@ mockMvc.perform(post("/api/some-protected-endpoint")
 
 ### Problem
 
-- Many integration tests failed after Spring Security was re-enabled. Failures were mostly 401 (Unauthorized) and 403 (Forbidden) for protected endpoints.
+- Many integration tests failed after Spring Security was re-enabled. Failures were mostly 401 (Unauthorizedand 403 (Forbiddenfor protected endpoints.
 - Some tests also triggered ApplicationContext load errors related to Actuator/management security auto-configuration.
 - After addressing security, a remaining failure surfaced during trade creation: the controller returned 400 Bad Request with messages like:
   - "Error creating trade: Trade must have exactly 2 legs"
@@ -1472,12 +1472,12 @@ mockMvc.perform(post("/api/trades")
 
 - 401 / 403 failures:
 
-  - Tests did not simulate authenticated users or provide CSRF tokens for mutating requests. With Spring Security back on, MockMvc requests that change state (POST/PATCH/DELETE) need CSRF, and protected endpoints need an authenticated SecurityContext.
+  - Tests did not simulate authenticated users or provide CSRF tokens for mutating requests. With Spring Security back on, MockMvc requests that change state (POST/PATCH/DELETEneed CSRF, and protected endpoints need an authenticated SecurityContext.
   - The test slice tried to auto-configure actuator/management security which expects beans not present in the test context. This caused ApplicationContext wiring errors.
 
 - 400 failures during trade creation:
 
-  - The business logic enforces DTO validation (e.g., trade must have two legs) and domain-level preconditions (book and counterparty must exist) before creating a trade.
+  - The business logic enforces DTO validation (e.g., trade must have two legsand domain-level preconditions (book and counterparty must existbefore creating a trade.
   - The test payloads initially lacked required fields and legs, causing DTO and service-level validation to fail.
 
 - Database duplication / referential integrity errors:
@@ -1496,10 +1496,10 @@ mockMvc.perform(post("/api/trades")
 
 1. Test security infra
 
-   - Created a `TestSecurityConfig` (test-only @TestConfiguration) that:
+   - Created a `TestSecurityConfig` (test-only @TestConfigurationthat:
      - Enables method level security (@EnableMethodSecurity).
      - Declares an in-memory `UserDetailsService` with test users and the roles needed by tests (e.g., `TRADE_CREATE`, `TRADE_EDIT`, `TRADE_VIEW`, `BOOK_VIEW`, `TRADER`, etc.).
-     - Declares a minimal `SecurityFilterChain` that requires authentication for requests, disables formLogin/httpBasic (so tests control auth), and keeps CSRF enabled (so MockMvc must use .with(csrf()) for mutating requests).
+     - Declares a minimal `SecurityFilterChain` that requires authentication for requests, disables formLogin/httpBasic (so tests control auth), and keeps CSRF enabled (so MockMvc must use .with(csrf()for mutating requests).
    - Imported `TestSecurityConfig` into the failing test class with `@Import(TestSecurityConfig.class)`.
 
 Example `TestSecurityConfig` snippet:
@@ -1508,14 +1508,14 @@ Example `TestSecurityConfig` snippet:
 @TestConfiguration
 public class TestSecurityConfig {
     @Bean
-    public UserDetailsService users() {
+    public UserDetailsService users({
         var uds = new InMemoryUserDetailsManager();
         uds.createUser(User.withUsername("alice").password("password").roles("TRADER").build());
         return uds;
     }
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain filterChain(HttpSecurity httpthrows Exception {
         http
           .csrf(csrf -> csrf.enable())
           .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
@@ -1527,7 +1527,7 @@ public class TestSecurityConfig {
 
 2. Prevent Actuator/management wiring errors in the test context
 
-   - Excluded `ManagementWebSecurityAutoConfiguration` (and related OAuth auto-configs) using `@ImportAutoConfiguration(exclude = {...})` on the test class so the test ApplicationContext would not attempt to create management SecurityFilterChain beans.
+   - Excluded `ManagementWebSecurityAutoConfiguration` (and related OAuth auto-configsusing `@ImportAutoConfiguration(exclude = {...})` on the test class so the test ApplicationContext would not attempt to create management SecurityFilterChain beans.
 
 Example exclusion on a test class:
 
@@ -1559,9 +1559,9 @@ mockMvc.perform(post("/api/users")
 Example method-level security in controller:
 
 ```java
-@PreAuthorize("hasRole('TRADER') or hasAuthority('TRADE_CREATE')")
+@PreAuthorize("hasRole('TRADER'or hasAuthority('TRADE_CREATE')")
 @PostMapping("/api/trades")
-public ResponseEntity<TradeDTO> createTrade(@RequestBody @Valid TradeDTO dto) {
+public ResponseEntity<TradeDTO> createTrade(@RequestBody @Valid TradeDTO dto{
     // ...
 }
 ```
@@ -1573,7 +1573,7 @@ public ResponseEntity<TradeDTO> createTrade(@RequestBody @Valid TradeDTO dto) {
 Example valid trade payload builder (test helper):
 
 ```java
-private String validTradeJson() {
+private String validTradeJson({
     return "{\"tradeDate\":\"2025-01-17\",\"bookName\":\"FX-BOOK-1\","
          + "\"counterpartyName\":\"MegaFund\",\"tradeLegs\":[{\"notional\":1000},{\"notional\":2000}]}";
 }
@@ -1589,9 +1589,9 @@ private String validTradeJson() {
 Example lookup in `TestDataFactory` to reuse seeded rows:
 
 ```java
-public Book findOrCreateBook(String name) {
+public Book findOrCreateBook(String name{
     return bookRepository.findByBookName(name)
-            .orElseGet(() -> bookRepository.save(new Book(name)));
+            .orElseGet((-> bookRepository.save(new Book(name)));
 }
 ```
 
@@ -1617,7 +1617,7 @@ mvn -Dtest=com.technicalchallenge.controller.UserPrivilegeIntegrationTest test
 ### Techniques used (short explanations)
 
 - Test-only security configuration: create in-memory test users and a scaled-down SecurityFilterChain so tests exercise Spring Security without loading full production auth mechanisms.
-- CSRF token simulation: MockMvc supports SecurityMockMvcRequestPostProcessors.csrf() which simulates a valid CSRF token for the request.
+- CSRF token simulation: MockMvc supports SecurityMockMvcRequestPostProcessors.csrf(which simulates a valid CSRF token for the request.
 - Use of seeded test data: rely on `data.sql` where convenient to avoid creating duplicate rows and identity collisions.
 - Method-level security checks: adjust `@PreAuthorize` expressions to match role names used by tests and ensure tests cover both allowed and forbidden roles.
 - Iterative validation: when tests fail, examine server logs (the test surefire XML and console output show the controller message bodies and SQL statements), correct the next most likely cause, re-run.
@@ -1631,7 +1631,7 @@ mvn -Dtest=com.technicalchallenge.controller.UserPrivilegeIntegrationTest test
 
 ### Next steps & follow-ups
 
-- Run the full project's test suite (`mvn test`) to confirm these changes cause no regressions elsewhere. Expectation: most security-related failures are resolved; if other tests relied on different seeded names or different security assumptions, they might need small updates.
+- Run the full project's test suite (`mvn test`to confirm these changes cause no regressions elsewhere. Expectation: most security-related failures are resolved; if other tests relied on different seeded names or different security assumptions, they might need small updates.
 - Make tests fully self-contained by creating and cleaning fixtures per-test (this avoids relying on `data.sql` but requires careful identity management to avoid PK collisions).
 - Add a small README in `docs/` describing the `TestSecurityConfig` usage so future contributors know why test security differs from production.
 
@@ -1652,7 +1652,7 @@ application-test.properties+0-8
 I'll re-run the full test suite now to see current failures after reverting the earlier global changes.
 
 mv n test -DskipITs=false
-I'll add a global test security configuration (active for the 'test' profile) that permits all requests and disables CSRF. This should remove 401/403 failures for controller tests without modifying every test. I'll create the new file and re-run the test suite to verify.
+I'll add a global test security configuration (active for the 'test' profilethat permits all requests and disables CSRF. This should remove 401/403 failures for controller tests without modifying every test. I'll create the new file and re-run the test suite to verify.
 
 GlobalTestSecurityConfig.java
 I'll re-run the full test suite to check whether the 401/403 failures are resolved now.
@@ -1660,7 +1660,7 @@ I'll re-run the full test suite to check whether the 401/403 failures are resolv
 mv n test -DskipITs=false
 Summarized conversation history
 
-I'll write an explicit todo list (plan) so we track next steps; mark the decision step in-progress.
+I'll write an explicit todo list (planso we track next steps; mark the decision step in-progress.
 
 Added 1 todo
 
@@ -1671,25 +1671,25 @@ Outcome: BUILD FAILURE
 Tests run: 153, Failures: 30, Errors: 13, Skipped: 0
 Key observations from the test run
 
-The focused class (UserPrivilegeIntegrationTest) still passes in isolation: 31 tests, 0 failures.
-Many controller integration tests are still failing with 401 (unauthenticated) or 403 (forbidden) responses:
+The focused class (UserPrivilegeIntegrationTeststill passes in isolation: 31 tests, 0 failures.
+Many controller integration tests are still failing with 401 (unauthenticatedor 403 (forbiddenresponses:
 Examples: AdvanceSearchDashboardIntegrationTest, BookControllerTest, CashflowControllerTest, TradeControllerTest, TradeLegControllerTest, UserControllerTest, etc.
-Several tests (SummaryIntegrationTest) are failing to load ApplicationContext (IllegalState) — likely due to test auto-configuration/profile mismatches introduced while experimenting with test security.
+Several tests (SummaryIntegrationTestare failing to load ApplicationContext (IllegalState— likely due to test auto-configuration/profile mismatches introduced while experimenting with test security.
 Other service/unit tests are passing (many service and validator tests passed).
 What I did next
 
 Option A (recommended, correct): Turn off the GlobalTestSecurityConfig mitigation and fix failing controller tests properly:
 
-For each failing controller test add explicit authentication (import TestSecurityConfig or use with(user(...)) on MockMvc), and add .with(csrf()) for mutating requests.
+For each failing controller test add explicit authentication (import TestSecurityConfig or use with(user(...)on MockMvc), and add .with(csrf()for mutating requests.
 Convert tests to be isolated by creating a TestDataFactory and using transactional rollback or cleanup to avoid data.sql collisions.
 Pros: keeps authorization tests meaningful and correct. Cons: slower — requires editing multiple tests.
-Option B (faster, temporary): Keep GlobalTestSecurityConfig (permitAll) active and focus on converting tests to be isolated and fixing non-auth failures first (and then come back to add real auth to tests).
+Option B (faster, temporary): Keep GlobalTestSecurityConfig (permitAllactive and focus on converting tests to be isolated and fixing non-auth failures first (and then come back to add real auth to tests).
 
 Pros: quickly reveals non-auth test failures and simplifies triage. Cons: masks authorization bugs; I'll need a second pass to reintroduce auth checks.
 
 - Remove the global permissive test profile (or disable it), re-run the full suite to get a fresh failure list.
 - Start fixing failing controller tests one-by-one: add authentication/CSRF and make payloads/fixtures valid.
-- Implement TestDataFactory and convert UserPrivilegeIntegrationTest to use it (transactional rollback) and verify.
+- Implement TestDataFactory and convert UserPrivilegeIntegrationTest to use it (transactional rollbackand verify.
 
 - Keep GlobalTestSecurityConfig active, implement TestDataFactory and transactional isolation, and iterate on remaining failures (ApplicationContext errors and validation/business-rule failures).
 - Produce a prioritized list of controller tests still failing and then re-enable auth later.
@@ -1712,11 +1712,11 @@ The test-suite was also fragile because some integration tests modified the in-m
 
 There were two interlinked causes:
 
-1. A global test config (a permit-all SecurityFilterChain) disabled enforcement of authentication/authorisation and often also disabled CSRF checks. With that present, tests passed even when the controller or service logic contained incorrect or incomplete security checks. This masked regressions and made it unsafe to rely on the test results as a proof of correct authorisation behaviour.
+1. A global test config (a permit-all SecurityFilterChaindisabled enforcement of authentication/authorisation and often also disabled CSRF checks. With that present, tests passed even when the controller or service logic contained incorrect or incomplete security checks. This masked regressions and made it unsafe to rely on the test results as a proof of correct authorisation behaviour.
 
 2. Integration tests that use the full Spring context modified the H2 test database and relied, implicitly, on side effects of earlier tests or on static seed data. That made test order important and produced collisions with seeded entities. Without explicit transactional rollback or fixture isolation, tests could fail intermittently.
 
-Together these two problems meant the test-suite was both over-permissive (security-wise) and brittle (state-wise).
+Together these two problems meant the test-suite was both over-permissive (security-wiseand brittle (state-wise).
 
 ## Solution
 
@@ -1725,18 +1725,18 @@ I implemented a small, pragmatic, repeatable plan to make tests exercise authori
 High level:
 
 - Removed the global permit-all test security configuration so tests no longer run with a totally permissive SecurityFilterChain.
-- Created and used a focused `TestSecurityConfig` (a test-only configuration) for tests that need a running SecurityFilterChain; it exposes in-memory users or enables the minimal beans tests require.
+- Created and used a focused `TestSecurityConfig` (a test-only configurationfor tests that need a running SecurityFilterChain; it exposes in-memory users or enables the minimal beans tests require.
 - Converted controller tests one-by-one to import `TestSecurityConfig` and to supply authentication explicitly (either with `@WithMockUser` or per-request post-processors).
-- Added `.with(csrf())` to every mutating MockMvc request (POST/PUT/PATCH/DELETE) so CSRF checks in the real filter chain are exercised in tests.
+- Added `.with(csrf())` to every mutating MockMvc request (POST/PUT/PATCH/DELETEso CSRF checks in the real filter chain are exercised in tests.
 - Standardised integration-test isolation by adding `@Transactional` + `@Rollback` to classes that load the full Spring context and touch the DB. This ensures each test method rolls back state at the end.
-- Introduced (and used) a `TestDataFactory` helper to create or find fixture entities; this reduces collisions with seeded data and keeps tests small and explicit.
+- Introduced (and useda `TestDataFactory` helper to create or find fixture entities; this reduces collisions with seeded data and keeps tests small and explicit.
 - Fixed expectations that relied on the permissive behaviour or on old status-codes (for example, changed controller POST responses to 201 Created where appropriate and ensured controllers returned 204 for deletes when tests expected No Content).
 
 ### Why this approach
 
 - Removing the global permit-all makes tests honest: they now fail when the application would deny a real user. That ensures the test-suite is a reliable guardrail for regressions in security behaviour.
 - Per-test `TestSecurityConfig` plus `@WithMockUser` keeps tests explicit about which roles are required and avoids surprising cross-test influence.
-- Enforcing CSRF in tests (by adding `.with(csrf())`) prevents false positives where the test passed only because CSRF was disabled globally.
+- Enforcing CSRF in tests (by adding `.with(csrf())`prevents false positives where the test passed only because CSRF was disabled globally.
 - Transactional rollback keeps the DB state stable and independent of test order. It is cheaper than recreating the whole Spring context between tests, and easier to reason about than poring through cleanup SQL in many places.
 - `TestDataFactory` gives a single place to create or find seeded entities and to perform deterministic cleanup when unique fixtures are required.
 
@@ -1802,12 +1802,12 @@ These are the kinds of files changed during Phase 2 (representative list):
 - Controller tests (many): e.g. `BookControllerTest`, `TradeControllerTest`, `TradeLegControllerTest`, `CounterpartyControllerTest`, `CashflowControllerTest`, `UserControllerTest` — each now imports `TestSecurityConfig` and uses `@WithMockUser` and `.with(csrf())` where needed.
 - Integration tests: `UserPrivilegeIntegrationTest`, `SummaryIntegrationTest`, `AdvanceSearchDashboardIntegrationTest` — annotated `@Transactional` + `@Rollback` and import `TestSecurityConfig`.
 - `TestDataFactory` — extended with helpers for unique fixture creation and cleanup.
-- Minor controller fixes: status-code adjustments (POST → 201, DELETE → 204) to match test expectations.
+- Minor controller fixes: status-code adjustments (POST → 201, DELETE → 204to match test expectations.
 
 ### Verification and results
 
-- I re-ran the modified tests incrementally while converting them. Targeted runs (single test classes) were used to iterate quickly and fix failures.
-- After the conversions and isolation changes were applied, a full test run was executed (`mvn clean test`) and completed successfully (tests passed under the stricter security configuration). The test-suite now exercises real authorisation behaviour.
+- I re-ran the modified tests incrementally while converting them. Targeted runs (single test classeswere used to iterate quickly and fix failures.
+- After the conversions and isolation changes were applied, a full test run was executed (`mvn clean test`and completed successfully (tests passed under the stricter security configuration). The test-suite now exercises real authorisation behaviour.
 
 ## Closing notes
 
@@ -1846,7 +1846,7 @@ BeanDefinitionOverrideException: Cannot register bean definition [securityFilter
 
 ```java
 @Bean(name = "testSecurityFilterChain")
-public SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
+public SecurityFilterChain testSecurityFilterChain(HttpSecurity httpthrows Exception {
     http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
         .csrf(csrf -> csrf.disable())
         .httpBasic(b -> b.disable())
@@ -1883,7 +1883,7 @@ Status expected:<204> but was:<400>
 
 - Before this change, controllers used relaxed or disabled security (permitAll).
 - When security enforcement was added, tests that didn’t mock users or provide authentication failed.
-- Some endpoints changed HTTP methods (e.g., `PUT` instead of `POST`) and started rejecting invalid verbs.
+- Some endpoints changed HTTP methods (e.g., `PUT` instead of `POST`and started rejecting invalid verbs.
 - New validators in `UserPrivilegeValidator` and `TradeDateValidator` produced `400 Bad Request` responses for incomplete payloads.
 
 ### Solution
@@ -1959,11 +1959,11 @@ Not production-grade yet — final decision pending between JWT and Cookie-based
 
 ---
 
-## 4. CORS (Cross-Origin) Configuration
+## 4. CORS (Cross-OriginConfiguration
 
 ### Problem
 
-Frontend (React/Vite) calls to backend API were blocked with CORS errors:
+Frontend (React/Vitecalls to backend API were blocked with CORS errors:
 
 ```
 Access to fetch at 'http://localhost:8080/api/...' from origin 'http://localhost:5173' has been blocked by CORS policy
@@ -1981,10 +1981,10 @@ Created a global `WebConfig`:
 @Configuration
 public class WebConfig {
     @Bean
-    public WebMvcConfigurer corsConfigurer() {
-        return new WebMvcConfigurer() {
+    public WebMvcConfigurer corsConfigurer({
+        return new WebMvcConfigurer({
             @Override
-            public void addCorsMappings(CorsRegistry registry) {
+            public void addCorsMappings(CorsRegistry registry{
                 registry.addMapping("/api/**")
                     .allowedOrigins("http://localhost:3000", "http://localhost:5173")
                     .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
@@ -1998,8 +1998,8 @@ public class WebConfig {
 
 ### Impact
 
-CORS now works for both React (localhost:5173) and Swagger UI.  
-No more preflight (OPTIONS) failures.  
+CORS now works for both React (localhost:5173and Swagger UI.  
+No more preflight (OPTIONSfailures.  
 API endpoints accessible via browser and frontend.
 
 ---
@@ -2027,7 +2027,7 @@ The controller or service returned `null` due to missing setup data or incorrect
 - Example safeguard:
 
 ```java
-if (createdUserPrivilege == null) {
+if (createdUserPrivilege == null{
     throw new IllegalStateException("User privilege creation failed");
 }
 ```
@@ -2157,7 +2157,7 @@ BeanDefinitionOverrideException: Cannot register bean definition [securityFilter
 
 ```java
 @Bean(name = "testSecurityFilterChain")
-public SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
+public SecurityFilterChain testSecurityFilterChain(HttpSecurity httpthrows Exception {
     http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
         .csrf(csrf -> csrf.disable())
         .httpBasic(b -> b.disable())
@@ -2194,7 +2194,7 @@ Status expected:<204> but was:<400>
 
 - Before this change, controllers used relaxed or disabled security (permitAll).
 - When security enforcement was added, tests that didn’t mock users or provide authentication failed.
-- Some endpoints changed HTTP methods (e.g., `PUT` instead of `POST`) and started rejecting invalid verbs.
+- Some endpoints changed HTTP methods (e.g., `PUT` instead of `POST`and started rejecting invalid verbs.
 - New validators in `UserPrivilegeValidator` and `TradeDateValidator` produced `400 Bad Request` responses for incomplete payloads.
 
 ### Solution
@@ -2270,11 +2270,11 @@ Not production-grade yet — final decision pending between JWT and Cookie-based
 
 ---
 
-## 4. CORS (Cross-Origin) Configuration
+## 4. CORS (Cross-OriginConfiguration
 
 ### Problem
 
-Frontend (React/Vite) calls to backend API were blocked with CORS errors:
+Frontend (React/Vitecalls to backend API were blocked with CORS errors:
 
 ```
 Access to fetch at 'http://localhost:8080/api/...' from origin 'http://localhost:5173' has been blocked by CORS policy
@@ -2292,10 +2292,10 @@ Created a global `WebConfig`:
 @Configuration
 public class WebConfig {
     @Bean
-    public WebMvcConfigurer corsConfigurer() {
-        return new WebMvcConfigurer() {
+    public WebMvcConfigurer corsConfigurer({
+        return new WebMvcConfigurer({
             @Override
-            public void addCorsMappings(CorsRegistry registry) {
+            public void addCorsMappings(CorsRegistry registry{
                 registry.addMapping("/api/**")
                     .allowedOrigins("http://localhost:3000", "http://localhost:5173")
                     .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
@@ -2309,8 +2309,8 @@ public class WebConfig {
 
 ### Impact
 
-CORS now works for both React (localhost:5173) and Swagger UI.  
-No more preflight (OPTIONS) failures.  
+CORS now works for both React (localhost:5173and Swagger UI.  
+No more preflight (OPTIONSfailures.  
 API endpoints accessible via browser and frontend.
 
 ---
@@ -2338,7 +2338,7 @@ The controller or service returned `null` due to missing setup data or incorrect
 - Example safeguard:
 
 ```java
-if (createdUserPrivilege == null) {
+if (createdUserPrivilege == null{
     throw new IllegalStateException("User privilege creation failed");
 }
 ```
@@ -2502,7 +2502,7 @@ The method in `TradeService` used logic similar to:
 ```java
 LocalDate currentDate = startDate.plusMonths(monthsInterval);
 
-while (!currentDate.isAfter(maturityDate)) {
+while (!currentDate.isAfter(maturityDate){
     dates.add(currentDate);
     currentDate = currentDate.plusMonths(monthsInterval);
 }
@@ -2570,7 +2570,7 @@ Fix the formula to divide the rate by 100 before multiplying:
 
 ```java
 BigDecimal result = notional
-    .multiply(BigDecimal.valueOf(rate).divide(BigDecimal.valueOf(100))) // convert % to decimal
+    .multiply(BigDecimal.valueOf(rate).divide(BigDecimal.valueOf(100))// convert % to decimal
     .multiply(BigDecimal.valueOf(months))
     .divide(BigDecimal.valueOf(12), RoundingMode.HALF_UP);
 ```
@@ -2597,7 +2597,7 @@ After all fixes:
 
 1. Always verify repository interactions with `verify(...).save(...)` before capturing arguments.
 2. Be careful with date comparisons — `.isAfter()` and `.isBefore()` can skip edge cases.
-3. Always normalize interest rates (divide by 100) when switching between percentages and decimals.
+3. Always normalize interest rates (divide by 100when switching between percentages and decimals.
 4. When debugging, write focused unit tests to isolate and reproduce each bug before fixing.
 
 ---
@@ -2616,7 +2616,7 @@ This log is a narrative of how I investigated and fixed more than thirty failing
 
 ---
 
-## 1) 403 where 200 expected on read-only endpoints
+## 1403 where 200 expected on read-only endpoints
 
 ### Problem (from tests)
 
@@ -2653,7 +2653,7 @@ public abstract class BaseIntegrationTest {}
 
 // Per-test
 @WithMockUser(username = "viewerUser", roles = { "TRADER" })
-void testSearchTradesEndpoint() throws Exception {
+void testSearchTradesEndpoint(throws Exception {
     mockMvc.perform(get("/api/dashboard/search"))
            .andExpect(status().isOk());
 }
@@ -2665,7 +2665,7 @@ All search and filter endpoints now authenticate correctly with the intended rol
 
 ---
 
-## 2) 401 vs 403 for unauthenticated tests
+## 2401 vs 403 for unauthenticated tests
 
 ### Problem (from tests)
 
@@ -2676,18 +2676,18 @@ UserPrivilegeIntegrationTest.testUnauthenticatedUserDenied: Status expected:<401
 
 ### Root cause
 
-With `@WithMockUser` on the base class, my “unauthenticated” test was actually authenticated as “alice”. When I switched to `@WithAnonymousUser`, Spring Security still considered the request authenticated (anonymous principal) and returned 403 where the endpoint required a specific role, hence 403 not 401.
+With `@WithMockUser` on the base class, my “unauthenticated” test was actually authenticated as “alice”. When I switched to `@WithAnonymousUser`, Spring Security still considered the request authenticated (anonymous principaland returned 403 where the endpoint required a specific role, hence 403 not 401.
 
 ### Solution
 
-I removed the base-level `@WithMockUser` entirely and used either no annotation (truly unauthenticated) or `@WithAnonymousUser` only when I explicitly wanted anonymous. For the test I updated the expectation depending on desired behaviour:
+I removed the base-level `@WithMockUser` entirely and used either no annotation (truly unauthenticatedor `@WithAnonymousUser` only when I explicitly wanted anonymous. For the test I updated the expectation depending on desired behaviour:
 
 - If the endpoint is secured and should challenge non-authenticated requests, expect 401.
 - If the endpoint permits anonymous but requires a role, expect 403.
 
 ```java
 @Test
-void testUnauthenticatedUserDenied() throws Exception {
+void testUnauthenticatedUserDenied(throws Exception {
     mockMvc.perform(get("/api/dashboard/daily-summary?traderId=testTrader"))
            .andExpect(status().isUnauthorized()); // truly no authentication now
 }
@@ -2699,7 +2699,7 @@ The intent of the tests now matches the security behaviour. No accidental 200 or
 
 ---
 
-## 3) 400 Bad Request instead of 403 Forbidden for modifying endpoints
+## 3400 Bad Request instead of 403 Forbidden for modifying endpoints
 
 ### Problem (from tests)
 
@@ -2720,7 +2720,7 @@ I supplied a minimal valid `TradeDTO` JSON matching the validation rules and the
 ```java
 @Test
 @WithMockUser(username="supportUser", roles={"SUPPORT"})
-void testSupportRoleDeniedPatchTrade_Simple() throws Exception {
+void testSupportRoleDeniedPatchTrade_Simple(throws Exception {
     String validPatchJson = "{\n" +
       "  \"bookName\": \"ValidBook\",\n" +
       "  \"counterpartyName\": \"ValidCounterparty\",\n" +
@@ -2745,7 +2745,7 @@ All the tests expecting 403 now reach the security layer and assert 403, not 400
 
 ---
 
-## 4) 404 Not Found when fetching specific trade by id
+## 4404 Not Found when fetching specific trade by id
 
 ### Problem (from tests)
 
@@ -2760,12 +2760,12 @@ I was asking for `/api/trades/1` assuming test seed data had a trade with id 1. 
 
 ### Solution
 
-I created the trade in the test to control the ID, then fetched using that exact ID. I also ensured the minimal graph (Book, Counterparty) was persisted first to satisfy FK constraints.
+I created the trade in the test to control the ID, then fetched using that exact ID. I also ensured the minimal graph (Book, Counterpartywas persisted first to satisfy FK constraints.
 
 ```java
 @Test
 @WithMockUser(username="viewerUser", roles={"TRADER","TRADE_VIEW"})
-void testTradeViewRoleAllowedById() throws Exception {
+void testTradeViewRoleAllowedById(throws Exception {
     Book book = new Book();
     book.setBookName("Book-" + System.nanoTime());
     book.setActive(true);
@@ -2797,7 +2797,7 @@ The 404s disappeared. I no longer couple these tests to a specific `data.sql` ro
 
 ---
 
-## 5) JSON path tradeId expected 200001 but was null
+## 5JSON path tradeId expected 200001 but was null
 
 ### Problem (from tests)
 
@@ -2829,12 +2829,12 @@ The create test now returns the expected JSON structure and passes.
 
 ---
 
-## 6) DataIntegrityViolationException on Book primary key
+## 6DataIntegrityViolationException on Book primary key
 
 ### Problem (from test run)
 
 ```
-org.springframework.dao.DataIntegrityViolationException: could not execute statement [Unique index or primary key violation: "PRIMARY KEY ON public.book(id) ... 'TEST-BOOK-1'"]
+org.springframework.dao.DataIntegrityViolationException: could not execute statement [Unique index or primary key violation: "PRIMARY KEY ON public.book(id... 'TEST-BOOK-1'"]
 ```
 
 ### Root cause
@@ -2847,21 +2847,21 @@ I consolidated and de-duplicated seed data, ensured foreign key order, and chang
 
 ```sql
 -- main data.sql (relevant parts)
-INSERT INTO desk (id, desk_name) VALUES (1000, 'FX'), (1001, 'Rates'), (1002, 'Credit');
-INSERT INTO sub_desk (id, subdesk_name, desk_id) VALUES (1000, 'FX Spot', 1000);
-INSERT INTO cost_center (id, cost_center_name, subdesk_id) VALUES (1000, 'London Trading', 1000);
+INSERT INTO desk (id, desk_nameVALUES (1000, 'FX'), (1001, 'Rates'), (1002, 'Credit');
+INSERT INTO sub_desk (id, subdesk_name, desk_idVALUES (1000, 'FX Spot', 1000);
+INSERT INTO cost_center (id, cost_center_name, subdesk_idVALUES (1000, 'London Trading', 1000);
 
 -- book ids do not clash with tests and include FK
-INSERT INTO book (id, book_name, active, version, cost_center_id) VALUES
+INSERT INTO book (id, book_name, active, version, cost_center_idVALUES
   (1000, 'FX-BOOK-1', true, 1, 1000),
   (1001, 'RATES-BOOK-1', true, 1, 1000);
 
 -- counterparty
-INSERT INTO counterparty (id, name, address, phone_number, internal_code, created_date, last_modified_date, active) VALUES
+INSERT INTO counterparty (id, name, address, phone_number, internal_code, created_date, last_modified_date, activeVALUES
   (1000, 'TestBank', '1 Bank St', '123-456-7890', 1001, '2024-01-01', '2025-06-02', true);
 ```
 
-And in `src/test/resources/data.sql` I kept only minimal non-overlapping rows (for privileges) or moved the test to create its own rows programmatically.
+And in `src/test/resources/data.sql` I kept only minimal non-overlapping rows (for privilegesor moved the test to create its own rows programmatically.
 
 ### Impact
 
@@ -2869,7 +2869,7 @@ The suite stopped tripping over duplicate keys. The context loads consistently a
 
 ---
 
-## 7) NonUniqueResultException on Counterparty findByName("BigBank")
+## 7NonUniqueResultException on Counterparty findByName("BigBank")
 
 ### Problem
 
@@ -2887,9 +2887,9 @@ I renamed the duplicate in main seed data to `TestBank` and left a single `BigBa
 
 ```sql
 -- Keep just one BigBank
-INSERT INTO counterparty (id, name, ...) VALUES (1, 'BigBank', ...);
+INSERT INTO counterparty (id, name, ...VALUES (1, 'BigBank', ...);
 -- Rename the other
-INSERT INTO counterparty (id, name, ...) VALUES (1000, 'TestBank', ...);
+INSERT INTO counterparty (id, name, ...VALUES (1000, 'TestBank', ...);
 ```
 
 ### Impact
@@ -2898,7 +2898,7 @@ All queries relying on a unique counterparty name behave predictably.
 
 ---
 
-## 8) CSRF missing on write requests
+## 8CSRF missing on write requests
 
 ### Problem
 
@@ -2926,7 +2926,7 @@ The requests now pass the CSRF filter and the tests hit the controller methods p
 
 ---
 
-## 9) 201 expected but 403 due to wrong role mapping
+## 9201 expected but 403 due to wrong role mapping
 
 ### Problem
 
@@ -2944,7 +2944,7 @@ I granted the precise authority in the test identity that the controller expects
 
 ```java
 @WithMockUser(username="creatorUser", roles={"TRADER","TRADE_CREATE"})
-void testCreateTrade() { ... }
+void testCreateTrade({ ... }
 ```
 
 ### Impact
@@ -2953,7 +2953,7 @@ Create now returns 201 as expected.
 
 ---
 
-## 10) 200 expected but 404 because I deleted seed data in @BeforeEach
+## 10200 expected but 404 because I deleted seed data in @BeforeEach
 
 ### Problem
 
@@ -2969,7 +2969,7 @@ Either: stop deleting those tables for that class, or recreate the required rows
 
 ```java
 @BeforeEach
-void setup() {
+void setup({
     tradeRepository.deleteAll();
     // then create only what this test class needs in each test
 }
@@ -2981,7 +2981,7 @@ The tests are isolated and no longer rely on fragile global IDs.
 
 ---
 
-## 11) ApplicationContext failed due to FK order in data.sql
+## 11ApplicationContext failed due to FK order in data.sql
 
 ### Problem
 
@@ -3017,7 +3017,7 @@ Application context now loads reliably for every test run.
 
 ---
 
-## 12) Using wrong JSON property name for legs
+## 12Using wrong JSON property name for legs
 
 ### Problem
 
@@ -3043,7 +3043,7 @@ Binding succeeds and the controller reaches domain validation rather than failin
 
 ---
 
-## 13) Testing with mocks inside integration tests
+## 13Testing with mocks inside integration tests
 
 ### Problem
 
@@ -3071,7 +3071,7 @@ Tests now reflect real behaviour and are less brittle.
 
 ---
 
-## 14) Duplicate user, role and privilege rows between main and test seeds
+## 14Duplicate user, role and privilege rows between main and test seeds
 
 ### Problem
 
@@ -3087,8 +3087,8 @@ I made the main seed the canonical base, and reduced the test seed to a minimal 
 
 ```sql
 -- test seed (only what I need, different ids)
-INSERT INTO user_profile (id, user_type) VALUES (2000, 'TRADER_SALES'), (2001, 'SUPPORT');
-INSERT INTO application_user (id, login_id, user_profile_id, active, version, last_modified_timestamp) VALUES (2000, 'viewerUser', 2000, true, 1, CURRENT_TIMESTAMP());
+INSERT INTO user_profile (id, user_typeVALUES (2000, 'TRADER_SALES'), (2001, 'SUPPORT');
+INSERT INTO application_user (id, login_id, user_profile_id, active, version, last_modified_timestampVALUES (2000, 'viewerUser', 2000, true, 1, CURRENT_TIMESTAMP());
 ```
 
 ### Impact
@@ -3097,7 +3097,7 @@ No more collisions on ids or ambiguous results during combined runs.
 
 ---
 
-## 15) Summary endpoint assertions mismatched expected structure
+## 15Summary endpoint assertions mismatched expected structure
 
 ### Problem
 
@@ -3122,7 +3122,7 @@ The summary tests align with the current API contract.
 
 ---
 
-## 16) Id collisions on create due to hard-coded tradeId
+## 16Id collisions on create due to hard-coded tradeId
 
 ### Problem
 
@@ -3134,7 +3134,7 @@ I was hard-coding `tradeId` rather than letting the database generate ids. In th
 
 ### Solution
 
-I removed hard-coded ids from create payloads unless I specifically needed to assert the value. When I must assert a value, I choose an id range that will not collide with seeds (e.g. 200001) and ensure the mock or mapper returns it in the DTO.
+I removed hard-coded ids from create payloads unless I specifically needed to assert the value. When I must assert a value, I choose an id range that will not collide with seeds (e.g. 200001and ensure the mock or mapper returns it in the DTO.
 
 ```java
 // For integration tests, omit tradeId so DB generates
@@ -3152,7 +3152,7 @@ No more duplicate key problems or flaky behaviour on repeated runs.
 
 ---
 
-## 17) Clearing repositories twice in @BeforeEach
+## 17Clearing repositories twice in @BeforeEach
 
 ### Problem
 
@@ -3168,7 +3168,7 @@ I cleaned up the setup methods and deleted data once, then only created what the
 
 ```java
 @BeforeEach
-void setup() {
+void setup({
     tradeRepository.deleteAll();
     bookRepository.deleteAll();
     counterpartyRepository.deleteAll();
@@ -3181,7 +3181,7 @@ Faster tests and clearer intent.
 
 ---
 
-## 18) Missing parent FK rows for new test-created trades
+## 18Missing parent FK rows for new test-created trades
 
 ### Problem
 
@@ -3207,7 +3207,7 @@ No more FK exceptions during tests.
 
 ---
 
-## 19) Confusion between business roles and granular authorities
+## 19Confusion between business roles and granular authorities
 
 ### Problem
 
@@ -3231,7 +3231,7 @@ Security tests assert the intended policy rather than a simplified role model.
 
 ---
 
-## 20) When to mock vs not to mock in integration
+## 20When to mock vs not to mock in integration
 
 ### Problem
 
@@ -3255,7 +3255,7 @@ Cleaner tests, more predictable outcomes, and fewer brittle assertions.
 
 ---
 
-## 21) Fixed ordering and isolation in `SummaryIntegrationTest`
+## 21Fixed ordering and isolation in `SummaryIntegrationTest`
 
 ### Problem
 
@@ -3271,7 +3271,7 @@ I set the correct `@WithMockUser` per method, seeded just the data each method n
 
 ```java
 @WithMockUser(username = "testTrader", roles = { "TRADER" })
-void testSummaryEndpointMultipleTradesToday() throws Exception {
+void testSummaryEndpointMultipleTradesToday(throws Exception {
     // create two trades for today for testTrader, then assert count == 2
 }
 ```
@@ -3282,7 +3282,7 @@ All summary tests pass regardless of execution order.
 
 ---
 
-## 22) RSQL and filter endpoints reliance on default data
+## 22RSQL and filter endpoints reliance on default data
 
 ### Problem
 
@@ -3294,7 +3294,7 @@ Wrong role and missing base data for the query.
 
 ### Solution
 
-I gave the identity permission to view (`TRADER` or `TRADE_VIEW`) and ensured at least one book with id used by the query existed either via `data.sql` or created in the test.
+I gave the identity permission to view (`TRADER` or `TRADE_VIEW`and ensured at least one book with id used by the query existed either via `data.sql` or created in the test.
 
 ```java
 @WithMockUser(username="viewerUser", roles={"TRADER"})
@@ -3308,7 +3308,7 @@ The RSQL tests are stable.
 
 ---
 
-## 23) Move to class-level or method-level `@WithAnonymousUser`
+## 23Move to class-level or method-level `@WithAnonymousUser`
 
 ### Problem
 
@@ -3320,7 +3320,7 @@ I tried to default everything to anonymous after removing base-level `@WithMockU
 
 ### Solution
 
-I removed class-level `@WithAnonymousUser` and placed it only on the specific tests that require it. Others have explicit `@WithMockUser` or no annotation (truly unauthenticated) depending on the scenario.
+I removed class-level `@WithAnonymousUser` and placed it only on the specific tests that require it. Others have explicit `@WithMockUser` or no annotation (truly unauthenticateddepending on the scenario.
 
 ### Impact
 
@@ -3328,7 +3328,7 @@ No accidental loss of authentication across a whole class.
 
 ---
 
-## 24) Ensuring CSRF plays nicely with custom SecurityConfig
+## 24Ensuring CSRF plays nicely with custom SecurityConfig
 
 ### Problem
 
@@ -3348,7 +3348,7 @@ Security behaviour in tests mirrors production semantics sufficiently without ma
 
 ---
 
-## 25) Double-deletion of all tables in Summary test setup
+## 25Double-deletion of all tables in Summary test setup
 
 ### Problem
 
@@ -3368,7 +3368,7 @@ Cleaner and quicker setup.
 
 ---
 
-## 26) Aligning controller expectations for “my trades” and “daily summary”
+## 26Aligning controller expectations for “my trades” and “daily summary”
 
 ### Problem
 
@@ -3394,7 +3394,7 @@ The “my trades” suite of endpoints is green.
 
 ---
 
-## 27) Build failures due to context not loading when all tests run
+## 27Build failures due to context not loading when all tests run
 
 ### Problem
 
@@ -3422,7 +3422,7 @@ Stable green runs irrespective of execution order.
 
 ---
 
-## 28) Adjusting expectations for controller behaviour once validation passes
+## 28Adjusting expectations for controller behaviour once validation passes
 
 ### Problem
 
@@ -3438,7 +3438,7 @@ Tests now clearly differentiate between validation and authorisation failures.
 
 ---
 
-## 29) Ensuring serialisation returns expected fields
+## 29Ensuring serialisation returns expected fields
 
 ### Problem
 
@@ -3449,7 +3449,7 @@ In create tests I asserted the response body contained `tradeId` but the seriali
 I made the mapper mock return a DTO that contains `tradeId`. In non-mock tests I asserted properties that are truly persisted and returned by the controller.
 
 ```java
-when(tradeMapper.toDto(any(Trade.class))).thenReturn(new TradeDTO() {{ setTradeId(200001L); }});
+when(tradeMapper.toDto(any(Trade.class))).thenReturn(new TradeDTO({{ setTradeId(200001L); }});
 ```
 
 ### Impact
@@ -3458,7 +3458,7 @@ JSONPath assertions are meaningful and stable.
 
 ---
 
-## 30) Removing magic IDs from tests unless absolutely necessary
+## 30Removing magic IDs from tests unless absolutely necessary
 
 ### Problem
 
@@ -3474,7 +3474,7 @@ Tests are self-contained and do not depend on fragile global assumptions.
 
 ---
 
-## 31) Consistency of naming between DTOs and entities
+## 31Consistency of naming between DTOs and entities
 
 ### Problem
 
@@ -3527,7 +3527,7 @@ After I thightened security and access rights and all 31 tests passed the proble
 
 ### Problem
 
-Endpoints that read or mutate trades and the trade dashboard started returning 403 (AccessDenied) despite an authenticated user being presentloggedin. The failing requests included:
+Endpoints that read or mutate trades and the trade dashboard started returning 403 (AccessDenieddespite an authenticated user being presentloggedin. The failing requests included:
 
 - GET /api/dashboard/summary?traderId=simon
 - GET /api/dashboard/daily-summary?traderId=simon
@@ -3539,13 +3539,13 @@ All of the above returned an HTTP 403 with the default Spring Security HTML erro
 
 ### Investigation and observations
 
-- Reproduced locally with seeded users 'simon' (trader) and 'joey' (trader). When logged in as 'joey' and requesting another trader's data (traderId=simon) the service returned 403 instead of the expected 200 or an explicit domain-level error.
+- Reproduced locally with seeded users 'simon' (traderand 'joey' (trader). When logged in as 'joey' and requesting another trader's data (traderId=simonthe service returned 403 instead of the expected 200 or an explicit domain-level error.
 - Initial service-level checks used a permissive stub `hasPrivilege(...)` which at times returned true and at times produced inconsistent behaviour because of mismatches between authorities and roles used in tests (`ROLE_TRADE_VIEW` vs `TRADE_VIEW`).
 - At one point programmatic session creation in `AuthorizationController.login` was added to force session persistence; this change altered test semantics and was later reverted to avoid broader test breakage.
 
 ### Root cause
 
-- Security checks existed in two places: controller-level `@PreAuthorize` expressions and programmatic checks inside `TradeDashboardService`. These were out of sync with test expectations and seed data. Some checks used raw authority strings (e.g. `TRADE_VIEW`) while tests used role-based annotations (e.g. `@WithMockUser(roles={"TRADE_VIEW"})`) which map to `ROLE_TRADE_VIEW` in Spring Security. This mismatch caused `isGranted` checks to fail and produced 403 responses.
+- Security checks existed in two places: controller-level `@PreAuthorize` expressions and programmatic checks inside `TradeDashboardService`. These were out of sync with test expectations and seed data. Some checks used raw authority strings (e.g. `TRADE_VIEW`while tests used role-based annotations (e.g. `@WithMockUser(roles={"TRADE_VIEW"})`which map to `ROLE_TRADE_VIEW` in Spring Security. This mismatch caused `isGranted` checks to fail and produced 403 responses.
 - The `hasPrivilege(String, String)` method in `TradeDashboardService` was a temporary permissive stub and lacked a DB-driven deny-by-default implementation. This left the system behaviour inconsistent during the refactor.
 - A ControllerAdvice for AccessDeniedException did not exist initially, so Spring returned an HTML error page which the frontend/tests did not expect.
 
@@ -3559,32 +3559,32 @@ How it integrates into authentication
 - At login the `DaoAuthenticationProvider` calls `loadUserByUsername(loginId)`; the returned Spring Security `UserDetails` contains:
   - username (loginId)
   - stored password (must match configured `PasswordEncoder`)
-  - a set of `GrantedAuthority` instances representing both roles (`ROLE_...`) and privileges (e.g. `TRADE_VIEW`).
+  - a set of `GrantedAuthority` instances representing both roles (`ROLE_...`and privileges (e.g. `TRADE_VIEW`).
 
 Mapping conventions and rationale
 
-- Profile -> ROLE* mapping: the user's domain profile (`ApplicationUser.userProfile.userType`) is mapped into a `ROLE*`authority. Example: a profile value`TRADER`becomes`ROLE_TRADER`. The service also adds normalised aliases such as `ROLE_MIDDLE_OFFICE`when the profile contains`MO`or`MIDDLE` so controller checks that expect the canonical role succeed.
+- Profile -> ROLE* mapping: the user's domain profile (`ApplicationUser.userProfile.userType`is mapped into a `ROLE*`authority. Example: a profile value`TRADER`becomes`ROLE_TRADER`. The service also adds normalised aliases such as `ROLE_MIDDLE_OFFICE`when the profile contains`MO`or`MIDDLE` so controller checks that expect the canonical role succeed.
 - Privilege -> authority mapping: privileges stored in `UserPrivilege`/`Privilege` are mapped into plain authorities (for example `TRADE_VIEW`). Mapping them as plain authorities allows the codebase to use either `hasRole('TRADER')` or `hasAuthority('TRADE_VIEW')` depending on the check's intent. The service also adds aliases when the DB uses different names (for example `READ_TRADE` is aliased to `TRADE_VIEW`).
 - Deny-by-default: the service returns whatever authorities it can compute from the DB. If a user has no privileges recorded, the authority set may be empty (only role-derived authorities may be present). Programmatic checks that use `hasPrivilege(...)` must therefore be defensive and assume absence of an authority means deny.
 
 Why this mattered for the 403 problems
 
-- Tests and some controller expressions were using role-style configuration (`@WithMockUser(roles={"TRADE_VIEW"})`) which Spring maps to `ROLE_TRADE_VIEW`. The `DatabaseUserDetailsService` emits both plain privilege authorities and `ROLE_` prefixed roles for user profiles; however, where the DB stored a differently-named privilege (for example `READ_TRADE`) the security expressions were not matching until an alias was added. This mismatch between the strings the code expected and the strings actually present in `UserDetails` is the main cause of the earlier 403s.
+- Tests and some controller expressions were using role-style configuration (`@WithMockUser(roles={"TRADE_VIEW"})`which Spring maps to `ROLE_TRADE_VIEW`. The `DatabaseUserDetailsService` emits both plain privilege authorities and `ROLE_` prefixed roles for user profiles; however, where the DB stored a differently-named privilege (for example `READ_TRADE`the security expressions were not matching until an alias was added. This mismatch between the strings the code expected and the strings actually present in `UserDetails` is the main cause of the earlier 403s.
 - The class contains debug logs that mask the stored password and print the computed authority set for each loaded user. These logs are intentionally present to diagnose AccessDenied issues during development; they make it straightforward to see why a particular `@PreAuthorize` check fails (for example, the required `TRADE_VIEW` authority might be absent).
 
 Interaction with other components
 
 - `ApplicationUserService`: `DatabaseUserDetailsService` calls the application service to fetch `ApplicationUser` by `loginId`. If the user is missing or inactive the service throws `UsernameNotFoundException` so Spring treats the account as unknown/disabled.
-- `UserPrivilegeService`: used to collect `UserPrivilege` links and map them to authority strings. For performance and clarity, prefer to add a `getByUserId(userId)` method in `UserPrivilegeService` (or a repository query) to avoid retrieving all links and filtering in memory.
+- `UserPrivilegeService`: used to collect `UserPrivilege` links and map them to authority strings. For performance and clarity, prefer to add a `getByUserId(userId)` method in `UserPrivilegeService` (or a repository queryto avoid retrieving all links and filtering in memory.
 - `SecurityConfig` / `DaoAuthenticationProvider`: Security config wires this class into the authentication chain; password verification is performed by the `DaoAuthenticationProvider` using configured `PasswordEncoder`.
 - Controllers / Services: `@PreAuthorize` checks rely on the authorities provided by this service. Programmatic checks in services such as `TradeDashboardService` also consult the Authentication object populated by the login process; if the authority set is incomplete or misnamed the checks will deny access and produce the 403s observed.
 
-- Aligned controller-level and service-level checks so that permission forms used in tests and runtime are accepted. Service-side checks now accept either privilege authorities or role-mapped authorities (both `TRADE_VIEW` and `ROLE_TRADE_VIEW`) while the concrete `hasPrivilege(...)` implementation is prepared.
+- Aligned controller-level and service-level checks so that permission forms used in tests and runtime are accepted. Service-side checks now accept either privilege authorities or role-mapped authorities (both `TRADE_VIEW` and `ROLE_TRADE_VIEW`while the concrete `hasPrivilege(...)` implementation is prepared.
 - Reverted programmatic creation of an HTTP session in `AuthorizationController.login` to avoid changing the behaviour of existing integration tests. Authentication is still set in the SecurityContext but session creation is left to the framework.
-- Added an `ApiExceptionHandler` (@ControllerAdvice) to map AccessDeniedException to compact JSON responses with a clear message, `status:403`, `error: 'Forbidden'`, `message: 'You do not have the privilege to view other traders\' trade details'`, `timestamp`, and `path`. For POST and DELETE on `/api/trades` the message was made contextual to explain why the operation was rejected (for example, attempted create/delete without appropriate privilege). I have done this so users including traders can understand that is wrong.
+- Added an `ApiExceptionHandler` (@ControllerAdviceto map AccessDeniedException to compact JSON responses with a clear message, `status:403`, `error: 'Forbidden'`, `message: 'You do not have the privilege to view other traders\' trade details'`, `timestamp`, and `path`. For POST and DELETE on `/api/trades` the message was made contextual to explain why the operation was rejected (for example, attempted create/delete without appropriate privilege). I have done this so users including traders can understand that is wrong.
 
 - Ammended a logical-delete in `TradeService.deleteTrade(Long)` so that DELETE requests mark `active=false`, set `deactivatedDate` and `tradeStatus=CANCELLED` instead of physically deleting rows. This prevents referential integrity issues and makes deleted trades invisible to normal queries.
-- Tightened `@PreAuthorize` on dashboard endpoints so a user with role TRADER may only request their own `traderId` (for example, joey requesting simon is denied) while accounts with TRADE_VIEW privilege or MIDDLE_OFFICE role can request other traders' summaries.
+- Tightened `@PreAuthorize` on dashboard endpoints so a user with role TRADER may only request their own `traderId` (for example, joey requesting simon is deniedwhile accounts with TRADE_VIEW privilege or MIDDLE_OFFICE role can request other traders' summaries.
 - Updated integration tests and test data: increased sample trade rows
 - I also adjusted the summary window from 2 days to 7 days to reflect a weekly summary change and to ensure the test data covers the new period.
 - Harmonised checks to accept both the authority string and the role-mapped string to avoid test-induced 403s until `hasPrivilege(...)` is implemented properly.
@@ -3612,12 +3612,12 @@ Next steps and improvements
 
 #### Problem
 
-A logged-in trader (for example, joey) could view another trader's (simon) dashboard summary. Programmatic login flow sometimes resulted in subsequent requests being evaluated as anonymous (ROLE_ANONYMOUS). There were also permissive, test-only shortcuts in the service layer that allowed bypassing the intended privilege model. Deletes were physical deletes rather than logical (cancel) so cancelled trades still appeared in some views.
+A logged-in trader (for example, joeycould view another trader's (simondashboard summary. Programmatic login flow sometimes resulted in subsequent requests being evaluated as anonymous (ROLE_ANONYMOUS). There were also permissive, test-only shortcuts in the service layer that allowed bypassing the intended privilege model. Deletes were physical deletes rather than logical (cancelso cancelled trades still appeared in some views.
 
 ### Root cause
 
-- The authoritative check lived only at controller-level (@PreAuthorize) while a permissive helper/service allowed bypass in some service flows.
-- hasPrivilege(...) implemented a permissive early-return (test-only) path and did not deny-by-default if no explicit privilege was found.
+- The authoritative check lived only at controller-level (@PreAuthorizewhile a permissive helper/service allowed bypass in some service flows.
+- hasPrivilege(...implemented a permissive early-return (test-onlypath and did not deny-by-default if no explicit privilege was found.
 - Programmatic login authenticated the user but did not persist the SecurityContext into the HTTP session, so clients that did not preserve cookies appeared anonymous on subsequent requests.
 - Trade delete logic performed hard deletes instead of marking trades as CANCELLED/inactive.
 
@@ -3625,25 +3625,25 @@ A logged-in trader (for example, joey) could view another trader's (simon) dashb
 
 Added another layer of security to the Spring Security and Controller access right.
 
-- TradeDashboardService.hasPrivilege(...) — rewritten to a deny-by-default implementation:
+- TradeDashboardService.hasPrivilege(...— rewritten to a deny-by-default implementation:
   - Short-circuits on existing SecurityContext authorities (ROLE\_\* and privileged authorities).
   - Falls back to DB lookup via UserPrivilegeService.findPrivilegesByUserLoginIdAndPrivilegeName(user, privilege).
   - Returns false if no matching authority/row found.
   - Adds diagnostic debug logging for ownership and authority checks (reduce in prod later).
-- Defensive guard added to fetchTradesForTraderWithoutPrivilegeCheck(...) so callers cannot request another trader's data without elevated privilege.
+- Defensive guard added to fetchTradesForTraderWithoutPrivilegeCheck(...so callers cannot request another trader's data without elevated privilege.
 - TradeDashboardController — tightened @PreAuthorize expressions so TRADER-level users may only request their own traderId; MIDDLE_OFFICE / SUPERUSER / TRADE_VIEW_ALL can view others.
-- AuthorizationController.login(...) — after successful authentication, persists SecurityContext into the HTTP session using:
+- AuthorizationController.login(...— after successful authentication, persists SecurityContext into the HTTP session using:
   request.getSession(true).setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, SecurityContextHolder.getContext());
   This makes programmatic login usable when the client preserves the JSESSIONID cookie.
-- AuthInfoController (/api/me) — simplified to return username string for simpler client checks during debugging.
-- Added ControllerAdvice (ApiExceptionHandler) to map AccessDeniedException / AccessDeniedHandler responses to a compact JSON 403: {timestamp,status,error,message,path} instead of an HTML error page.
-- Trade delete operations changed to logical delete (mark trade status CANCELLED and/or set active=false) so cancelled trades are hidden from active queries rather than physically removed.
+- AuthInfoController (/api/me— simplified to return username string for simpler client checks during debugging.
+- Added ControllerAdvice (ApiExceptionHandlerto map AccessDeniedException / AccessDeniedHandler responses to a compact JSON 403: {timestamp,status,error,message,path} instead of an HTML error page.
+- Trade delete operations changed to logical delete (mark trade status CANCELLED and/or set active=falseso cancelled trades are hidden from active queries rather than physically removed.
 - Removed the permissive test-only shortcut in hasPrivilege and updated tests to explicitly mock UserPrivilegeService where a lenient default was previously assumed.
 
 Tests & verification
 
 - Updated unit and integration tests that relied on the permissive behavior. Where the authorization decision wasn't under test, tests now explicitly mock UserPrivilegeService to return the needed privileges.
-- Added (recommended) negative integration test to assert that a TRADER cannot view another trader's summary. (If not yet present, this is the next high-priority test to add.)
+- Added (recommendednegative integration test to assert that a TRADER cannot view another trader's summary. (If not yet present, this is the next high-priority test to add.)
 - Manual verification performed with curl:
   - Programmatic login + cookie reuse (sessions):
     - curl -i -c cookies.txt -X POST "http://localhost:8080/api/login/simon?Authorization=password"
@@ -3656,8 +3656,8 @@ Notes and follow-ups
 
 - Logging added for debugging should be reduced to INFO/WARN in production to avoid leaking sensitive data.
 - Sweep other helper methods named \*WithoutPrivilegeCheck and either remove them or add defensive authorization checks/caller contracts.
-- Add an automated integration test that covers the programmatic login (session cookie) scenario to prevent regressions.
-- Consider exposing a small `/api/me/details` debug endpoint (admin-only) if richer debugging info is required during investigations.
+- Add an automated integration test that covers the programmatic login (session cookiescenario to prevent regressions.
+- Consider exposing a small `/api/me/details` debug endpoint (admin-onlyif richer debugging info is required during investigations.
 
 ### Impact
 
@@ -3670,12 +3670,12 @@ theproblem was that the userprivilege meant to be an integration test but I made
 
 Solution
 
-- Converted the original test into a proper integration test that persists required fixtures (books, counterparties, trades) and uses the business `tradeId` for controller requests. Removed mocks that masked repository/service behaviour. Where unit-like isolation was still required, the `UserPrivilegeService` is explicitly mocked to provide the needed privilege results so tests remain deterministic. Added `@Transactional` + `@Rollback` to ensure test isolation and avoid seed-data collisions.
-- Ensured test authentication is explicit (either `@WithMockUser` or programmatic login with session persistence) and that CSRF tokens are supplied for mutating requests. Verified that the test exercises controller → service → repository paths and asserts on the business-level trade id and JSON response structure.
+- Converted the original test into a proper integration test that persists required fixtures (books, counterparties, tradesand uses the business `tradeId` for controller requests. Removed mocks that masked repository/service behaviour. Where unit-like isolation was still required, the `UserPrivilegeService` is explicitly mocked to provide the needed privilege results so tests remain deterministic. Added `@Transactional` + `@Rollback` to ensure test isolation and avoid seed-data collisions.
+- Ensured test authentication is explicit (either `@WithMockUser` or programmatic login with session persistenceand that CSRF tokens are supplied for mutating requests. Verified that the test exercises controller → service → repository paths and asserts on the business-level trade id and JSON response structure.
 
 Impact
 
-- The test now validates the full stack behaviour and catches integration-level issues (missing reference data, incorrect id-type usage, security context persistence). It prevented a false sense of correctness that had previously come from over-mocked unit-style tests. A small amount of added test setup (fixtures and explicit privilege stubbing) made the test slower but far more trustworthy.
+- The test now validates the full stack behaviour and catches integration-level issues (missing reference data, incorrect id-type usage, security context persistence). It prevented a false sense of correctness that had previously come from over-mocked unit-style tests. A small amount of added test setup (fixtures and explicit privilege stubbingmade the test slower but far more trustworthy.
 
 ### Problem — SummaryIntegrationTest: proper integration test with one mock added
 
@@ -3685,9 +3685,94 @@ Problem
 
 ### Solution
 
-- Kept the class as an integration test (full Spring context, real repositories) but explicitly documented and centralised the one mock (`UserPrivilegeService`) in the test class setup. The mock is a lenient stub that returns the minimal privilege set required for tests that should succeed, and is used to assert negative cases (expect 403) where privilege denial is the behaviour under test.
+- Kept the class as an integration test (full Spring context, real repositoriesbut explicitly documented and centralised the one mock (`UserPrivilegeService`in the test class setup. The mock is a lenient stub that returns the minimal privilege set required for tests that should succeed, and is used to assert negative cases (expect 403where privilege denial is the behaviour under test.
 - Added explanatory comments in the test to make the intent clear: the mock isolates privilege lookup while still exercising all other layers.
 
-Impact
+### Impact
 
-- This approach preserves the integration-level coverage (real DB, mapping, DTOs, and controllers) while making test outcomes deterministic for authorization-related branches. The single mock reduces flakiness from DB privilege seeding without sacrificing the value of an end-to-end integration test.
+- This approach preserves the integration-level coverage (real DB, mapping, DTOs, and controllerswhile making test outcomes deterministic for authorization-related branches. The single mock reduces flakiness from DB privilege seeding without sacrificing the value of an end-to-end integration test.
+
+2025-10-23 | AdditionalInfoRepository.java | Malformed JPQL prevented ApplicationContext from loading
+
+### Problem
+
+I introduced a malformed JPQL query in `AdditionalInfoRepository` while editing Additional/SettlementInfo code. Spring Data parses repository `@Query` strings at startup; the malformed query caused Hibernate to throw a parsing exception during repository initialisation. That single parse error prevented Spring from creating the ApplicationContext, which in turn caused many integration tests to report `Failed to load ApplicationContext`.
+
+### Root cause
+
+The repository `@Query` literal was missing spaces and used an alias inconsistently (for example the string compiled to something like `SELECT AdditionalInfoFROM AdditionalInfo AdditionalInfoWHERE ...` while the WHERE clause referenced `a.fieldValue` though alias `a` was never declared). Spring Data / Hibernate validates JPQL at bean creation time, so the parse error blocked the whole context.
+
+### Solution
+
+I corrected the JPQL to a clear, valid form using a single alias and proper spacing. Example:
+
+```
+@Query("SELECT a FROM AdditionalInfo a WHERE LOWER(a.fieldValueLIKE LOWER(CONCAT('%', :keyword, '%'))")
+List<AdditionalInfo> searchByFieldValue(@Param("keyword"String keyword);
+```
+
+I saved the corrected repository file in the workspace and re-ran the test suite.
+
+### Impact
+
+Fixing that one query allowed Spring to instantiate the repository bean and start the ApplicationContext. The cascade of `Failed to load ApplicationContext` errors disappeared and the affected tests ran normally. As a small preventive measure I recommend adding a focused repository-level integration test that exercises custom `@Query` methods so JPQL parse errors are caught early in CI rather than at full test startup.
+
+### Problem
+
+The method `setFieldType(String)` was undefined for the type `AdditionalInfoRequestDTO`.  
+This error appeared when trying to set the field type inside the `TradeSettlementController`.
+
+### Root Cause
+
+The DTO did not contain a `fieldType` property or a corresponding setter.  
+It was a misunderstanding of the data model — the controller was trying to populate a non-existent field.
+
+### Solution
+
+Removed the call to `setFieldType(...)` from the controller since it was unnecessary.  
+The `AdditionalInfoRequestDTO` already holds the correct information through `fieldName` and `fieldValue`, so no extra field was needed.
+
+### Impact
+
+The controller compiled successfully and became simpler.  
+It also clarified the distinction between entity metadata (like entity type and ID) and business data (field name and value).
+
+---
+
+### Problem
+
+Confusion around how to fetch multiple trades using `getTradeById`.  
+The method name suggested it returned a single trade, but the logic required a list of trades.
+
+### Root Cause
+
+The `TradeService` only had a single-trade method (`getTradeById(Long id)`),  
+but the settlement search feature needed to retrieve multiple trades based on a list of IDs.
+
+### Solution
+
+Introduced an overloaded method `getTradeById(List<Long> ids)` in the `TradeService`  
+and added a corresponding `findAllByTradeIdIn(List<Long> ids)` method in the `TradeRepository`.
+
+### Impact
+
+Allowed batch fetching of trades by their IDs, improving efficiency and enabling the settlement search endpoint to work properly.
+
+---
+
+### Problem
+
+`findAllByTradeIdIn` was not recognised in `TradeRepository` during implementation.
+
+### Root Cause
+
+The method did not exist yet in the repository interface,  
+and Spring Data JPA could not generate a query for a missing method definition.
+
+### Solution
+
+Added the following method to the repository:
+
+```java
+List<Trade> findAllByTradeIdIn(List<Long> tradeIds);
+```

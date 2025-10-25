@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface AdditionalInfoRepository extends JpaRepository<AdditionalInfo, Long> {
@@ -28,6 +29,7 @@ public interface AdditionalInfoRepository extends JpaRepository<AdditionalInfo, 
             AND info.entityId = :entityId
             AND info.active = true
       """)
+
   List<AdditionalInfo> findActiveByEntityTypeAndEntityId(
       @Param("entityType") String entityType,
       @Param("entityId") Long entityId);
@@ -89,5 +91,63 @@ public interface AdditionalInfoRepository extends JpaRepository<AdditionalInfo, 
   @Query("SELECT a FROM AdditionalInfo a WHERE LOWER(a.fieldValue) LIKE LOWER(CONCAT('%', :keyword, '%'))")
   // Connects the method parameter to the :keyword in the query.
   List<AdditionalInfo> searchByFieldValue(@Param("keyword") String keyword);
+
+  /*
+   * Purpose:
+   * This query retrieves a single active "AdditionalInfo" record for a specific
+   * trade (or other entity)
+   * and a given field name.
+   * 
+   * In our settlement instructions feature, this is used when we want to fetch
+   * the
+   * most recent, active record for a particular trade’s settlement instructions.
+   * 
+   * Explanation:
+   * - "entityType" limits the search to the relevant entity (for example, TRADE).
+   * - "entityId" ensures we are matching a specific record linked to one trade.
+   * - "fieldName" identifies the exact field (such as SETTLEMENT_INSTRUCTIONS).
+   * - "active = true" filters out any logically deleted or inactive records.
+   * 
+   * This query returns at most one result because a trade should only have one
+   * active entry for each field type at any time.
+   */
+  @Query("""
+      SELECT a FROM AdditionalInfo a
+      WHERE a.entityType = :entityType
+        AND a.entityId   = :entityId
+        AND a.fieldName  = :fieldName
+        AND a.active     = true
+      """)
+  Optional<AdditionalInfo> findActiveOne(
+      @Param("entityType") String entityType,
+      @Param("entityId") Long entityId,
+      @Param("fieldName") String fieldName);
+
+  /*
+   * This query performs a case-insensitive search for settlement instructions
+   * text
+   * stored in the AdditionalInfo table.
+   * Business Requirements: The operations team needs to be able to search for
+   * trades by a keyword that appears anywhere within the settlement instructions.
+   * For example, typing “Euroclear” should find all trades whose settlement text
+   * mentions Euroclear, regardless of case.
+   * - "entityType = 'TRADE'": limits the search to trade-related entries only.
+   * - "fieldName = 'SETTLEMENT_INSTRUCTIONS'": focuses the search on the
+   * settlement data.
+   * - "active = true": excludes any archived or deleted records.
+   * - "LOWER(a.fieldValue) LIKE LOWER(CONCAT('%', :keyword, '%'))":
+   * This performs a partial, case-insensitive match.
+   * 
+   * This approach allows flexible, user-friendly searches without requiring exact
+   * wording.
+   */
+  @Query("""
+      SELECT a FROM AdditionalInfo a
+      WHERE a.entityType = 'TRADE'
+        AND a.fieldName  = 'SETTLEMENT_INSTRUCTIONS'
+        AND a.active     = true
+        AND LOWER(a.fieldValue) LIKE LOWER(CONCAT('%', :keyword, '%'))
+      """)
+  List<AdditionalInfo> searchTradeSettlementByKeyword(@Param("keyword") String keyword);
 
 }

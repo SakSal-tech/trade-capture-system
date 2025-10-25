@@ -6,8 +6,14 @@ import com.technicalchallenge.model.AdditionalInfo;
 import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 
-// for converting between AdditionalInfo entities and DTOs.
-
+/**
+ * Handles conversion between AdditionalInfo entities and DTOs.
+ * 
+ * Refactored ADDED:
+ * - Validation checks: Prevent null-pointer errors.
+ * - Version tracking: Supports audit history requirement.
+ * - Business logic awareness: Keeps timestamps consistent for compliance.
+ */
 @Component
 public class AdditionalInfoMapper {
 
@@ -15,12 +21,13 @@ public class AdditionalInfoMapper {
      * Converts an AdditionalInfo entity (from the database)
      * into a DTO to send to the frontend or API clients.
      *
-     * @param entity The AdditionalInfo entity retrieved from the database
-     * @return A DTO representing the same data in a frontend-friendly format
+     * BUSINESS REQUIREMENT:
+     * Supports data visibility — ensures UI can view structured
+     * settlement instructions safely without exposing database internals.
      */
     public AdditionalInfoDTO toDto(AdditionalInfo entity) {
         if (entity == null) {
-            return null;
+            return null; // Validation check: avoids NullPointerException
         }
 
         AdditionalInfoDTO dto = new AdditionalInfoDTO();
@@ -34,21 +41,20 @@ public class AdditionalInfoMapper {
         dto.setCreatedDate(entity.getCreatedDate());
         dto.setLastModifiedDate(entity.getLastModifiedDate());
         dto.setDeactivatedDate(entity.getDeactivatedDate());
+        dto.setVersion(entity.getVersion()); // Refactored ADDED: supports audit/version tracking
         return dto;
     }
 
     /**
      * Converts an AdditionalInfoRequestDTO into a new AdditionalInfo entity.
      *
-     * This is typically used when creating a new record
-     * (for example, when a trader adds settlement instructions).
-     *
-     * @param request The incoming request data from the frontend
-     * @return A new AdditionalInfo entity ready to be persisted
+     * BUSINESS REQUIREMENT:
+     * Used when creating new settlement instructions (TRADER/SALES users).
+     * Ensures new entries are marked active and have consistent timestamps.
      */
     public AdditionalInfo toEntity(AdditionalInfoRequestDTO request) {
         if (request == null) {
-            return null;
+            return null; // Validation check
         }
 
         AdditionalInfo entity = new AdditionalInfo();
@@ -56,29 +62,39 @@ public class AdditionalInfoMapper {
         entity.setEntityId(request.getEntityId());
         entity.setFieldName(request.getFieldName());
         entity.setFieldValue(request.getFieldValue());
-        entity.setFieldType("STRING"); // Default type for now
+        entity.setFieldType("STRING"); // Default type for text-based settlement data
         entity.setActive(true);
         entity.setCreatedDate(LocalDateTime.now());
         entity.setLastModifiedDate(LocalDateTime.now());
+        entity.setVersion(1); // Refactored ADDED: first version of record for audit trail so ti tracks how
+                              // many times a record changed. Prevents overwriting older updates by mistake if
+                              // multiple users edit simultaneously.
         return entity;
     }
 
     /**
-     * Updates an existing AdditionalInfo entity with new data
-     * from a request DTO.
+     * Updates an existing AdditionalInfo entity with new data from a request DTO.
      *
-     * This is used when updating an existing field value
-     * (for example, when a trader edits settlement instructions).
-     *
-     * @param entity  The existing entity fetched from the database
-     * @param request The updated values from the frontend
+     * BUSINESS REQUIREMENT:
+     * Supports trade amendment handling — updating existing settlement instructions
+     * while maintaining version history and modification timestamps.
      */
     public void updateEntityFromRequest(AdditionalInfo entity, AdditionalInfoRequestDTO request) {
         if (entity == null || request == null) {
-            return;
+            return; // Validation check
         }
 
-        entity.setFieldValue(request.getFieldValue());
+        // Only update mutable fields (fieldValue). Other data like entityType remains
+        // stable.
+        if (request.getFieldValue() != null) {
+            entity.setFieldValue(request.getFieldValue());
+        }
+
+        // Track the edit time and increment version number for audit trail
         entity.setLastModifiedDate(LocalDateTime.now());
+        entity.setVersion(entity.getVersion() == null ? 1 : entity.getVersion() + 1); // Refactored ADDED version to
+                                                                                      // keep track how many times a
+                                                                                      // record changes by increasing
+                                                                                      // version by one.
     }
 }

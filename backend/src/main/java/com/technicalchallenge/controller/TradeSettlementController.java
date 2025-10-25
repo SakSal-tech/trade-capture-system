@@ -1,10 +1,17 @@
 package com.technicalchallenge.controller;
 
+import com.technicalchallenge.dto.AdditionalInfoAuditDTO;
 import com.technicalchallenge.dto.AdditionalInfoDTO;
 import com.technicalchallenge.dto.AdditionalInfoRequestDTO;
 import com.technicalchallenge.dto.TradeDTO;
+import com.technicalchallenge.mapper.AdditionalInfoAuditMapper;
+import com.technicalchallenge.mapper.AdditionalInfoMapper;
 import com.technicalchallenge.mapper.TradeMapper;
+import com.technicalchallenge.model.AdditionalInfo;
+import com.technicalchallenge.model.AdditionalInfoAudit;
 import com.technicalchallenge.model.Trade;
+import com.technicalchallenge.repository.AdditionalInfoAuditRepository;
+import com.technicalchallenge.repository.AdditionalInfoRepository;
 import com.technicalchallenge.service.AdditionalInfoService;
 import com.technicalchallenge.service.TradeService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,11 +28,11 @@ import java.util.Set;
 
 /**
  * Handles Settlement Instructions integration for trades.
- * 
+ *
  * This controller interacts with the AdditionalInfo table, which is used as a
  * flexible
  * key-value store for storing settlement instructions related to trades.
- * 
+ *
  * Key points:
  * - fieldName = "SETTLEMENT_INSTRUCTIONS"
  * - fieldValue = actual settlement text (optional)
@@ -43,12 +50,33 @@ public class TradeSettlementController {
     private TradeMapper tradeMapper;
 
     @Autowired
+    private AdditionalInfoMapper additionalInfoMapper;
+
+    @Autowired
     private AdditionalInfoService additionalInfoService;
 
+    @Autowired
+    private AdditionalInfoAuditMapper additionalInfoAuditMapper;
+
+    @Autowired
+    private AdditionalInfoAuditRepository additionalInfoAuditRepository;
+
+    @Autowired
+    private AdditionalInfoRepository additionalInfoRepository;
+
     /**
-     * Search trades by settlement instruction content.
-     * 
-     * Accessible to TRADER, MIDDLE_OFFICE, and SUPPORT roles.
+     * Refactored ADDED:
+     * This endpoint was improved to delegate all searching logic to the service
+     * layer,
+     * rather than loading all records and filtering in the controller.
+     *
+     * WHY:
+     * - Improves performance (database handles search instead of Java loops)
+     * - Keeps controller "thin" — handles only request/response logic
+     * - Easier to test and reuse (search logic is now in AdditionalInfoService)
+     *
+     * Business Requirement:
+     * "Search capability for finding trades with specific settlement requirements."
      */
     @GetMapping("/search/settlement-instructions")
     @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')")
@@ -62,8 +90,10 @@ public class TradeSettlementController {
         // Trim removes any extra spaces from both ends of user input.
         String trimmedInput = instructions.trim();
 
-        // This will search all records that contain the given text
-        List<AdditionalInfoDTO> matchingInfos = additionalInfoService.searchByKey(trimmedInput);
+        // Refactored: Instead of calling searchByKey() (which loads all records),
+        // we now call a dedicated service method that performs a focused database
+        // query.
+        List<AdditionalInfoDTO> matchingInfos = additionalInfoService.searchTradesBySettlementText(trimmedInput);
 
         // Use a Set to ensure unique trade IDs (avoid duplicates)
         Set<Long> tradeIdSet = new HashSet<>();
@@ -99,92 +129,21 @@ public class TradeSettlementController {
     }
 
     /**
-     * Create or update settlement instructions for a trade.
-     * 
-     * Editable by TRADER and SALES roles only.
-     * 
-     * Assignment requirement: settlement instructions are OPTIONAL.
-     * If not provided, no validation errors should be thrown.
-     */
-    @PutMapping("/{id}/settlement-instructions")
-    @PreAuthorize("hasAnyRole('TRADER','SALES')")
-    public ResponseEntity<?> updateSettlementInstructions(
-            @PathVariable Long id,
-            @RequestBody AdditionalInfoRequestDTO infoRequest) {
-
-        // Verify that the trade exists before attempting update
-        Optional<Trade> tradeOpt = tradeService.getTradeById(id);
-        if (tradeOpt.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Trade not found with ID: " + id);
-        }
-
-        // Basic request validation
-        if (infoRequest == null) {
-            return ResponseEntity.badRequest().body("Request body cannot be null.");
-        }
-
-        // The field name must always be "SETTLEMENT_INSTRUCTIONS"
-        if (!"SETTLEMENT_INSTRUCTIONS".equalsIgnoreCase(infoRequest.getFieldName())) {
-            return ResponseEntity.badRequest()
-                    .body("Invalid fieldName. Expected 'SETTLEMENT_INSTRUCTIONS'.");
-        }
-
-        /*
-         * Settlement instructions are OPTIONAL.
-         * 
-         * If no value is provided (null or blank), do not reject the request.
-         * This allows trades that do not yet have settlement details to be saved or
-         * updated.
-         * 
-         * However, if the user provides only spaces, normalise it to null.
-         * This avoids storing meaningless whitespace in the database.
-         */
-        String fieldValue = infoRequest.getFieldValue();
-        if (fieldValue != null) {
-            String trimmedValue = fieldValue.trim();
-            if (trimmedValue.isEmpty()) {
-                // Treat blank-only input as "no instructions provided"
-                infoRequest.setFieldValue(null);
-            } else {
-                // Store the cleaned-up (trimmed) text
-                infoRequest.setFieldValue(trimmedValue);
-            }
-        }
-
-        // Define which entity this record belongs to
-        infoRequest.setEntityType("TRADE");
-        infoRequest.setEntityId(id);
-
-        // --- Check for an existing record for this trade ---
-        List<AdditionalInfoDTO> existingInfos = additionalInfoService.searchByKey("SETTLEMENT_INSTRUCTIONS");
-        AdditionalInfoDTO existingRecord = null;
-
-        // Loop through and find the matching record by ID
-        for (AdditionalInfoDTO info : existingInfos) {
-            if (info.getEntityId().equals(id)) {
-                existingRecord = info;
-                break; // stop once found
-            }
-        }
-
-        // --- Create or update depending on existence ---
-        AdditionalInfoDTO result;
-        if (existingRecord != null) {
-            // Update the existing record
-            result = additionalInfoService.updateAdditionalInfo(existingRecord.getAdditionalInfoId(), infoRequest);
-        } else {
-            // Create a new record if none exists
-            result = additionalInfoService.createAdditionalInfo(infoRequest);
-        }
-
-        return ResponseEntity.ok(result);
-    }
-
-    /**
-     * Retrieve settlement instructions for a specific trade.
-     * 
-     * Accessible to TRADER, MIDDLE_OFFICE, and SUPPORT roles.
+     * Refactored ADDED:
+     * - The controller no longer loops through all AdditionalInfo records to find
+     * one match.
+     * - Instead, it now calls a single-purpose service method
+     * (getTradeSettlementInstructions)
+     * that uses a focused JPA query.
+     *
+     * WHY:
+     * - Improves performance (fetches only one matching record, not all)
+     * - Keeps controller code cleaner and easier to understand
+     * - Moves business logic closer to the service layer, where it belongs
+     *
+     * Business Requirement:
+     * "Settlement instructions visible to all roles but editable by TRADER and
+     * SALES only."
      */
     @GetMapping("/{id}/settlement-instructions")
     @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')")
@@ -197,26 +156,103 @@ public class TradeSettlementController {
                     .body("Trade not found with ID: " + id);
         }
 
-        // Retrieve all settlement-related additional info records
-        List<AdditionalInfoDTO> allInfos = additionalInfoService.searchByKey("SETTLEMENT_INSTRUCTIONS");
+        // Refactored: Instead of manually searching through all records,
+        // the controller now delegates to the service for a single lookup.
+        Optional<AdditionalInfoDTO> recordOpt = additionalInfoService.getTradeSettlementInstructions(id);
 
-        AdditionalInfoDTO record = null;
-
-        // Find the record for this specific trade
-        for (AdditionalInfoDTO info : allInfos) {
-            if (info.getEntityType().equalsIgnoreCase("TRADE")
-                    && info.getEntityId().equals(id)) {
-                record = info;
-                break;
-            }
-        }
-
-        // If no record is found, return a 404, but not an error, just "no data yet"
-        if (record == null) {
+        // If not found, return a 404 message
+        if (recordOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("No settlement instructions found for trade ID: " + id);
         }
 
-        return ResponseEntity.ok(record);
+        // Return the found record as a DTO
+        return ResponseEntity.ok(recordOpt.get());
     }
+
+    /**
+     * Refactored ADDED:
+     * - Previously, the controller handled searching and updating logic directly.
+     * - Now, all complex validation, SQL-safety checks, and audit logging are
+     * handled
+     * by the service layer for cleaner separation of concerns.
+     * 
+     * BUSINESS REQUIREMENTS AS REQUESTED:
+     * - Amendment Handling: Settlement instructions can be updated during trade
+     * amendments.
+     * - Access Control: Editable by TRADER and SALES roles only.
+     * - Optional Field: Field may be blank or null (no forced validation).
+     * - Audit Trail: Every change is automatically recorded by the service layer.
+     */
+    @PutMapping("/{id}/settlement-instructions")
+    @PreAuthorize("hasAnyRole('TRADER','SALES')")
+    public ResponseEntity<?> updateSettlementInstructions(
+            @PathVariable Long id,
+            @RequestBody AdditionalInfoRequestDTO infoRequest) {
+
+        // Confirm trade existence
+        Optional<Trade> tradeOpt = tradeService.getTradeById(id);
+        if (tradeOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Trade not found with ID: " + id);
+        }
+
+        // Validate request structure
+        if (infoRequest == null || infoRequest.getFieldName() == null ||
+                !"SETTLEMENT_INSTRUCTIONS".equalsIgnoreCase(infoRequest.getFieldName())) {
+            return ResponseEntity.badRequest().body("fieldName must be SETTLEMENT_INSTRUCTIONS");
+        }
+
+        // Extract the settlement text (can be null or blank)
+        String text = infoRequest.getFieldValue();
+
+        // Record who made the change (placeholder for logged-in user)
+        String changedBy = "CURRENT_USER";
+
+        // Delegate logic to service layer (handles both create & update)
+        AdditionalInfoDTO result = additionalInfoService.upOrInsertTradeSettlementInstructions(id, text, changedBy);
+
+        return ResponseEntity.ok(result);
+    }
+
+    //// Added this endpoint to extend the "Audit Trail" business requirement.
+    // Allows ADMIN and MIDDLE_OFFICE users to view a record of all settlement
+    // instruction changes.
+    @GetMapping("/{id}/audit-trail")
+    @PreAuthorize("hasAnyRole('ADMIN','MIDDLE_OFFICE')")
+    public ResponseEntity<?> getAuditTrail(@PathVariable Long id) {
+
+        // --- Step 1: Retrieve all audit records for this trade ---
+        List<AdditionalInfoAudit> auditRecords = additionalInfoAuditRepository.findByTradeIdOrderByChangedAtDesc(id);
+
+        // If none found, return a helpful message
+        if (auditRecords.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("No audit history found for trade ID: " + id);
+        }
+
+        // Convert entities to DTOs using the mapper
+        List<AdditionalInfoAuditDTO> auditDTOs = new ArrayList<>();
+        for (AdditionalInfoAudit record : auditRecords) {
+            auditDTOs.add(additionalInfoAuditMapper.toDto(record)); // Avoid exposing raw JPA entities
+        }
+
+        // Return the DTO list to the frontend
+        return ResponseEntity.ok(auditDTOs);
+    }
+
+    // Refactored ADDED:
+    // Fetches settlement instructions for a single trade directly from DB.
+    // Supports business requirement — “Settlement instructions visible to all user
+    // types.”
+    public Optional<AdditionalInfoDTO> getTradeSettlementInstructions(Long tradeId) {
+
+        if (tradeId == null || tradeId <= 0) {
+            throw new IllegalArgumentException("Trade ID must be valid.");
+        }
+
+        // Delegate to the service layer which returns Optional<AdditionalInfoDTO>,
+        // avoiding direct repository Optional references in this class.
+        return additionalInfoService.getTradeSettlementInstructions(tradeId);
+    }
+
 }

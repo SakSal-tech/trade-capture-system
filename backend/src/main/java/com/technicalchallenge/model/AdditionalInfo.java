@@ -13,9 +13,7 @@ import java.time.LocalDateTime;
  * (e.g. Trade, Counterparty, Book, etc.).
  *
  * Instead of modifying existing database tables each time new
- * business fields are needed, this table can hold them dynamically.
- *
- * Example:
+ * business fields are needed, this table can hold them dynamically e.g:
  * entityType = "TRADE"
  * entityId = 1234
  * fieldName = "SETTLEMENT_INSTRUCTIONS"
@@ -27,7 +25,19 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "additional_info")
+// Refactored.ADDED Index for fast lookups, instead of reading every single row
+// in the table one
+// by one, to see if it matches.An index combining these three columns
+// entity_type, field_name, which accelerates most of repository searches.
+// Another index on field_value especially with case-insensitive matching
+// queries. Big O That makes the average lookup O(log N), compared to O(N) for
+// an unindexed full scan. for queries such as
+// findActiveByEntityTypeAndEntityIdAndFieldName(...).
+@Table(name = "additional_info", indexes = {
+        @jakarta.persistence.Index(name = "idx_ai_entity_type_name_id", columnList = "entity_type,field_name,entity_id"),
+        @jakarta.persistence.Index(name = "idx_ai_field_value_lower_like", columnList = "field_value")// for endpoint
+                                                                                                      // searchTradeSettlementByKeyword(...).
+})
 public class AdditionalInfo {
 
     /**
@@ -112,4 +122,13 @@ public class AdditionalInfo {
      */
     @Column(name = "deactivated_date")
     private LocalDateTime deactivatedDate;
+
+    // Refactored ADDED: first version of record for audit trail so ti tracks how
+    // many times a record changed. Prevents overwriting older updates by mistake if
+    // multiple users edit simultaneously.
+    @Version // Enables optimistic locking. Prevent two users from accidentally overwriting
+             // each other's updates
+    @Column(name = "version", nullable = false)
+    private Integer version = 1;
+
 }
