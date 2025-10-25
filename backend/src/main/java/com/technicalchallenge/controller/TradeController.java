@@ -1,9 +1,12 @@
 package com.technicalchallenge.controller;
 
+import com.technicalchallenge.dto.AdditionalInfoRequestDTO;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.mapper.TradeMapper;
 import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.service.TradeService;
+import com.technicalchallenge.service.AdditionalInfoService;
+
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -30,6 +33,9 @@ public class TradeController {
 
     @Autowired
     private TradeService tradeService;
+
+    @Autowired
+    private AdditionalInfoService additionalInfoService;
 
     @Autowired
     private TradeMapper tradeMapper;
@@ -80,6 +86,29 @@ public class TradeController {
         tradeService.populateReferenceDataByName(trade, tradeDTO);
 
         Trade savedTrade = tradeService.saveTrade(trade, tradeDTO);
+        // Integration: Handle settlement instructions during trade booking
+        //// Extracts the settlement instructions text that may have been included in
+        // the trade creation request.
+        String instructions = tradeDTO.getSettlementInstructions();
+        // If null or empty spaces, removes leading and trailing spaces to prevent
+        // storing whitespace as data skip saving because the field is optional as
+        // requested
+        if (instructions != null && !instructions.trim().isEmpty()) {
+            // Creates a new instance of the request DTO that represents a row in the
+            // AdditionalInfo table.
+            AdditionalInfoRequestDTO infoRequest = new AdditionalInfoRequestDTO();
+            // Sets the entity type to “TRADE”. This allows the AdditionalInfo table to know
+            // which main entity this extra information belongs to (Trade, Book,
+            // Counterparty, etc.)
+            infoRequest.setEntityType("TRADE");
+            infoRequest.setEntityId(savedTrade.getTradeId());
+            infoRequest.setFieldName("SETTLEMENT_INSTRUCTIONS");
+            infoRequest.setFieldValue(instructions.trim());
+
+            // Save the settlement info using your existing service
+            additionalInfoService.createAdditionalInfo(infoRequest);
+        }
+
         TradeDTO savedDTO = tradeMapper.toDto(savedTrade);
         return new ResponseEntity<>(savedDTO, HttpStatus.CREATED);
     }

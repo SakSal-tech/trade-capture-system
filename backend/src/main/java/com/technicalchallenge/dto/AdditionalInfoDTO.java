@@ -25,4 +25,6 @@ public class AdditionalInfoDTO {
     private LocalDateTime createdDate; // When this record was created
     private LocalDateTime lastModifiedDate; // When this record was last updated
     private LocalDateTime deactivatedDate; // When this record was deactivated (if applicable)
+    private Integer version;// Refactored added a version to keep track how many times a record is changed
+
 }

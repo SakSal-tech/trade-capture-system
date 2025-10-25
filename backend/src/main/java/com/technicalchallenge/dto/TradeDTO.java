@@ -77,8 +77,11 @@ public class TradeDTO {
     // Additional fields for extensibility
     private List<AdditionalInfoDTO> additionalFields;
 
-    // Add: Action to be performed on trade
+    // Added: Action to be performed on trade
     private String action;
-    // Adding this line to force commit
+
+    // Added to integrate settlement instructions to trade. It's optional (can be
+    // null) as business rules.
+    private String settlementInstructions;
 
 }

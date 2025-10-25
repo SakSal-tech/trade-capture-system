@@ -19,14 +19,14 @@
   - Committed initial failing test and validation classes
 - Planned structure for future validators (User, Leg, Entity)
 
-### Learned / Understood Better
+### Learned
 
 - Role of ChronoUnit.DAYS.between() and why it returns a long type
 - How to structure reusable validators for maintainability
 - Purpose of separating TradeValidationResult and TradeValidationEngine
 - Importance of TDD phases (Red → Green → Refactor)
 
-### Challenges / Notes
+### Challenges
 
 - Took me time to decide the structure of classes and methods
 - Needed clarity on exception handling (decided to use result aggregation pattern instead of throwing)
@@ -134,7 +134,7 @@ Expanded test coverage and implemented multiple validation layers.
 - Refactoring for SRP and separation of concerns improves clarity and scalability
 - Systematic test review ensures robust coverage and prevents regression
 
-### Challenges / Notes
+### Challenges
 
 - Needed to update test assertions to match validator error messages
 - Refactoring required careful coordination between engine and validator classes
@@ -345,13 +345,13 @@ Hours active: 4
 - Wrote unit tests for controller behaviour using @WithMockUser to assert that authorised roles receive 200 and unauthorised roles receive 403 for several endpoints.
 - Created the initial UserPrivilegeIntegrationTest class and added placeholder test methods that assert correct HTTP status codes for obvious cases.
 
-### Learned / Understood Better
+### Learned
 
 - The practical difference between role-based annotations and resource-level checks. Annotations like @PreAuthorize are concise for role checks but do not capture ownership rules, so I combined both approaches.
 - How to extract the current user identity safely from the SecurityContextHolder and pass it down to repositories and services as a filter.
 - The value of writing small, focused integration tests that assert status codes as a first line of defence for security regressions.
 
-### Challenges / Notes
+### Challenges
 
 - I initially relied too much on controller annotations and missed a case where a trader could call the endpoint for another trader's trade id. I had to add explicit ownership checks at the start of those controller methods.
 - Tests ran quickly but I found mocking authority sets across many test cases resulted in some duplicated setup code. I made a helper method to build the mock authority set for reuse.
@@ -373,13 +373,13 @@ Hours active: 5
 - Added tests in TradeServiceTest to assert that when the ownerId parameter is provided, repository calls return only owned trades and that unauthorised access results in AccessDeniedException bubbling back to be translated into 403.
 - Extended UserPrivilegeIntegrationTest with an explicit test: traderCannotAccessAnotherTradersTrade_shouldReturn403.
 
-### Learned / Understood Better
+### Learned
 
 - Placing access checks in services reduces duplication and reduces the risk of forgetting ownership checks in controllers or other callers.
 - How to design repository methods that support both global and scoped queries; for example findByIdAndOwnerId and findById for admin-level access.
 - The difference between throwing AccessDeniedException inside a service and allowing Spring Security to convert exceptions to 403 responses later in the filter chain.
 
-### Challenges / Notes
+### Challenges
 
 - I had to refactor some DTO mapping logic because scoping earlier in the call chain removed the need to fetch some linked entities. I made the mappers resilient to partial data to keep integration tests simpler.
 - Ensuring consistent error messages across service and controller layers required standardising on a small set of exceptions and mapping them in a ControllerAdvice.
@@ -398,13 +398,13 @@ Hours active: 6
 - Created TestSecurityConfig used for integration tests so I can inject mock users or use an in-memory authentication provider when I want simpler setups.
 - Wrote integration tests using @WithUserDetails for a subset of endpoints to verify that the database-backed user details are loaded correctly and roles are interpreted as expected.
 
-### Learned / Understood Better
+### Learned
 
 - Why using a database-backed UserDetailsService is important for production parity in integration tests and how it differs from the @WithMockUser approach used in fast unit tests.
 - How authorities and privileges map through UserDetails to Spring Security expressions; specifically how to represent complex privilege sets (for example VIEW + EDIT) as GrantedAuthority strings so @PreAuthorize("hasAuthority('TRADE_EDIT')") works.
 - How to isolate security configuration for tests by providing a test profile configuration class and using @Import in test classes to avoid conflicting beans.
 
-### Challenges / Notes
+### Challenges
 
 - I ran into a mismatch between the privileges stored in the database and the GrantedAuthority strings expected by the code; I added a small mapping layer in DatabaseUserDetailsService to normalise database privileges into the authority names used across the application.
 - Ensuring password encoding compatibility for test users required seeding the test database with encoded passwords; I added a TestDataBuilder to create those records.
@@ -428,12 +428,12 @@ Hours active: 5
   - UserPrivilegeIntegrationTest shouldDenyTraderAccessToOtherTradersTrades
   - UserPrivilegeIntegrationTest shouldAllowAdminFullTradeAccess
 
-### Learned / Understood Better
+### Learned
 
 - How fragile integration tests can be when context configuration drifts. I now ensure TestSecurityConfig is explicitly imported in every integration test that relies on database user details.
 - The value of verifying payload contents in addition to status codes. For example, a 200 response could still leak other users data unless I check the response payload.
 
-### Challenges / Notes
+### Challenges
 
 - Some tests were slow because they re-initialised the DB multiple times. I grouped similar tests and re-used a prepopulated schema where safe to reduce test time.
 - A handful of edge cases remained where read-only endpoints were accessible without a role because I had left @PermitAll on a controller method from an earlier iteration; I tightened those permissions.
@@ -456,12 +456,12 @@ Hours active: 5.5
   - TradeDashboardIntegrationTest shouldReturn403WhenTraderRequestsOtherTradersBookAggregation
 - Added guard rails in services to log suspicious attempts where user id in path does not match authenticated user and return AccessDeniedException quickly.
 
-### Learned / Understood Better
+### Learned
 
 - How to structure the service API so authorisation decisions are clear: a method either accepts an optional caller id (for admin callers) or strictly uses the authenticated principal.
 - That moving filtering logic to repository queries not only improves performance but also removes accidental leaks that can happen with in-memory filtering.
 
-### Challenges / Notes
+### Challenges
 
 - Rewriting queries required small database migration adjustments because I added a few composite indexes (for example trade.owner_id plus maturity_date) to keep the new queries efficient.
 - I had to coordinate these schema changes with the test data builders so integration tests still passed locally.
@@ -482,12 +482,12 @@ Hours active: 4.5
   - When a complex conflict occurred, I created a temporary merge branch to resolve conflicts and run tests; only then did I fast-forward the feature branch or open a pull request.
 - Ran a focused test suite for all UserPrivilegeIntegrationTest and TradeDashboardIntegrationTest classes and verified they passed after the merge conflict fixes.
 
-### Learned / Understood Better
+### Learned
 
 - Practical merge discipline: smaller, more frequent merges reduce conflict surface; resolving conflicts locally on a dedicated merge branch allows me to run tests before updating the feature branch.
 - How to coordinate schema and code changes in the same branch so CI can apply migrations before the service starts. For local runs this meant seeding the test DB after migrations using a consistent test data builder.
 
-### Challenges / Notes
+### Challenges
 
 - Some merges required manual reconciliation between test configuration classes that had similar bean names; I standardised naming to avoid future conflicts.
 - Ensuring that merge commit messages clearly explained why a change was kept or altered helped when I reviewed history later.
@@ -513,12 +513,12 @@ Hours active: 6
   - How to run the security integration tests with the TestSecurityConfig profile
 - Committed and pushed the feature branch containing the final security work and opened a pull request for review.
 
-### Learned / Understood Better
+### Learned
 
 - How a combination of role checks and ownership checks provides both coarse and fine-grained protection and how to document those decisions to keep the rest of the team aligned.
 - Naming conventions for integration tests that make the intent and expected HTTP status obvious to reviewers and that help in triaging failures quickly.
 
-### Challenges / Notes
+### Challenges
 
 - Balancing thorough test coverage against acceptable execution time required me to categorise tests into fast unit, medium integration and slow end-to-end tests and to make that matrix clear in the developer documentation.
 - Before pushing I double checked that the pull request included a clear description of the security changes and links to the new integration tests so reviewers can focus on the security surface area.
@@ -547,7 +547,7 @@ Key actions to carry forward
 - Preserved all role-based access control using `@PreAuthorize` annotations.
 - Wrote detailed, explanatory comments throughout the controller and service to make the logic clear and consistent.
 
-### Learned / Understood Better
+### Learned
 
 - Implementing SQL injection prevention properly for user-provided text fields was new to me. I learned how to validate and sanitise user input safely before it reaches the database.
 - I spent time reasoning through why and how to structure two separate DTOs — one for incoming API requests (`AdditionalInfoRequestDTO`) and another for backend use (`AdditionalInfoDTO`). At first, it felt redundant, but I understood that it keeps the API layer clean and avoids exposing unnecessary internal fields.
@@ -555,7 +555,7 @@ Key actions to carry forward
 - The process of validating an optional field was interesting. I implemented the logic so that settlement instructions can be omitted but still cleaned and validated when provided.
 - I gained a better understanding of how trimming, null-checking, and normalisation work together to maintain both clean data and flexibility in input handling.
 
-### Challenges / Notes
+### Challenges
 
 - At the beginning, deciding how to model settlement instructions was not straightforward. I debated whether they should live inside the trade table or as a separate linked entity.
 - Handling optional fields required careful validation flow to prevent contradictions between the controller and service.
