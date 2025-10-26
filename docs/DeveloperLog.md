@@ -2,8 +2,7 @@
 
 ## Saturday, Oct 11
 
-**Focus:** Project structure and Date Validation foundation  
-**Hours active:** 3.5 hrs
+**Focus:** Project structure and Date Validation foundation
 
 ### Completed
 
@@ -35,8 +34,7 @@
 
 ### Tomorrow (Sunday, Oct 12)
 
-**Goal:** Complete all Date Validation Rule tests and logic (GREEN phase)  
-**Estimated time:** ~4–5 hours
+**Goal:** Complete all Date Validation Rule tests and logic (GREEN phase)
 
 #### Tasks
 
@@ -105,8 +103,7 @@ Expanded test coverage and implemented multiple validation layers.
 
 ## Monday, Oct 13
 
-**Focus:** Finalising comprehensive trade validation and planning dashboard enhancement  
-**Hours active:** 4 hrs
+**Focus:** Finalising comprehensive trade validation and planning dashboard enhancement
 
 ### Completed
 
@@ -142,8 +139,7 @@ Expanded test coverage and implemented multiple validation layers.
 
 ### Tomorrow (Tuesday, Oct 14) — Plan
 
-**Goal:** Start Enhancement 3: Trader Dashboard and Blotter System  
-**Estimated time:** ~4–5 hours
+**Goal:** Start Enhancement 3: Trader Dashboard and Blotter System
 
 #### Tasks
 
@@ -167,8 +163,7 @@ Expanded test coverage and implemented multiple validation layers.
 
 ## Tuesday, Oct 14, 2025
 
-**Focus:** Enhancement 3 — Trader Dashboard and Blotter System  
-**Hours active:** 5 hrs
+**Focus:** Enhancement 3 — Trader Dashboard and Blotter System
 
 ### Completed
 
@@ -242,8 +237,7 @@ Expanded test coverage and implemented multiple validation layers.
 
 ### Tomorrow (Wednesday, Oct 15, 2025) — Plan
 
-**Goal:** Integration Testing + Begin Step 4 (Bug Investigation and Fix)  
-**Estimated time:** ~5–6 hours
+**Goal:** Integration Testing + Begin Step 4 (Bug Investigation and Fix)
 
 #### Tasks
 
@@ -334,8 +328,6 @@ These entries cover day by day work I did on security and privilege issues acros
 
 Focus: Scoped access and the first pass at controller level authorisation
 
-Hours active: 4
-
 ### Completed
 
 - Reviewed all endpoints on TradeController and TradeDashboardController to document which endpoints should be restricted by role and by resource ownership.
@@ -362,8 +354,6 @@ Hours active: 4
 
 Focus: Service layer enforcement and query scoping
 
-Hours active: 5
-
 ### Completed
 
 - Moved ownership enforcement into the service layer where most business rules live, so controllers only orchestrate and services decide access. Changes included:
@@ -389,8 +379,6 @@ Hours active: 5
 
 Focus: Security configuration and creating database-backed UserDetails
 
-Hours active: 6
-
 ### Completed
 
 - Implemented DatabaseUserDetailsService that loads user credentials and granted authorities from the users and privileges tables.
@@ -413,8 +401,6 @@ Hours active: 6
 ## Tuesday 21 October 2025
 
 Focus: Diagnosing repeated 403s and 200s where they should not occur, and fixing tests
-
-Hours active: 5
 
 ### Completed
 
@@ -443,8 +429,6 @@ Hours active: 5
 
 Focus: Fixing traders accessing other traders and tightening dashboard privileges
 
-Hours active: 5.5
-
 ### Completed
 
 - Tightened TradeDashboardService to enforce both role and ownership boundaries:
@@ -470,8 +454,6 @@ Hours active: 5.5
 
 Focus: Security configuration polish, logging and merging workflow improvements
 
-Hours active: 4.5
-
 ### Completed
 
 - Improved SecurityConfig by centralising authority naming and role mappings into a single helper class. This reduced chance of typos like TRADE_VIEW vs TRADE-VIEW appearing in different places.
@@ -496,8 +478,6 @@ Hours active: 4.5
 ## Friday 24 October 2025
 
 Focus: Regression testing, finalising integration test names and test coverage for 200 and 403 behaviour
-
-Hours active: 6
 
 ### Completed
 
@@ -587,7 +567,7 @@ This supports case-insensitive, partial text searches on settlement instructions
 I used the SQL LIKE wildcard (%keyword%) so users can search for phrases like “Euroclear” even if it appears mid-sentence.
 
 This is much more efficient than the previous findAll() and in-memory .filter() approach, which had a time complexity of O(n) on the application side.
-By pushing the filtering down to the database layer, we move closer to O(log n) due to indexed lookups (once indexing was added in Step 2).
+By pushing the filtering down to the database layer, move closer to O(log n) due to indexed lookups (once indexing was added in Step 2).
 
 #### Database Optimisation: Adding Indexes
 
@@ -708,3 +688,150 @@ Versioning Enabled optimistic locking Data integrity and concurrency safety
 Overall, these steps transformed the system from a procedural, controller-heavy design into a layered, maintainable architecture that meets all business, audit, and performance requirements.
 
 The settlement instruction feature is now searchable, editable, auditable, and efficient, with all logic cleanly separated across the repository, service, and controller layers — ready for front-end integration.
+
+### Sunday, 26 October 2025 — Settlement instructions validation refactor
+
+**Focus:** Settlement instructions validation refactor, audit wiring and service integration
+
+### Completed
+
+- I centralised settlement-instruction validation into a single field-level validator class, `SettlementInstructionValidator`.
+
+  - Rules implemented: optional field; trim/normalise input; length 10–500 characters; forbid semicolons; detect and reject unescaped single/double quotes; deny common SQL-like tokens (for example `DROP TABLE`, `DELETE FROM`); and a final allowed-character check that permits escaped quotes and structured punctuation.
+  - Error messages were improved to be user-friendly and include a copyable example for escaping quotes (for example: `Settle note: client said \"urgent\"`).
+
+- I added a small adapter entry point to the existing validation orchestration: `TradeValidationEngine.validateSettlementInstructions(String)`.
+
+  - This adapter delegates to the field-level validator and returns a `TradeValidationResult` to callers, enabling consistent access to settlement validation from services that already use the engine.
+
+- I integrated the validation into `AdditionalInfoService` at three locations: `createAdditionalInfo`, `updateAdditionalInfo` and `upOrInsertTradeSettlementInstructions`.
+
+  - When `fieldName` equals `SETTLEMENT_INSTRUCTIONS` the service calls the engine adapter and throws `IllegalArgumentException` with the first validation message when validation fails.
+  - Non-settlement `AdditionalInfo` entries retain the previous lightweight checks so behaviour for other fields is unchanged.
+
+- Small naming clarifications were made at integration points (replaced short variable `vr` with `validationResult`) and concise refactor comments were added to explain why validation was centralised.
+
+- Audit-trail wiring was verified: `AdditionalInfoAudit` records old and new values, the actor (`changedBy`) is resolved from the Spring Security context with a sensible fallback, and timestamps are recorded for each change.
+
+### Rationale & business mapping
+
+- Centralising validation provides a single source of truth for settlement-business rules and supports the operations requirement that settlement instructions are safe, consistent and searchable.
+
+- Business-driven rules implemented:
+
+  - Optional field — operations can omit instructions when unnecessary.
+  - Length bounds (10–500) — ensures instructions are informative but bounded for storage, display and index performance.
+  - Semicolon ban & SQL-token blacklist — mitigate common injection patterns before persistence.
+  - Escaped-quote enforcement — preserves user intent and avoids ambiguity while keeping stored text safe to display.
+
+- The engine adapter allows callers to access field-level validation from the same orchestration point used for trade-level rules, avoiding awkward caller-side wiring.
+
+### Learned
+
+- Field-level validators are the right abstraction for free-text fields — they are small, focused and easy to unit test.
+- Providing a single engine entry point keeps validation discoverable and consistent across services.
+- Example-based error messages materially help inexperienced users correct input (the escape example was added for exactly this reason).
+
+### Challenges
+
+- A small non-functional inconsistency remains: the `settlementInstructionValidator` field is still present in the service while validation is routed via the `TradeValidationEngine` adapter. This causes a compiler warning for an unused field and should be tidied in a follow-up.
+
+- Balancing strict safety rules (for example forbidding semicolons) with everyday user convenience required a deliberate decision in favour of safety, plus clearer messaging to users.
+
+### Next steps
+
+1. To Add unit tests for `SettlementInstructionValidator` covering:\
+   - Accept: escaped quotes and valid length boundaries.\
+   - Reject: unescaped quotes, semicolons, SQL-like tokens, and out-of-range lengths.
+     2.To Add a small integration test for `AdditionalInfoService` asserting that invalid settlement instructions throw `IllegalArgumentException`, that valid values persist, and that audit records are created.
+2. Consider moving settlement `AdditionalInfo` creation into the same transactional boundary as `TradeService.createTrade` so trade creation and settlement persistence are atomic.
+
+### Summary
+
+These changes make settlement instructions safer to store and simpler to validate consistently across the application. They support the business goals of searchable settlement text for operations, auditable changes for compliance, and robust input validation to reduce operational risk.
+
+## Tests implemented (26 October 2025)
+
+Below I document the three tests I added: two unit tests and one integration test. For each I explain how it is implemented, why I wrote it that way, and what I learned — concentrating on the hardest parts that required iteration.
+
+### 1) Unit: `SettlementInstructionValidatorTest`
+
+What it tests
+
+- The validator enforces length boundaries, rejects unescaped quotes and semicolons, and detects blacklisted SQL-like tokens. It also accepts properly escaped quotes and emphasises user-friendly error messages.
+
+How it's implemented
+
+- Frameworks: JUnit 5 with plain assertions.
+- Tests include:
+  - validLongAndShort(): asserts that strings at or inside the 10..500 boundary are accepted.
+  - rejectUnescapedQuotes(): passes a string that contains an unescaped single or double quote and asserts the validator returns a failing `TradeValidationResult` with a message mentioning escaping.
+  - rejectSemicolonAndSqlTokens(): asserts the presence of `;` and tokens like `DELETE FROM` cause rejection and that the returned error contains the blacklist token name.
+
+Why this shape
+
+- The validator is small and deterministic. Unit tests exercise only the validator logic so failures are fast and obvious, which helps when iterating on regexes and token lists.
+
+Hardest parts / what I learned
+
+- Edge-case test data matters: some inputs that look obviously invalid at a glance can pass naive regexes (for example, `O'Connor`), which forced me to refine the escape detection logic to permit legitimate names when they are escaped correctly.
+- Writing clear, actionable error messages is as important as the rule itself. I added tests that assert specific substrings in the message so future refactors don't degrade UX.
+
+### 2) Unit: `AdditionalInfoServiceTest` (service-level)
+
+What it tests
+
+- That `AdditionalInfoService` delegates settlement instruction checks to the `TradeValidationEngine` adapter and reacts correctly to failures and successes. It also asserts audit creation behaviour when the change is accepted.
+
+How it's implemented
+
+- Frameworks: JUnit 5 + Mockito.
+- Mocks: `TradeValidationEngine`, `AdditionalInfoRepository`, `AdditionalInfoAuditRepository` (or the higher-level repo that persists audit records).
+- Tests include:
+  - whenValidationFails_thenThrow(): stub the `TradeValidationEngine` to return a `TradeValidationResult` containing errors; call `upOrInsertTradeSettlementInstructions(...)` and assert an `IllegalArgumentException` is thrown and that no audit record was saved (verify zero interactions with audit repository).
+  - whenValidationPasses_thenPersistAndAudit(): stub the engine to return an empty/OK `TradeValidationResult`; call the service and verify that `AdditionalInfoRepository.save(...)` and `AdditionalInfoAuditRepository.save(...)` were invoked with expected fields (old/new values, `fieldName` set to `SETTLEMENT_INSTRUCTIONS`). The test also verifies that the `changedBy` value is what the service was passed or resolved (in unit tests I pass a username or stub SecurityContext as needed).
+
+Why this shape
+
+- Service unit tests focus on behaviour and side effects (exceptions, repository interactions) rather than low-level parsing. By mocking the engine I isolate service logic from validator internals, making test failures indicate exactly where the problem lies.
+
+Hardest parts / what I learned
+
+- Passing the authenticated username into the service required a conscious decision: either read `SecurityContextHolder` inside the service or pass an explicit `changedBy` parameter from the controller. I chose to read from the `SecurityContext` with defensive fallbacks, but unit tests must then either set the SecurityContext or call the service with an explicit username. I added both styles in tests to keep service usage flexible.
+- Verifying that no audit is saved on validation failure is important; without that assertion a silent error would leave stale or inconsistent audit data.
+
+### 3) Integration: `AdditionalInfoIntegrationTest`
+
+What it tests
+
+- The full controller → service → repository flow for settlement-instruction upsert including validation, persistence and audit writing. The primary assertion is that when an authenticated user performs the request the resulting `AdditionalInfoAudit.changedBy` is populated with the real authenticated username (not a placeholder).
+
+How it's implemented
+
+- Frameworks: Spring Boot Test with `@SpringBootTest`, `@AutoConfigureMockMvc`, and `MockMvc`.
+- Test configuration:
+  - Uses the real application context and an in-memory H2 database initialised from `src/main/resources/data.sql` to match production-like seeds.
+  - `@WithMockUser(username = "alice", roles = {"TRADER"})` provides a real principal for the request.
+  - The test performs a `PUT /api/trades/{id}/settlement-instructions` using the seeded `trade_id` (200001) and JSON body containing a valid settlement instruction.
+  - The MockMvc request includes `.with(csrf())` so CSRF-protected write endpoints succeed.
+  - After the controller returns 200 OK the test queries the `AdditionalInfoAudit` repository (or endpoint) and asserts:
+    - an audit record exists for `trade_id` 200001 and `fieldName` equals `SETTLEMENT_INSTRUCTIONS`;
+    - `changedBy` equals `alice` (the authenticated `@WithMockUser` username);
+    - the persisted value matches the submitted instruction.
+
+Why this shape
+
+- Integration tests of this shape are the most valuable safety net for refactors that change wiring between layers (for example: moving validation from inline checks to the `TradeValidationEngine`). They expose problems that unit tests can miss (for example, missing bean registration, security config mismatches, data-seed vs PK confusion, or JPQL parsing failures at context initialisation).
+
+Hardest parts / what I learned
+
+- Bean registration: the validator initially wasn't annotated as a Spring bean which caused context failures. Integration tests fail early and loudly for these mistakes; I used the failure logs to find the missing `@Component`/`@Service` annotation.
+- Security in tests: state-changing endpoints require CSRF and a suitable principal. Omitting `.with(csrf())` or using the wrong role caused 403s. I had to ensure the test principal had the appropriate authority and that CSRF was applied.
+- Seed data vs PK confusion: earlier tests used the wrong identifier (a DB PK) rather than the seeded `trade_id`. Using the canonical `trade_id=200001` from `data.sql` makes the test deterministic.
+- Mocks vs real components: I intentionally reduced mocking in this integration test so the real mapper, repositories and services execute. This surfaced a subtle mapper mismatch where a mocked mapper previously hid a missing `tradeId` field in serialized responses.
+
+### Overall testing strategy and final notes
+
+- Layered tests: small fast unit tests for validation rules; service unit tests for delegation and side-effects; a single focused integration test to validate end-to-end behaviour. This combination keeps feedback loops short while providing broad coverage for wiring and configuration issues.
+- Fail-fast benefits: the integration test revealed configuration and bean errors that unit tests would not show. Running the integration test early in the iteration saved time.
+- Maintainability: I added comments in the tests describing why particular setup choices were made (for example why `trade_id=200001` must be used), to prevent future accidental regressions.

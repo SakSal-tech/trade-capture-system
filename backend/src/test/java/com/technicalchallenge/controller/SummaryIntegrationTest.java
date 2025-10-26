@@ -146,7 +146,7 @@ public class SummaryIntegrationTest extends BaseIntegrationTest {
                 // Ensure the DB-backed privilege check used by the service allows
                 // the test user to perform TRADE_VIEW so requests reach the
                 // controller and exercise parameter validation / aggregation.
-                // We use a lenient Mockito stub so other tests may override it.
+                // use a lenient Mockito stub so other tests may override it.
                 Mockito.lenient().when(userPrivilegeService.findPrivilegesByUserLoginIdAndPrivilegeName(
                                 org.mockito.ArgumentMatchers.anyString(),
                                 org.mockito.ArgumentMatchers.eq("TRADE_VIEW")))

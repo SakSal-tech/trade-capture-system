@@ -21,7 +21,7 @@ import com.technicalchallenge.validation.UserPrivilegeValidationEngine;
  * Focused authentication/authorization unit tests for TradeDashboardService.
  *
  * - This test class isolates the privilege-checking behaviour (the
- *   service-level `hasPrivilege(...)` logic) so we can validate short-circuit
+ *   service-level `hasPrivilege(...)` logic) so can validate short-circuit
  *   rules (SecurityContext authorities) and the DB-backed privilege fallback.
  * - The service now uses a deny-by-default approach and requires a
  *   mocked UserPrivilegeService for DB lookups in unit tests. Tests must
@@ -54,7 +54,7 @@ public class TradeDashboardServiceAuthTest {
         SecurityContextHolder.clearContext();
     }
 
-    // helper to satisfy constructor when we want a null engine (useful for test)
+    // helper to satisfy constructor when want a null engine (useful for test)
     private UserPrivilegeValidationEngine privilege_validation_engine() {
         return privilegeValidationEngine;
     }

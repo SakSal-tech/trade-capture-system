@@ -283,7 +283,7 @@ public class TradeDashboardService {
         // ADDED: Capture current Authentication once to avoid races where
         // subsequent service/mapper calls may trigger user lookups that do not
         // change the real caller but can alter the SecurityContext in some
-        // environments. We use the captured auth/name/authorities for all
+        // environments. use the captured auth/name/authorities for all
         // authorization decisions in this method.
         Authentication auth = SecurityContextHolder.getContext() != null
                 ? SecurityContextHolder.getContext().getAuthentication()
@@ -302,7 +302,7 @@ public class TradeDashboardService {
         // ROLE_SUPERUSER, or the TRADE_VIEW_ALL privilege. This avoids a simple
         // mistake in the UI exposing 'simon' data to 'joey'.
         // NOTE: In test contexts or when no Authentication is present (e.g.
-        // direct service unit tests), we do not enforce this guard so tests
+        // direct service unit tests), do not enforce this guard so tests
         // that call the service with explicit traderIds continue to work.
         boolean canViewOthers = auth != null && auth.getAuthorities().stream().anyMatch(a -> {
             String ga = a.getAuthority();
@@ -326,7 +326,7 @@ public class TradeDashboardService {
 
         // 2Load trades: retrieve all trades for the trader and prepare the
         // DTO that will be returned. Use an internal fetch that does NOT
-        // perform redundant privilege checks (we already validated above).
+        // perform redundant privilege checks (already validated above).
         TradeSummaryDTO summaryDTO = new TradeSummaryDTO();
         List<TradeDTO> tradesForTrader = fetchTradesForTraderWithoutPrivilegeCheck(traderId);
 
@@ -734,7 +734,7 @@ public class TradeDashboardService {
         // resort after direct authority + DB privilege checks).
         try {
             // NOTE: privilegeValidationEngine expects domain objects; only call
-            // if available and applicable. We cannot build a full TradeDTO here,
+            // if available and applicable. cannot build a full TradeDTO here,
             // so this call is omitted. Keep this block for future integration.
         } catch (Exception e) {
             logger.debug("Privilege validation engine check skipped or failed", e);

@@ -135,7 +135,7 @@ public class TradeService {
         // Populate reference data
         populateReferenceDataByName(trade, tradeDTO);
 
-        // Ensure we have essential reference data
+        // Ensure have essential reference data
         validateReferenceData(trade);
 
         Trade savedTrade = tradeRepository.save(trade);

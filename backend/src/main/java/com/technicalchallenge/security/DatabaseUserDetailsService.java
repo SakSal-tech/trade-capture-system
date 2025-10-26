@@ -150,7 +150,7 @@ public class DatabaseUserDetailsService implements UserDetailsService {
                 // names for privileges than the security expressions expect.
             });
         } catch (Exception e) {
-            // On error, continue with whatever authorities we already have
+            // On error, continue with whatever authorities already have
         }
 
         // Log the computed authorities for debugging authorization failures

@@ -1,0 +1,99 @@
+package com.technicalchallenge.controller;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.MockMvc;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.MediaType;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.technicalchallenge.repository.AdditionalInfoAuditRepository;
+import com.technicalchallenge.model.AdditionalInfoAudit;
+import java.util.Map;
+import java.util.List;
+import java.util.Objects;
+import static org.assertj.core.api.Assertions.assertThat;
+
+// @SpringBootTest boots the full Spring context (controllers, services, repositories and DB)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureMockMvc
+public class AdditionalInfoIntegrationTest {
+
+    // MockMvc is used to perform HTTP requests against controller endpoints
+    @Autowired
+    private MockMvc mockMvc;
+
+    // ObjectMapper serialises request payloads into JSON
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    // Repository is used to verify persisted state after controller calls.
+    // Note: only need the audit repository in this test because the
+    // controller endpoint writes an audit record; do not read
+    // AdditionalInfoRepository here so it is intentionally omitted.
+    @Autowired
+    private AdditionalInfoAuditRepository auditRepository;
+
+    @Test
+    @DisplayName("Controller -> Service -> Repository: settlement instruction audit records must store authenticated username")
+    // The controller PUT endpoint requires TRADER or SALES to edit settlement
+    // instructions. Use role TRADER in the test so security checks succeed.
+    @WithMockUser(username = "alice", roles = { "TRADER" })
+    /*
+     * This integration test boots the application context, calls the
+     * AdditionalInfo controller to persist settlement instructions, and
+     * then verifies that an audit record exists with the authenticated
+     * principal name in the changedBy field.
+     */
+    void whenPostSettlement_thenAuditSavedWithUsername() throws Exception {
+
+        // Build a minimal payload compatible with the controller's DTO.
+        // Using Map.of keeps the test concise and flexible.
+        // Use a real trade identifier from test fixtures (see
+        // src/main/resources/data.sql).
+        // Note: the repository uses the column `trade_id` (not the PK id) when
+        // looking up trades, so must use the trade_id value found in the
+        // seed data. The row with PK 2000 has trade_id = 200001, therefore we
+        // use 200001L here so the controller finds an active trade.
+        long tradeId = 200001L;
+
+        // Build payload matching AdditionalInfoRequestDTO expected by the
+        // controller. Field name must be exactly SETTLEMENT_INSTRUCTIONS.
+        var payload = Map.of(
+                "fieldName", "SETTLEMENT_INSTRUCTIONS",
+                "fieldValue", "Pay to ABC");
+
+        // Perform PUT to the real controller endpoint. The controller reads
+        // the authenticated principal via SecurityContext and passes the
+        // username into the service audit record; this is what the test asserts.
+        mockMvc.perform(
+                put("/api/trades/{id}/settlement-instructions", tradeId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isOk());
+
+        // Retrieve audit records and locate the entry created by the
+        // controller call. Defensive null-checks guard against any
+        // unexpected null elements returned by the repository.
+        List<AdditionalInfoAudit> audits = auditRepository.findAll();
+        AdditionalInfoAudit audit = null;
+        for (AdditionalInfoAudit a : audits) {
+            if (a == null)
+                continue; // skip null entries if present
+            if ("alice".equals(a.getChangedBy()) && "SETTLEMENT_INSTRUCTIONS".equals(a.getFieldName())) {
+                audit = a;
+                break; // stop on first match
+            }
+        }
+
+        // Assert that a matching audit record was found and contains the
+        assertThat(audit).isNotNull();
+        Objects.requireNonNull(audit);
+        assertThat(audit.getChangedBy()).isEqualTo("alice");
+        assertThat(audit.getFieldName()).isEqualTo("SETTLEMENT_INSTRUCTIONS");
+    }
+}

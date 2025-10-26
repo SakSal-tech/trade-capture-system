@@ -98,13 +98,13 @@ public interface AdditionalInfoRepository extends JpaRepository<AdditionalInfo, 
    * trade (or other entity)
    * and a given field name.
    * 
-   * In our settlement instructions feature, this is used when we want to fetch
+   * In our settlement instructions feature, this is used when want to fetch
    * the
    * most recent, active record for a particular trade’s settlement instructions.
    * 
    * Explanation:
    * - "entityType" limits the search to the relevant entity (for example, TRADE).
-   * - "entityId" ensures we are matching a specific record linked to one trade.
+   * - "entityId" ensures are matching a specific record linked to one trade.
    * - "fieldName" identifies the exact field (such as SETTLEMENT_INSTRUCTIONS).
    * - "active = true" filters out any logically deleted or inactive records.
    * 

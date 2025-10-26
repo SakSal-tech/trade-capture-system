@@ -1019,7 +1019,7 @@ After implementing advanced validation and RSQL filtering in the trade capture s
    These configurations create beans such as `JwtDecoder`, `OAuth2LoginAuthenticationFilter`, and `BearerTokenAuthenticationFilter`.  
    During integration tests, no OAuth2 credentials or issuer URIs are defined, so Spring fails to build the context.
 
-   Disabling only the first two (which we did initiallywas not enough — OAuth2 configs were still being loaded, causing startup failure.
+   Disabling only the first two (which did initiallywas not enough — OAuth2 configs were still being loaded, causing startup failure.
 
 2. **Duplicate Data Loading**
 
@@ -1355,7 +1355,7 @@ I created two different test config classes for different purposes:
 
 - `GlobalTestSecurityConfig` — a temporary permit-all configuration used for quick triage. It registers a `SecurityFilterChain` that permits all requests and typically disables CSRF. I placed it under `src/test/java` so it only affects test runs.
 
-- `TestSecurityConfig` — a realistic test security config that defines an in-memory `UserDetailsService`, enables method security and registers a standard `SecurityFilterChain` that requires authentication. Use this for Phase 2 when we remove global permit-all and want tests to assert correct authorisation.
+- `TestSecurityConfig` — a realistic test security config that defines an in-memory `UserDetailsService`, enables method security and registers a standard `SecurityFilterChain` that requires authentication. Use this for Phase 2 when remove global permit-all and want tests to assert correct authorisation.
 
 ## Next steps (Phase 2)
 
@@ -1423,6 +1423,118 @@ This log records the problems encountered while restoring Spring Security and ge
 
 ````markdown
 # Test Fix Log — UserPrivilegeIntegrationTest
+
+### Problem
+
+Intermittent 401 / 403 / 400 failures across multiple integration tests (Summary, UserPrivilege, TradeController) caused by test security and malformed request payloads.
+
+### Root cause
+
+Multiple separate issues produced similar symptoms:
+
+- A base-level `@WithMockUser` on a test base class meant tests that were intended to be unauthenticated ran with a mock principal, turning expected 401 responses into 403 or 200.
+- Several write-tests omitted CSRF tokens; SecurityConfig enforces CSRF for state-changing requests so tests failed with 403.
+- Some payloads were incomplete or used wrong property names (for example `legs` instead of `tradeLegs`), causing controller-level validation to return 400 before security checks could run.
+
+### Solution
+
+- Removed global `@WithMockUser` from the base test class and made authentication explicit per test using `@WithMockUser` or `@WithAnonymousUser` where appropriate. This removed accidental authentication bleed-through.
+- Added `.with(csrf())` to write operations in tests to satisfy CSRF protections.
+- Corrected JSON payloads to match DTO expectations (use `tradeLegs`, include minimal required fields), so tests reach authorisation rather than being rejected for malformed input.
+
+### Impact
+
+Tests that assert authorisation now exercise the correct layer and return expected 401/403 statuses. Validation tests reach the intended controller/service logic rather than stopping at JSON binding.
+
+---
+
+### Problem
+
+Duplicate seed data and ID collisions caused DataIntegrityViolationException and NonUniqueResultException in combined test runs.
+
+### Root cause
+
+Main `src/main/resources/data.sql` and test `src/test/resources/data.sql` contained overlapping rows and hard-coded IDs. Some setup code also cleared tables in `@BeforeEach` which removed needed rows for other tests.
+
+### Solution
+
+- Consolidated seed data: moved canonical baseline data to main `data.sql` and kept test seeds minimal and non-overlapping.
+- Where tests require deterministic data, created required entities programmatically at test start using repositories (this avoids hard-coded IDs and FK ordering issues).
+- Ensured parent tables are populated before child tables in data scripts (desk → subdesk → cost centre → book → counterparty → trade → legs → cashflows).
+
+### Impact
+
+Removal of duplicate seeds and careful test-scoped creation eliminated primary key collisions and non-unique result errors. Tests run reliably in any order.
+
+---
+
+### Problem
+
+403 responses were returned as HTML pages by Spring Security, which broke JSON-based client expectations and test assertions.
+
+### Root cause
+
+No `@ControllerAdvice` existed to convert framework exceptions like `AccessDeniedException` into a compact JSON payload. The default Spring Security error page is HTML.
+
+### Solution
+
+Added an `ApiExceptionHandler` controller advice that converts `AccessDeniedException` and related security exceptions into a compact JSON response with fields `{timestamp, status, error, message, path}`. This provides consistent machine-readable responses for tests and clients.
+
+### Impact
+
+Clients and tests receive JSON error payloads for authorisation failures. This simplifies assertions and improves the API's developer experience.
+
+---
+
+### Problem
+
+Service-side authorisation checks and controller-level `@PreAuthorize` expressions were misaligned; this produced inconsistencies where some callers bypassed intended restrictions.
+
+### Root cause
+
+Two authorisation models were in place: controller `@PreAuthorize` annotations and programmatic checks in services (for example `hasPrivilege(...)`). Additionally, tests and some code used role strings (`ROLE_*`) while others used authority strings (e.g. `TRADE_VIEW`), producing mismatches.
+
+### Solution
+
+- Implemented `DatabaseUserDetailsService` to map domain users, profiles and privileges into Spring Security `GrantedAuthority` objects (both `ROLE_*` role authorities and plain privilege authorities such as `TRADE_VIEW`). This ensures a single authoritative set of authorities per authenticated user.
+- Aligned service-level checks to consult the same authorities as `@PreAuthorize`. Where compatibility was required during the refactor, temporary acceptance of both forms was added and a TODO placed to replace the permissive helper with a DB-driven deny-by-default lookup.
+- Reverted programmatic session creation that changed framework behaviour and ensured session persistence only when intentionally required in tests.
+
+### Impact
+
+Authorisation decisions are now consistent across controllers and services. The mapping service makes authority composition explicit and debuggable and avoids brittle string mismatch errors.
+
+---
+
+### Problem
+
+Integration tests sometimes mocked services and mappers while still relying on the real database; this caused mismatches in serialised response fields (e.g. `tradeId` missing) and gave a false sense of correctness.
+
+### Root cause
+
+Mixing mocks with the real persistence layer meant some assertions referenced fields that the mocks did not populate. For example, a mock of `tradeMapper.toDto` returned an empty DTO without `tradeId`, making JSONPath assertions fail.
+
+### Solution
+
+- Reduced mocking in integration tests. For end-to-end tests, allowed the real mapper/service/repository to run and created data programmatically as needed.
+- Where a mock remained necessary (for deterministic privilege results), ensured the mock returned DTOs containing the exact fields asserted by the test (for example set `tradeId` on the mocked DTO).
+
+### Impact
+
+Integration tests represent real behaviour more faithfully and are less brittle. Mocks are used only where a narrow dependency requires deterministic stubbed behaviour.
+
+---
+
+### Verification and final state
+
+After applying the fixes above and re-running targeted tests, the settlement-instruction unit tests and the new `AdditionalInfoIntegrationTest` pass. The test suite is stable for the changes introduced in this refactor. The remaining TODOs are:
+
+- Implement the DB-driven deny-by-default lookup for `hasPrivilege(...)` and add focused unit tests for `DatabaseUserDetailsService`.
+- Run the full backend test suite and address any unrelated failures surfaced by the broader run.
+
+---
+
+End of settlement-instructions refactor notes.
 
 Date: 2025-10-17
 
@@ -1660,7 +1772,7 @@ I'll re-run the full test suite to check whether the 401/403 failures are resolv
 mv n test -DskipITs=false
 Summarized conversation history
 
-I'll write an explicit todo list (planso we track next steps; mark the decision step in-progress.
+I'll write an explicit todo list (planso track next steps; mark the decision step in-progress.
 
 Added 1 todo
 
@@ -3773,7 +3885,7 @@ and Spring Data JPA could not generate a query for a missing method definition.
 
 Added the following method to the repository:
 
-```java
+````java
 List<Trade> findAllByTradeIdIn(List<Long> tradeIds);
 
 ---
@@ -3818,5 +3930,57 @@ wiring audit usernames and getting tests to run in the backend module.
 - Re-run the full backend test suite and confirm no further ApplicationContext bootstrap errors.
 - Add unit tests for `SettlementInstructionValidator` and service-level tests around AdditionalInfo create/update/upsert flows (validation + audit username wiring).
 
+
+### Additional fixes and lessons from the settlement-instructions refactor (2025-10-26)
+
+The following entries document the errors and test failures encountered while centralising settlement instruction validation, wiring the authenticated principal into audit records, and stabilising tests. Each item follows the same Problem / Root cause / Solution / Impact format used throughout this document. Language is UK English and narrative is first person.
+
 ---
-```
+
+### Problem
+
+ApplicationContext failed to start and a number of integration tests reported failures after adding the settlement-instructions validator and associated wiring.
+
+### Root cause
+
+Several contributing issues surfaced during the refactor:
+
+- The new field-level validator was created but not registered as a Spring bean, which caused a NoSuchBeanDefinitionException during startup when the validation engine attempted to autowire it.
+- A malformed JPQL `@Query` in `AdditionalInfoRepository` (missing spaces and a consistent alias) caused Spring Data/Hibernate to parse an invalid query at context initialisation and prevented the entire application context from loading.
+- Some tests targeted a non-existent controller path (`/api/additional-info`) and used an incorrect identifier (PK id versus the `trade_id` business column), causing 404s and 400s instead of exercising the intended controller → service → repository flow.
+
+### Solution
+
+- Annotated the validator with `@Component` and exposed a single engine adapter method `TradeValidationEngine#validateSettlementInstructions(...)` so the service delegates validation to the central engine.
+- Corrected the JPQL in `AdditionalInfoRepository` to use a single alias with clear spacing and valid WHERE syntax; this allowed Spring Data to parse queries at startup without error.
+- Updated the integration test to call the real endpoint that handles settlement instructions (`PUT /api/trades/{id}/settlement-instructions`), used the seeded `trade_id` value from `data.sql` (200001) rather than the PK, and set the test principal to a role accepted by the controller (`@WithMockUser(username="alice", roles={"TRADER"})`). Added explanatory comments in the test to make intent clear.
+
+### Impact
+
+Context now initialises cleanly and the integration test exercises the real controller path. The central validator is the single source of settlement validation logic and is available to any future callers via the validation engine.
+
+---
+
+### Problem
+
+Audit records were not reliably recording the authenticated username; some records contained placeholders such as `SYSTEM` or `ANONYMOUS` even when a principal was present during tests or real requests.
+
+### Root cause
+
+Audit creation code used a placeholder or local stub rather than reading the authentication principal from the SecurityContext. In some service flows the username was set to a default string unconditionally, which reduced audit usefulness.
+
+### Solution
+
+Changed audit wiring to read from Spring Security's context where present:
+
+```java
+Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+String changedBy = (auth != null && auth.getName() != null && !auth.getName().isBlank()) ? auth.getName() : "ANONYMOUS";
+audit.setChangedBy(changedBy);
+````
+
+Added defensive null checks and sensible fallbacks. Integration test asserts now check for the real username provided by `@WithMockUser`.
+
+### Impact
+
+Audit trail records now reliably show the authenticated principal when available. This improves traceability and supports regulatory and operational auditing.

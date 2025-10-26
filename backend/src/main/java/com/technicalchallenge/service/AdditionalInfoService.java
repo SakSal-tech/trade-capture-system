@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Optional;
 
 // for validations
-import com.technicalchallenge.validation.SettlementInstructionValidator;
 import com.technicalchallenge.validation.TradeValidationResult;
 import com.technicalchallenge.validation.TradeValidationEngine;
 
@@ -42,7 +41,6 @@ public class AdditionalInfoService {
     public AdditionalInfoService(AdditionalInfoRepository additionalInfoRepository,
             AdditionalInfoMapper additionalInfoMapper,
             AdditionalInfoAuditRepository additionalInfoAuditRepository,
-            SettlementInstructionValidator settlementInstructionValidator,
             TradeValidationEngine tradeValidationEngine) {
         this.additionalInfoRepository = additionalInfoRepository;
         this.additionalInfoMapper = additionalInfoMapper;
