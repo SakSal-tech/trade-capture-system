@@ -165,7 +165,7 @@ public class TradeController {
      * Roles allowed: TRADER only.
      * SUPPORT and others denied.
      *
-     * I’m catching RuntimeException to ensure we return 404 if not found.
+     * I’m catching RuntimeException to ensure return 404 if not found.
      */
     @PostMapping("/{id}/cancel")
     @PreAuthorize("hasRole('TRADER')")

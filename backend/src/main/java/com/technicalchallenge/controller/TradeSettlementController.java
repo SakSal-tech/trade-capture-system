@@ -101,7 +101,7 @@ public class TradeSettlementController {
         String trimmedInput = instructions.trim();
 
         // Refactored: Instead of calling searchByKey() (which loads all records),
-        // we now call a dedicated service method that performs a focused database
+        // now call a dedicated service method that performs a focused database
         // query.
         List<AdditionalInfoDTO> matchingInfos = additionalInfoService.searchTradesBySettlementText(trimmedInput);
 

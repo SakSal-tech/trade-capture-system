@@ -3,7 +3,7 @@ package com.technicalchallenge.config;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.context.annotation.Bean;
-// removed unused imports (we wire a DatabaseUserDetailsService via DaoAuthenticationProvider)
+// removed unused imports (wire a DatabaseUserDetailsService via DaoAuthenticationProvider)
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 // Authentication provider classes
@@ -128,7 +128,7 @@ public class SecurityConfig {
     /**
      * Expose the AuthenticationManager from the configuration so other beans
      * (for example controllers performing programmatic login) can authenticate
-     * credentials using the same providers we registered
+     * credentials using the same providers registered
      * (DaoAuthenticationProvider).
      */
     @Bean

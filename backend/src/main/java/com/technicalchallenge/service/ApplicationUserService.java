@@ -38,7 +38,7 @@ public class ApplicationUserService {
                 // Compare plain password with stored (possibly encoded) password.
                 boolean matches = passwordEncoder.matches(password, stored);
 
-                // We log a masked representation of the stored value and the
+                // log a masked representation of the stored value and the
                 // match result to help debug authentication failures during
                 // development. The full encoded password is never logged.
                 String masked = stored.length() <= 6 ? "***" : stored.substring(0, 4) + "***";
@@ -46,7 +46,7 @@ public class ApplicationUserService {
                 return matches;
             } catch (Exception e) {
                 // If the PasswordEncoder throws (malformed value, unknown id,
-                // etc.) we fall back to a plain equals check. This fallback is
+                // etc.) fall back to a plain equals check. This fallback is
                 // only intended to assist with legacy seed data and is not
                 // recommended for production use.
                 boolean eq = stored.equals(password);

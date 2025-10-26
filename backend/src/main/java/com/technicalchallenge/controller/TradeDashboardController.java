@@ -39,7 +39,7 @@ public class TradeDashboardController {
      */
     @GetMapping("/search")
     // Changed authorization to allow either the listed ROLE_* authorities OR
-    // the TRADE_VIEW privilege authority. We map profile -> ROLE_* in the DB
+    // the TRADE_VIEW privilege authority. map profile -> ROLE_* in the DB
     // but individual privileges are stored as plain authorities (e.g. TRADE_VIEW),
     // so this expression ensures both models grant access.
     @PreAuthorize("(hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')) or hasAuthority('TRADE_VIEW')")

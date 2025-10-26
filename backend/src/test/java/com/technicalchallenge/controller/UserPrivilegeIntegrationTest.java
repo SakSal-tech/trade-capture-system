@@ -112,7 +112,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                  * lookups (see TradeService.getTradeById which calls
                  * tradeRepository.findByTradeIdAndActiveTrue). That means controller
                  * endpoints expect the business tradeId in the path (e.g. /api/trades/{id}).
-                 * - To avoid 404s we set trade.setTradeId(100001L) so controller calls
+                 * - To avoid 404s set trade.setTradeId(100001L) so controller calls
                  * in the tests resolve the persisted trade.
                  */
                 trade = new Trade();
@@ -188,7 +188,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         @Test
         @WithMockUser(username = "viewerUser", roles = { "TRADER", "TRADE_VIEW" })
         void testTradeViewRoleAllowedById() throws Exception {
-                // When / Then - use the persisted business trade id so we hit the
+                // When / Then - use the persisted business trade id so hit the
                 // full controller -> service -> repository path and validate mapping
                 // and authorization behaviour end-to-end.
                 mockMvc.perform(get("/api/trades/" + savedTradeBusinessId))
@@ -220,7 +220,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         @Test
         void testTradeCreateRoleAllowed() throws Exception {
                 // When / Then - send a valid payload to create a trade and expect 201.
-                // We assert the echoed bookName rather than brittle numeric ids because
+                // assert the echoed bookName rather than brittle numeric ids because
                 // the application generates or assigns tradeIds and the response id
                 // may differ across environments.
                 mockMvc.perform(post("/api/trades")
@@ -248,7 +248,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         /*
          * I updated this test to send a valid TradeDTO payload so the request fails
          * on authorization (403) instead of validation (400). Using a full payload
-         * ensures we exercise the controller's privilege check.
+         * ensures exercise the controller's privilege check.
          */
         @Test
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
@@ -282,7 +282,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         @WithMockUser(username = "editorUser", roles = { "TRADER" })
         void testTradeEditRoleAllowedPatch() throws Exception {
                 // Minimal valid patch payload that satisfies DTO validation rules.
-                // The PATCH is executed against the business trade id we persisted
+                // The PATCH is executed against the business trade id persisted
                 // earlier (savedTradeBusinessId) so the controller finds the trade.
                 String patchJson = "{\n" +
                                 "  \"bookName\": \"UpdatedBook\",\n" +

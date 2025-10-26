@@ -286,7 +286,7 @@ The `when(tradeStatusRepository.findByTradeStatus("NEW"))` mock was originally d
 ### Solution
 
 Explanation for moving the tradeStatusRepository mock to @BeforeEach:
-By moving this mock to the `@BeforeEach` setup method, we ensure that: Consistency across all tests
+By moving this mock to the `@BeforeEach` setup method, ensure that: Consistency across all tests
 
 ### Impact
 
