@@ -79,12 +79,12 @@ public interface AdditionalInfoRepository extends JpaRepository<AdditionalInfo, 
 
   // Select all records from the AdditionalInfo table where the fieldValue
   // contains the search keyword, no matter where it appears in the text Filters
-  // only the rows whose fieldValue contains your keyword
+  // only the rows whose fieldValue contains keyword
   // (case-insensitive).
   /*
    * findAll() loads every record from the additional_info table into memory.
    * .stream().filter(...) filters them in Java (not in the database).
-   * It works fine for testing and small datasets (like in your H2 database).
+   * It works fine for testing and small datasets (like in H2 database).
    * But for a real database with thousands of records, this would be slow and
    * memory-heavy. Big O time and space complexity.
    */

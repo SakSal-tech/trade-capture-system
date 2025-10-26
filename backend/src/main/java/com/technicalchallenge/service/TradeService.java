@@ -80,9 +80,19 @@ public class TradeService {
         return tradeRepository.findAll();
     }
 
+    // Fetch a single trade
     public Optional<Trade> getTradeById(Long tradeId) {
         logger.debug("Retrieving trade by id: {}", tradeId);
         return tradeRepository.findByTradeIdAndActiveTrue(tradeId);
+    }
+
+    // Refactored and changed the above method to fetch multiple trades by a list of
+    // IDs
+    // instead of fetching a single trade by ID
+    public List<Trade> getTradesById(List<Long> ids) {
+        if (ids == null || ids.isEmpty())
+            return java.util.Collections.emptyList();
+        return tradeRepository.findAllByTradeIdIn(ids);
     }
 
     // ADDED this method after I created Additional Settlement information, to

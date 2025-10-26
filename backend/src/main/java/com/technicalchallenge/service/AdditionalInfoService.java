@@ -10,10 +10,18 @@ import com.technicalchallenge.repository.AdditionalInfoRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+
+// for validations
+import com.technicalchallenge.validation.SettlementInstructionValidator;
+import com.technicalchallenge.validation.TradeValidationResult;
+import com.technicalchallenge.validation.TradeValidationEngine;
+
+//ADDED: let the service read the authenticated principal from Spring Security so the audit record can use the real username (with a sensible fallback).
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * This service is responsible for validating, saving, updating,
@@ -27,12 +35,19 @@ public class AdditionalInfoService {
     private final AdditionalInfoMapper additionalInfoMapper;
     private final AdditionalInfoAuditRepository additionalInfoAuditRepository;// Added: injecting the repository.
 
+    // central validation engine (refactor: prefer single entry point for
+    // validations)
+    private final TradeValidationEngine tradeValidationEngine;
+
     public AdditionalInfoService(AdditionalInfoRepository additionalInfoRepository,
             AdditionalInfoMapper additionalInfoMapper,
-            AdditionalInfoAuditRepository additionalInfoAuditRepository) {
+            AdditionalInfoAuditRepository additionalInfoAuditRepository,
+            SettlementInstructionValidator settlementInstructionValidator,
+            TradeValidationEngine tradeValidationEngine) {
         this.additionalInfoRepository = additionalInfoRepository;
         this.additionalInfoMapper = additionalInfoMapper;
         this.additionalInfoAuditRepository = additionalInfoAuditRepository;
+        this.tradeValidationEngine = tradeValidationEngine;
     }
 
     /**
@@ -46,45 +61,48 @@ public class AdditionalInfoService {
             throw new IllegalArgumentException("AdditionalInfo request cannot be null.");
         }
 
-        // Presence Check. Validate fieldName (required)
         String fieldName = additionalInfoRequestDTO.getFieldName();
         if (fieldName == null || fieldName.trim().isEmpty()) {
             throw new IllegalArgumentException("Field name cannot be empty.");
         }
         fieldName = fieldName.trim();
 
-        /*
-         * VALIDATION RULE 1: Settlement instructions are optional.
-         * If fieldValue (settlement instruction text) is blank or null,
-         * it is perfectly fine to skip further checks.
-         */
         String fieldValue = additionalInfoRequestDTO.getFieldValue();
         if (fieldValue != null && !fieldValue.trim().isEmpty()) {
             fieldValue = fieldValue.trim();
 
-            // VALIDATION RULE 2A: Length Check
-            if (fieldValue.length() < 10 || fieldValue.length() > 500) {
-                throw new IllegalArgumentException("Field value must be between 10 and 500 characters when provided.");
-            }
+            // REFACTOR NOTE: settlement-specific validation has been centralised
+            // into `SettlementInstructionValidator`. If this AdditionalInfo record
+            // is a settlement instruction, use the validator; otherwise preserve
+            // the original lightweight checks for other fields.
+            if ("SETTLEMENT_INSTRUCTIONS".equalsIgnoreCase(fieldName)) {
+                // Use central engine entry point for settlement validation
+                TradeValidationResult validationResult = tradeValidationEngine
+                        .validateSettlementInstructions(fieldValue);
+                if (!validationResult.isValid()) {
+                    throw new IllegalArgumentException(validationResult.getErrors().get(0));
+                }
+            } else {
+                // Non-settlement fields keep the previous quick validations
+                if (fieldValue.length() < 10 || fieldValue.length() > 500) {
+                    throw new IllegalArgumentException(
+                            "Field value must be between 10 and 500 characters when provided.");
+                }
 
-            // VALIDATION RULE 3: Content Validation protect against SQL injection
-            // attempts
-            if (fieldValue.contains(";") ||
-                    fieldValue.contains("--") ||
-                    fieldValue.toLowerCase().contains("drop table") ||
-                    fieldValue.toLowerCase().contains("delete from")) {
-                throw new IllegalArgumentException("Field value contains unsafe or invalid characters.");
-            }
+                if (fieldValue.contains(";") ||
+                        fieldValue.contains("--") ||
+                        fieldValue.toLowerCase().contains("drop table") ||
+                        fieldValue.toLowerCase().contains("delete from")) {
+                    throw new IllegalArgumentException("Field value contains unsafe or invalid characters.");
+                }
 
-            // VALIDATION RULE 4: Structured format check ensure only safe structured text
-            // Should support structured multi-line text (label:value style).
-            if (!fieldValue.matches("^[a-zA-Z0-9 ,.:;/\\-\\n\\r]+$")) {
-                throw new IllegalArgumentException(
-                        "Field value format not supported. Only structured text is allowed.");
+                if (!fieldValue.matches("^[a-zA-Z0-9 ,.:;/\\-\\n\\r]+$")) {
+                    throw new IllegalArgumentException(
+                            "Field value format not supported. Only structured text is allowed.");
+                }
             }
 
         } else {
-            // Field is optional no value provided is acceptable
             fieldValue = null;
         }
 
@@ -124,27 +142,38 @@ public class AdditionalInfoService {
         if (updatedValue != null && !updatedValue.trim().isEmpty()) {
             updatedValue = updatedValue.trim();
 
-            if (updatedValue.length() < 10 || updatedValue.length() > 500) {
-                throw new IllegalArgumentException("Field value must be between 10 and 500 characters when provided.");
-            }
-            // Against SQL injection
-            if (updatedValue.contains(";") ||
-                    updatedValue.contains("--") ||
-                    updatedValue.toLowerCase().contains("drop table") ||
-                    updatedValue.toLowerCase().contains("delete from")) {
-                throw new IllegalArgumentException("Field value contains unsafe or invalid characters.");
-            }
+            // REFACTOR NOTE: Moved validations to the SettlementInstructionValidator to use
+            // central settlement validator for settlement fields
+            // If existing record field is "SETTLEMENT_INSTRUCTIONS" run validator
+            if ("SETTLEMENT_INSTRUCTIONS".equalsIgnoreCase(existingAdditionalInfo.getFieldName())) {
+                // Use central engine entry point for settlement validation
+                TradeValidationResult validationResult = tradeValidationEngine
+                        .validateSettlementInstructions(updatedValue);
+                if (!validationResult.isValid()) {
+                    throw new IllegalArgumentException(validationResult.getErrors().get(0));
+                }
+            } else {
+                // Kept the previous non-settlement validations for non-settlement fields and
+                // not
+                // moving it to the validoator class
+                if (updatedValue.length() < 10 || updatedValue.length() > 500) {
+                    throw new IllegalArgumentException(
+                            "Field value must be between 10 and 500 characters when provided.");
+                }
+                // Against SQL injection
+                if (updatedValue.contains(";") ||
+                        updatedValue.contains("--") ||
+                        updatedValue.toLowerCase().contains("drop table") ||
+                        updatedValue.toLowerCase().contains("delete from")) {
+                    throw new IllegalArgumentException("Field value contains unsafe or invalid characters.");
+                }
 
-            // Validates that settlement instructions contain only safe, structured
-            // characters.
-            // Allows letters, numbers, spaces, common punctuation, quotes, slashes,
-            // hyphens, and line breaks.
-            // Prevents unsafe symbols (<, >, $, %, etc.) to reduce injection risk.
-            if (!updatedValue.matches("^[a-zA-Z0-9 ,.:;'\"/\\-\\n\\r]+$")) {
-                throw new IllegalArgumentException(
-                        "Field value format not supported. Only structured text is allowed.");
+                // Validates structured characters for non-settlement fields
+                if (!updatedValue.matches("^[a-zA-Z0-9 ,.:;'\"/\\-\\n\\r]+$")) {
+                    throw new IllegalArgumentException(
+                            "Field value format not supported. Only structured text is allowed.");
+                }
             }
-
         }
 
         additionalInfoMapper.updateEntityFromRequest(existingAdditionalInfo, requestDTO);
@@ -168,8 +197,16 @@ public class AdditionalInfoService {
             audit.setFieldName(existingAdditionalInfo.getFieldName()); // e.g. "SETTLEMENT_INSTRUCTIONS"
             audit.setOldValue(oldValue); // Store what it was before
             audit.setNewValue(newValue); // Store what it is now
-            audit.setChangedBy("SYSTEM_USER"); // Later replace with logged-in username
-            audit.setChangedAt(LocalDateTime.now()); // Timestamp of the change
+            // Refactored:Added Security measures which reads the current authenticated
+            // principal from
+            // Spring Security and uses its username if available to show and record who
+            // made
+            // the change fallback is ANONYMOUS to used when there is no authenticated user
+
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            String changedBy = (auth != null && auth.getName() != null && !auth.getName().isBlank()) ? auth.getName()
+                    : "SYSTEM";
+            audit.setChangedBy(changedBy);
 
             // Saving audit record so it appears in the audit trail endpoint
             additionalInfoAuditRepository.save(audit);// saving the audit after the main entity ensures that:The trade
@@ -316,20 +353,11 @@ public class AdditionalInfoService {
         if (settlementText != null && !settlementText.trim().isEmpty()) {
             settlementText = settlementText.trim();
 
-            if (settlementText.length() < 10 || settlementText.length() > 500) {
-                throw new IllegalArgumentException("Settlement instructions must be between 10 and 500 characters.");
-            }
-
-            if (settlementText.contains(";") ||
-                    settlementText.contains("--") ||
-                    settlementText.toLowerCase().contains("drop table") ||
-                    settlementText.toLowerCase().contains("delete from")) {
-                throw new IllegalArgumentException("Settlement instructions contain unsafe or invalid characters.");
-            }
-
-            // Allow structured input with quotes and formatting safely
-            if (!settlementText.matches("^[a-zA-Z0-9 ,.:;'\"/\\-\\n\\r]+$")) {
-                throw new IllegalArgumentException("Unsupported format. Only structured text is allowed.");
+            // REFACTOR: centralised settlement validation via the validation engine
+            TradeValidationResult validationResult = tradeValidationEngine
+                    .validateSettlementInstructions(settlementText);
+            if (!validationResult.isValid()) {
+                throw new IllegalArgumentException(validationResult.getErrors().get(0));
             }
         }
 

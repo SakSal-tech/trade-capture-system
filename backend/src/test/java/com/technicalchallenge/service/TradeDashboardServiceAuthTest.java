@@ -13,7 +13,6 @@ import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.technicalchallenge.model.UserPrivilege;
-import com.technicalchallenge.service.UserPrivilegeService;
 import com.technicalchallenge.mapper.TradeMapper;
 import com.technicalchallenge.repository.TradeRepository;
 import com.technicalchallenge.validation.UserPrivilegeValidationEngine;

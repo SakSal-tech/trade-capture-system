@@ -5,13 +5,10 @@ import com.technicalchallenge.dto.AdditionalInfoDTO;
 import com.technicalchallenge.dto.AdditionalInfoRequestDTO;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.mapper.AdditionalInfoAuditMapper;
-import com.technicalchallenge.mapper.AdditionalInfoMapper;
 import com.technicalchallenge.mapper.TradeMapper;
-import com.technicalchallenge.model.AdditionalInfo;
 import com.technicalchallenge.model.AdditionalInfoAudit;
 import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.repository.AdditionalInfoAuditRepository;
-import com.technicalchallenge.repository.AdditionalInfoRepository;
 import com.technicalchallenge.service.AdditionalInfoService;
 import com.technicalchallenge.service.TradeService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +22,17 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+
+// Added: Swagger imports to ensure developers, auditors, or testers can open /swagger-ui.html and use endpoints
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+
+// Added. Security imports to implement access rights
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * Handles Settlement Instructions integration for trades.
@@ -40,6 +48,7 @@ import java.util.Set;
  * - entityId = trade ID this info belongs to
  */
 @RestController
+@Tag(name = "Trade Settlement Instructions", description = "Endpoints for managing trade settlement instructions and audit history")
 @RequestMapping("/api/trades")
 public class TradeSettlementController {
 
@@ -50,9 +59,6 @@ public class TradeSettlementController {
     private TradeMapper tradeMapper;
 
     @Autowired
-    private AdditionalInfoMapper additionalInfoMapper;
-
-    @Autowired
     private AdditionalInfoService additionalInfoService;
 
     @Autowired
@@ -60,9 +66,6 @@ public class TradeSettlementController {
 
     @Autowired
     private AdditionalInfoAuditRepository additionalInfoAuditRepository;
-
-    @Autowired
-    private AdditionalInfoRepository additionalInfoRepository;
 
     /**
      * Refactored ADDED:
@@ -80,6 +83,13 @@ public class TradeSettlementController {
      */
     @GetMapping("/search/settlement-instructions")
     @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')")
+    // OpenAPI: @Operation provides a short summary and description displayed
+    // in Swagger UI. @ApiResponses lists common HTTP responses for the endpoint.
+    @Operation(summary = "Search trades by settlement instruction text", description = "Performs a case-insensitive partial match across settlement instructions and returns matching trades as trade DTOs.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "List of trades matching the search"),
+            @ApiResponse(responseCode = "400", description = "Invalid or empty search text provided")
+    })
     public ResponseEntity<?> searchBySettlementInstructions(@RequestParam String instructions) {
 
         // If user provides nothing or only spaces, return HTTP 400
@@ -147,6 +157,12 @@ public class TradeSettlementController {
      */
     @GetMapping("/{id}/settlement-instructions")
     @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')")
+    // OpenAPI: Document this read endpoint for Swagger UI.
+    @Operation(summary = "Get settlement instructions for a trade", description = "Returns settlement instructions DTO for the specified trade ID if present.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Settlement instructions found and returned"),
+            @ApiResponse(responseCode = "404", description = "Trade or settlement instructions not found")
+    })
     public ResponseEntity<?> getSettlementInstructions(@PathVariable Long id) {
 
         // Confirm trade exists
@@ -186,8 +202,16 @@ public class TradeSettlementController {
      */
     @PutMapping("/{id}/settlement-instructions")
     @PreAuthorize("hasAnyRole('TRADER','SALES')")
+    // OpenAPI: Describe this mutation endpoint. @Parameter documents the path
+    // parameter 'id' in the generated API docs; @Operation provides summary.
+    @Operation(summary = "Create or update settlement instructions", description = "Creates or updates the settlement instructions for a trade and records an audit entry.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Settlement instructions created/updated"),
+            @ApiResponse(responseCode = "400", description = "Invalid request payload or validation failed"),
+            @ApiResponse(responseCode = "404", description = "Trade not found")
+    })
     public ResponseEntity<?> updateSettlementInstructions(
-            @PathVariable Long id,
+            @Parameter(name = "id", description = "Trade id", required = true) @PathVariable Long id,
             @RequestBody AdditionalInfoRequestDTO infoRequest) {
 
         // Confirm trade existence
@@ -204,9 +228,14 @@ public class TradeSettlementController {
 
         // Extract the settlement text (can be null or blank)
         String text = infoRequest.getFieldValue();
-
-        // Record who made the change (placeholder for logged-in user)
-        String changedBy = "CURRENT_USER";
+        // Refactored:Added Security measures which reads the current authenticated
+        // principal from
+        // Spring Security and uses its username if available to show and record who
+        // made
+        // the change fallback is ANONYMOUS to used when there is no authenticated user
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String changedBy = (auth != null && auth.getName() != null && !auth.getName().isBlank()) ? auth.getName()
+                : "ANONYMOUS";
 
         // Delegate logic to service layer (handles both create & update)
         AdditionalInfoDTO result = additionalInfoService.upOrInsertTradeSettlementInstructions(id, text, changedBy);
@@ -219,6 +248,12 @@ public class TradeSettlementController {
     // instruction changes.
     @GetMapping("/{id}/audit-trail")
     @PreAuthorize("hasAnyRole('ADMIN','MIDDLE_OFFICE')")
+    // OpenAPI: Expose audit trail endpoint details in Swagger UI.
+    @Operation(summary = "Get audit trail for settlement instructions", description = "Returns the history of changes to settlement instructions for a trade, ordered by most recent change.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Audit trail records returned"),
+            @ApiResponse(responseCode = "404", description = "No audit history found for the trade ID")
+    })
     public ResponseEntity<?> getAuditTrail(@PathVariable Long id) {
 
         // --- Step 1: Retrieve all audit records for this trade ---

@@ -563,3 +563,148 @@ Key actions to carry forward
 - Managing two DTOs added extra complexity, especially making sure the mapping between request and response was consistent.
 - Updating the service and repository to integrate the new logic took time, as I had to ensure that existing trade lookups still worked correctly.
 - Overall, today’s work felt like a good combination of design thinking, validation logic, and improving application safety.
+
+### Development Log — Settlement Instructions Integration (Steps 1–7)
+
+Feature: Integration of Settlement Instructions into Trade Capture Workflow
+Objective: To enable traders to capture settlement instructions directly during trade booking, reducing operational delays and errors.
+
+#### Repository Layer: Focused Queries for Faster Retrieval
+
+I started by enhancing the AdditionalInfoRepository to add purpose-built queries that allow focused lookups instead of scanning the entire table.
+
+The key addition was:
+`@Query("""
+       SELECT a FROM AdditionalInfo a
+       WHERE a.entityType = 'TRADE'
+         AND a.fieldName  = 'SETTLEMENT_INSTRUCTIONS'
+         AND a.active     = true
+         AND LOWER(a.fieldValue) LIKE LOWER(CONCAT('%', :keyword, '%'))
+       """)
+List<AdditionalInfo> searchTradeSettlementByKeyword(@Param("keyword") String keyword);`
+
+This supports case-insensitive, partial text searches on settlement instructions — an explicit business requirement for the operations team.
+I used the SQL LIKE wildcard (%keyword%) so users can search for phrases like “Euroclear” even if it appears mid-sentence.
+
+This is much more efficient than the previous findAll() and in-memory .filter() approach, which had a time complexity of O(n) on the application side.
+By pushing the filtering down to the database layer, we move closer to O(log n) due to indexed lookups (once indexing was added in Step 2).
+
+#### Database Optimisation: Adding Indexes
+
+Next, I added composite indexes to the AdditionalInfo entity to improve query performance.
+
+`@Table(
+  name = "additional_info",
+  indexes = {
+    @Index(name = "idx_entity_type_field_entity", columnList = "entity_type, field_name, entity_id"),
+    @Index(name = "idx_field_value", columnList = "field_value")
+  }
+)`
+
+The first index accelerates lookups for queries that identify records by entity type and ID (used in findActiveOne() and similar methods).
+The second index supports LIKE-based text searches in searchTradeSettlementByKeyword().
+
+Although the second index doesn’t make LIKE '%keyword%' truly constant time, it does help the database prune results faster, improving real-world performance.
+
+#### Service Layer Refactor: Business Logic and Validation
+
+I refactored AdditionalInfoService to include clear, business-focused methods for settlement instructions.
+Previously, the controller directly performed validation and persistence logic, which violated separation of concerns.
+
+The refactored methods (createAdditionalInfo, updateAdditionalInfo, and the new settlement-specific methods) now handle:
+
+    Length checks (10–500 chars)
+
+    SQL injection prevention (rejects dangerous patterns like ;, --, DROP TABLE)
+
+    Regex-based content validation
+
+    Structured text support for multiline “label: value” formats
+
+This centralises validation in the service layer, ensuring consistent rules whether data comes from the UI or an API.
+Complexity-wise, validation operations are O(n) in string length, which is negligible since the field has a capped size.
+
+#### Audit Trail Implementation
+
+To meet the Audit Trail business requirement, I introduced a new entity:
+
+AdditionalInfoAudit
+
+This records every change to settlement instructions, storing:
+
+    Old and new values
+
+    User who made the change
+
+    Timestamp
+
+While not all user roles need to view this data, ADMIN and MIDDLE_OFFICE roles can retrieve it via a dedicated endpoint:
+`@GetMapping("/{id}/audit-trail")`
+This ensures full traceability for compliance, regulatory reporting, and internal controls.
+Each change record is independent of the main AdditionalInfo table, so write operations have slightly higher cost (O(1) insert for each change), but with high accountability benefits.
+
+#### Controller Refactor: Clean Delegation
+
+I replaced inline controller logic with clean service-layer calls in TradeSettlementController.
+For example, the updateSettlementInstructions() method was refactored to delegate to a single service method:
+`AdditionalInfoDTO result =
+additionalInfoService.upOrInsertTradeSettlementInstructions(id, text, changedBy);`
+This “upInsert” (update-or-insert) approach simplifies handling of both new and amended settlement instructions.
+It aligns with business rules allowing traders to edit settlement instructions at any stage, while maintaining audit tracking automatically.
+
+This also improves maintainability — the controller is now focused solely on HTTP and role logic, not database operations.
+
+#### Mapper Sanity Check and Versioning
+
+I revisited AdditionalInfoMapper to ensure that conversions between entities and DTOs were safe and future-proof.
+
+I added a version field to the entity, annotated with:
+`@Version`
+This enables optimistic locking — preventing two users from overwriting each other’s changes to the same record.
+The first update succeeds and increments the version (starting at 1), while any concurrent update throws an OptimisticLockException.
+
+This is an essential part of data integrity in multi-user systems and meets audit and risk management expectations.
+
+The mapper also includes a small “sanity check” step: it ensures that null DTOs or entities don’t cause runtime exceptions and that field values are correctly defaulted where missing (e.g., fieldType = "STRING").
+
+#### Repository Enhancements and Final Linkages
+
+In TradeRepository, I confirmed the existence of:
+`List<Trade> findAllByTradeIdIn(List<Long> tradeIds);`
+This method allows retrieving all trades by a list of IDs, used by the searchBySettlementInstructions() controller.
+
+It is a derived query method generated automatically by Spring Data JPA — clean, type-safe, and efficient (translates to SQL WHERE trade_id IN (...)).
+
+I also ensured that all Optional imports were correctly included (for example, in findActiveOne()), so that the service layer can handle “record not found” scenarios safely, avoiding NullPointerException.
+
+#### Reflection and Alternatives Considered
+
+Alternative to AdditionalInfo Table Extension
+
+I could have added settlement_instructions directly into the Trade table (simpler schema).
+
+However, I chose to use the existing AdditionalInfo extensible architecture for long-term scalability — it allows storing future optional fields (like “Delivery Notes”) without schema changes.
+
+#### Audit Trail Alternatives
+
+Could have used database triggers or Hibernate Envers, but I implemented a lightweight manual table for clarity and control.
+
+#### Performance Considerations
+
+Indexes ensure faster lookups. Without them, most repository searches would remain O(n), which isn’t scalable for production data volumes.
+
+#### Validation and Security
+
+Validation at service level prevents SQL injection and malicious payloads early in the request cycle, which is both safer and easier to test.
+
+#### Learned
+
+Planning for betternService Centralised validation + audit logic Consistency and security
+Controller Cleaned endpoints to delegate to service Better architecture
+Mapper Added safety checks and versioning Prevent data corruption
+Audit Trail Implemented via new entity and endpoint Traceability for compliance
+Versioning Enabled optimistic locking Data integrity and concurrency safety
+
+Overall, these steps transformed the system from a procedural, controller-heavy design into a layered, maintainable architecture that meets all business, audit, and performance requirements.
+
+The settlement instruction feature is now searchable, editable, auditable, and efficient, with all logic cleanly separated across the repository, service, and controller layers — ready for front-end integration.

@@ -5,8 +5,6 @@ import com.technicalchallenge.mapper.BookMapper;
 import com.technicalchallenge.model.Book;
 import com.technicalchallenge.repository.BookRepository;
 import com.technicalchallenge.repository.CostCenterRepository;
-import com.technicalchallenge.repository.TradeRepository;
-
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 

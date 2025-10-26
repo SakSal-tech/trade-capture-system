@@ -9,7 +9,7 @@ import lombok.Setter;
 
 The controller will accept this DTO in POST or PUT methods.
 
-The backend will convert it to an AdditionalInfo entity using your Mapper.
+The backend will convert it to an AdditionalInfo entity using Mapper.
 
 After saving, the backend returns an AdditionalInfoDTO (the response)
  */
