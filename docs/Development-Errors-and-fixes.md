@@ -3640,7 +3640,7 @@ Added another layer of security to the Spring Security and Controller access rig
 - Trade delete operations changed to logical delete (mark trade status CANCELLED and/or set active=falseso cancelled trades are hidden from active queries rather than physically removed.
 - Removed the permissive test-only shortcut in hasPrivilege and updated tests to explicitly mock UserPrivilegeService where a lenient default was previously assumed.
 
-Tests & verification
+### Tests & verification
 
 - Updated unit and integration tests that relied on the permissive behavior. Where the authorization decision wasn't under test, tests now explicitly mock UserPrivilegeService to return the needed privileges.
 - Added (recommendednegative integration test to assert that a TRADER cannot view another trader's summary. (If not yet present, this is the next high-priority test to add.)
@@ -3652,7 +3652,7 @@ Tests & verification
     - curl -i -u simon:password "http://localhost:8080/api/dashboard/summary?traderId=simon" # 200
     - curl -i -u simon:password "http://localhost:8080/api/dashboard/summary?traderId=joey" # 403 JSON
 
-Notes and follow-ups
+### Notes and follow-ups
 
 - Logging added for debugging should be reduced to INFO/WARN in production to avoid leaking sensitive data.
 - Sweep other helper methods named \*WithoutPrivilegeCheck and either remove them or add defensive authorization checks/caller contracts.
@@ -3673,13 +3673,13 @@ Solution
 - Converted the original test into a proper integration test that persists required fixtures (books, counterparties, tradesand uses the business `tradeId` for controller requests. Removed mocks that masked repository/service behaviour. Where unit-like isolation was still required, the `UserPrivilegeService` is explicitly mocked to provide the needed privilege results so tests remain deterministic. Added `@Transactional` + `@Rollback` to ensure test isolation and avoid seed-data collisions.
 - Ensured test authentication is explicit (either `@WithMockUser` or programmatic login with session persistenceand that CSRF tokens are supplied for mutating requests. Verified that the test exercises controller → service → repository paths and asserts on the business-level trade id and JSON response structure.
 
-Impact
+### Impact
 
 - The test now validates the full stack behaviour and catches integration-level issues (missing reference data, incorrect id-type usage, security context persistence). It prevented a false sense of correctness that had previously come from over-mocked unit-style tests. A small amount of added test setup (fixtures and explicit privilege stubbingmade the test slower but far more trustworthy.
 
 ### Problem — SummaryIntegrationTest: proper integration test with one mock added
 
-Problem
+### Problem
 
 - `SummaryIntegrationTest` was a proper integration test that exercised controller→service→repo. During the refactor a single `@MockBean` was added for `UserPrivilegeService` to make privilege responses deterministic when authorization decisions were not under test.
 
@@ -3775,4 +3775,48 @@ Added the following method to the repository:
 
 ```java
 List<Trade> findAllByTradeIdIn(List<Long> tradeIds);
+
+---
+
+## 2025-10-26 — Errors encountered while implementing Settlement Instructions refactor
+
+Summary of errors, root causes and fixes applied on 2025-10-26 while centralising settlement instruction validation,
+wiring audit usernames and getting tests to run in the backend module.
+
+- Problem: ApplicationContext bootstrap failed during tests with a NoSuchBeanDefinitionException for SettlementInstructionValidator.
+    - Root cause: The new `SettlementInstructionValidator` class was added but not registered as a Spring bean (no stereotype or @Configuration registration).
+    - Action / Fix: Added `@Component` to `com.technicalchallenge.validation.SettlementInstructionValidator` so Spring component-scan picks it up. This resolved the No qualifying bean error and allowed tests to start the ApplicationContext.
+
+- Problem: `AdditionalInfoService` constructor included an unused `SettlementInstructionValidator` parameter and assignment.
+    - Root cause: During refactor the service constructor signature was not reconciled with the final wiring (the validator is now obtained via the validation engine adapter), leaving an unused parameter/assignment.
+    - Action / Fix: This is noted for cleanup — remove the unused constructor parameter/field assignment in `AdditionalInfoService` to avoid confusion and compiler warnings. (Pending change)
+
+- Problem: Several Maven invocations failed while capturing test output and surefire reports.
+    - Examples: Running `mvn` from the repository root (no POM) produced a MissingProjectException; a later invocation used the wrong working directory (`backend/backend`) due to an automated command, causing a "no POM in this directory" error in some attempts.
+    - Action / Fix: Run Maven from the module directory that contains the POM (`.../backend`). When invoking from an external tool, pass `-f backend/pom.xml` or change to the backend dir first. Re-ran the targeted test from the correct directory and confirmed green results for the targeted class.
+
+- Problem: Some terminal/test attempts produced misleading failures due to typos or wrong commands (e.g. `vn` instead of `mvn`) or incorrect -f path usage.
+    - Action / Fix: Corrected the commands and executed `mvn -Dtest=com.technicalchallenge.controller.TradeControllerTest test -e` from the absolute `backend` directory to capture the ApplicationContext stacktrace and then confirm success after the bean fix.
+
+- Problem: Test security configuration in tests caused incorrect bean type/signature for the test user password handling.
+    - Root cause: A test security bean was returning the wrong type or failed to encode the test user's password with a PasswordEncoder, leading to authentication mismatches in test contexts.
+    - Action / Fix: Fixed `TestSecurityConfig` to return a `UserDetailsService` and use a `BCryptPasswordEncoder` to encode the test user's password in tests.
+
+- Problem: Attempted automated append to the main DeveloperLog failed repeatedly.
+    - Action / Fix: Created a dedicated document `docs/SettlementInstructions-Refactor-2025-10-26.md` containing the full refactor notes as a fallback and included a short summary here.
+
+- Problem: OpenAPI/Swagger annotations/imports added to `TradeSettlementController` risk unused-import warnings (detected during manual review).
+    - Action / Fix: Plan: either add the missing `@Operation/@ApiResponse/@Parameter` annotations to the controller methods so imports are used, or remove unused imports. This is tracked in the repo TODOs.
+
+### Verification performed
+
+- Re-ran `com.technicalchallenge.controller.TradeControllerTest` from the `backend` module after registering the validator bean: Tests for that class ran and passed (7 tests, 0 errors).
+
+### Next steps
+
+- Remove the unused `SettlementInstructionValidator` constructor parameter/assignment from `AdditionalInfoService` (small code cleanup).
+- Re-run the full backend test suite and confirm no further ApplicationContext bootstrap errors.
+- Add unit tests for `SettlementInstructionValidator` and service-level tests around AdditionalInfo create/update/upsert flows (validation + audit username wiring).
+
+---
 ```

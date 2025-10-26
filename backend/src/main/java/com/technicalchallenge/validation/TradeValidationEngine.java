@@ -38,6 +38,26 @@ public class TradeValidationEngine {
         }
         return result;
     }
+
+    /**
+     * Added: Delegates settlement-instruction validation to the field-level
+     * validator.
+     *
+     * Rationale: Settlement instructions are a field-level concern (free text)
+     * rather than a full TradeDTO validation. Providing a single entry point on
+     * the validation engine keeps validation orchestration consistent across the
+     * codebase and makes future additions easier.
+     *
+     * This method intentionally instantiates the field validator directly to
+     * avoid changing bean wiring elsewhere; it adapts the existing validator to
+     * the engine's orchestration model.
+     */
+    public TradeValidationResult validateSettlementInstructions(String text) {
+        TradeValidationResult result = new TradeValidationResult();
+        // Field-level validator handles trimming, length and character rules
+        new SettlementInstructionValidator().validate(text, result);
+        return result;
+    }
     // Adding this line to force commit
 
 }

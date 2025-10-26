@@ -6,9 +6,7 @@ import org.springframework.data.jpa.domain.Specification;
 import com.technicalchallenge.model.Trade;
 
 import static org.junit.jupiter.api.Assertions.*; // For assertions like assertNotNull
-import static org.mockito.Answers.*;
 import org.mockito.Mockito;
-
 import cz.jirutka.rsql.parser.ast.AndNode;
 import cz.jirutka.rsql.parser.ast.ComparisonNode;
 import cz.jirutka.rsql.parser.ast.ComparisonOperator;

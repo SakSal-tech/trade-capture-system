@@ -2,7 +2,6 @@ package com.technicalchallenge.controller;
 
 import org.springframework.test.context.ActiveProfiles;
 
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.annotation.Rollback;
@@ -17,7 +16,6 @@ import com.technicalchallenge.repository.BookRepository;
 import com.technicalchallenge.repository.CounterpartyRepository;
 import com.technicalchallenge.repository.TradeRepository;
 import com.technicalchallenge.repository.TradeStatusRepository;
-import com.technicalchallenge.service.TradeDashboardService;
 
 import java.time.LocalDate;
 
@@ -62,9 +60,6 @@ public class SummaryIntegrationTest extends BaseIntegrationTest {
 
         @Autowired
         private TradeRepository tradeRepository;
-
-        @Autowired
-        private TradeDashboardService tradeDashboardService;
 
         @Autowired
         private BookRepository bookRepository;

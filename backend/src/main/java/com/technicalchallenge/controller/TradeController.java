@@ -105,7 +105,7 @@ public class TradeController {
             infoRequest.setFieldName("SETTLEMENT_INSTRUCTIONS");
             infoRequest.setFieldValue(instructions.trim());
 
-            // Save the settlement info using your existing service
+            // Save the settlement info using existing service
             additionalInfoService.createAdditionalInfo(infoRequest);
         }
 

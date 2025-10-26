@@ -1,6 +1,5 @@
 package com.technicalchallenge.service;
 
-import com.technicalchallenge.dto.SearchCriteriaDTO;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
 import com.technicalchallenge.mapper.TradeMapper;
@@ -20,15 +19,11 @@ import org.mockito.quality.Strictness; // FIX: import for lenient strictness
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import org.springframework.data.jpa.domain.Specification;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Page;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT) // FIX: Prevent UnnecessaryStubbingException across tests with
