@@ -172,18 +172,30 @@ public class TradeSettlementController {
                     .body("Trade not found with ID: " + id);
         }
 
-        // Refactored: Instead of manually searching through all records,
-        // the controller now delegates to the service for a single lookup.
-        Optional<AdditionalInfoDTO> recordOpt = additionalInfoService.getTradeSettlementInstructions(id);
-
-        // If not found, return a 404 message
-        if (recordOpt.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("No settlement instructions found for trade ID: " + id);
+        /*
+         * -Moved logic into AdditionalInfoService so authorization,
+         * validation, audit and persistence are handled in one place (cleaner
+         * code, easier tests, stronger security).
+         * 200 = record exists and you can view it.
+         * 404 = no settlement instructions saved for that trade (not a
+         * permission issue).
+         * 403 = you are not the trade owner and lack privileges.
+         * - Rows disappearing after restart? That's caused by
+         * spring.jpa.hibernate.ddl-auto=create-drop. Change to 'update' or
+         */
+        try {
+            AdditionalInfoDTO dto = additionalInfoService.getSettlementInstructionsByTradeId(id);
+            if (dto == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("No settlement instructions found for trade ID: " + id);
+            }
+            return ResponseEntity.ok(dto);
+        } catch (org.springframework.security.access.AccessDeniedException ade) {
+            // Let the global exception handler map this to a 403 with a clear
+            // message, but return here for clarity in the controller flow.
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Insufficient privileges to view settlement instructions for trade " + id);
         }
-
-        // Return the found record as a DTO
-        return ResponseEntity.ok(recordOpt.get());
     }
 
     /**

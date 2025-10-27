@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 // @SpringBootTest boots the full Spring context (controllers, services, repositories and DB)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ActiveProfiles("test")
 @AutoConfigureMockMvc
 public class AdditionalInfoIntegrationTest {
 
@@ -42,7 +44,11 @@ public class AdditionalInfoIntegrationTest {
     @DisplayName("Controller -> Service -> Repository: settlement instruction audit records must store authenticated username")
     // The controller PUT endpoint requires TRADER or SALES to edit settlement
     // instructions. Use role TRADER in the test so security checks succeed.
-    @WithMockUser(username = "alice", roles = { "TRADER" })
+    // The trade with tradeId=200001 in the seed data belongs to 'simon'.
+    // Use Simon as the authenticated principal so the ownership check in the
+    // service permits the operation and the test remains focused on audit
+    // behaviour rather than authorization policy.
+    @WithMockUser(username = "simon", roles = { "TRADER" })
     /*
      * This integration test boots the application context, calls the
      * AdditionalInfo controller to persist settlement instructions, and
@@ -84,16 +90,17 @@ public class AdditionalInfoIntegrationTest {
         for (AdditionalInfoAudit a : audits) {
             if (a == null)
                 continue; // skip null entries if present
-            if ("alice".equals(a.getChangedBy()) && "SETTLEMENT_INSTRUCTIONS".equals(a.getFieldName())) {
+            if ("simon".equals(a.getChangedBy()) && "SETTLEMENT_INSTRUCTIONS".equals(a.getFieldName())) {
                 audit = a;
                 break; // stop on first match
             }
         }
 
         // Assert that a matching audit record was found and contains the
+        // authenticated principal noted in the audit.
         assertThat(audit).isNotNull();
         Objects.requireNonNull(audit);
-        assertThat(audit.getChangedBy()).isEqualTo("alice");
+        assertThat(audit.getChangedBy()).isEqualTo("simon");
         assertThat(audit.getFieldName()).isEqualTo("SETTLEMENT_INSTRUCTIONS");
     }
 }

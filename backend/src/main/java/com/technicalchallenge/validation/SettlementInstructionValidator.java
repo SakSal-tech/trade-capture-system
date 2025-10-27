@@ -9,8 +9,11 @@ public class SettlementInstructionValidator {
 
     private static final Pattern UNESCAPED_QUOTE = Pattern.compile("(?<!\\\\)[\"']");
     // allow letters, numbers, spaces and common punctuation; allow escaped quotes
-    // (\\" or \\\')
-    private static final String ALLOWED_PATTERN = "^(?:(?:\\\\['\"])|[\\p{L}\\p{N} ,.:/()\\-\\n\\r])+$";
+    // (\\" or \\\\')
+    // Refactored after I got 500 as Put request contained T +1 to include '+' (e.g.
+    // T+1) which is commonly used in settlement notes e.g Monday trade is T. T+1 is
+    // next day.
+    private static final String ALLOWED_PATTERN = "^(?:(?:\\\\['\"])|[\\p{L}\\p{N} ,.:/()\\-\\n\\r\\+])+$";
 
     public void validate(String text, TradeValidationResult result) {
 

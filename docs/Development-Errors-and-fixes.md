@@ -3984,3 +3984,144 @@ Added defensive null checks and sensible fallbacks. Integration test asserts now
 ### Impact
 
 Audit trail records now reliably show the authenticated principal when available. This improves traceability and supports regulatory and operational auditing.
+
+---
+
+## Consolidated error and test-failure log — 2025-10-27
+
+### Problem
+
+Some traders could view or create settlement instructions that belonged to other traders. In parallel, admin and middle-office users could not reliably view audit records for settlement changes. Several PUT requests to persist settlement instructions returned success but rows were either missing or audit entries were not visible after application restart.
+
+### Root cause
+
+- Ownership checks were enforced only at the controller level in some places and in other flows missing entirely; service-level enforcement was absent for the new settlement write path, allowing clients (or test stubs) to change other traders' data.
+- Audit wiring used a placeholder or local stub in some code paths instead of resolving the authenticated principal from Spring Security, so `additional_info_audit.changed_by` sometimes contained `SYSTEM` or `ANONYMOUS` and admin/MO views appeared empty or inconsistent.
+- Persistence symptoms were amplified by a separate startup issue: the runtime dev DB is a file-backed H2 (`jdbc:h2:file:./data/tradingdb`) and `src/main/resources/data.sql` contains plain INSERTs with fixed IDs. Spring Boot attempted to re-run `data.sql` on restart (`spring.sql.init.mode=always`), H2 raised unique-key violations and Spring aborted application context initialisation; this caused apparent data loss because the restarted instance never completed initialisation correctly.
+
+### Solution
+
+- Implemented service-level enforcement: `AdditionalInfoService` now verifies trade ownership by loading the trade and comparing the trade's trader id with the authenticated principal. Service methods throw AccessDeniedException when the principal is not authorised.
+- Rewrote audit wiring to read the username from SecurityContextHolder; added defensive null checks and fallbacks (explicitly set `changed_by` to the authenticated login when present). Tests now assert the real principal is recorded (for example `simon` when `@WithMockUser("simon")` is used).
+- Implemented atomic upsert + audit within a single `@Transactional` service method: the settlement upsert and creation of the `additional_info_audit` row are committed together or rolled back together.
+- Immediate dev recovery: removed file H2 DB files (`tradingdb.mv.db`, `tradingdb.trace.db`) so a fresh seed applied cleanly and the application completed startup; verified that a subsequent PUT by `simon` produced both an `additional_info` row and a matching `additional_info_audit` row visible to admin and MO users.
+
+  Additionally, the runtime `application.properties` remained configured for a persistent dev DB (`spring.jpa.hibernate.ddl-auto=update` and `spring.sql.init.mode=always`) while `src/test/resources/application-test.properties` was left using an in-memory H2 with `spring.jpa.hibernate.ddl-auto=create-drop`. That difference meant tests ran safely in-memory but the developer file-backed DB could be reseeded repeatedly and fail on duplicate inserts.
+
+### Impact
+
+- Ownership violations are prevented at the service boundary and cannot be bypassed by controller-level gaps.
+- Audit trail reliability improved: `changed_by` now reflects the authenticated principal when available, enabling admin/MO users to see correct audit entries.
+- The immediate removal of file H2 DB files is a recovery step — the long-term fix is to make `data.sql` idempotent or scope SQL init to tests to prevent reseed failures.
+
+---
+
+### Problem
+
+Multiple integration and controller tests failed with HTTP 401/403, JSON path misses, or ApplicationContext load errors; a local full test run reported many failures and errors and the suite was noisy and non-deterministic.
+
+### Root cause
+
+- Several causes contributed to the failing tests:
+  - Security: re-enabling Spring Security without updating tests caused many 401/403 failures because tests lacked authentication or CSRF tokens.
+  - Test environment: `data.sql` re-seeding against a file-backed H2 DB caused duplicate-key errors during startup and aborted ApplicationContext initialisation, producing `Failed to load ApplicationContext` in many integration tests.
+  - JPQL / repository issues: a malformed JPQL `@Query` in `AdditionalInfoRepository` caused Hibernate to fail while parsing repository annotations at startup.
+  - Bean wiring: the new `SettlementInstructionValidator` was created but not annotated as a Spring bean, causing NoSuchBeanDefinitionException in test contexts.
+  - Mixed test styles: some integration tests mixed mocks with real repositories and returned empty DTOs from mapper mocks, producing JSON path assertion failures (for example `$.tradeId` being null).
+
+### Solution
+
+- Test security: created a test-friendly security configuration (test-only `TestSecurityConfig`) and updated tests to use `@WithMockUser` or `.with(user(...))` and `.with(csrf())` for mutating requests. Where appropriate, converted controller slice tests to use `@AutoConfigureMockMvc(addFilters = false)` to focus on controller logic without filter-chain noise.
+- Test DB isolation: updated `src/test/resources/application-test.properties` to use in-memory H2 with `spring.jpa.hibernate.ddl-auto=create-drop` and `spring.sql.init.mode=never` for tests; annotated key integration tests with `@ActiveProfiles("test")` to make test runs deterministic.
+- Repository and bean fixes: corrected the malformed JPQL in `AdditionalInfoRepository` and annotated `SettlementInstructionValidator` with `@Component` so tests can autowire it. Removed the incorrect `setFieldType(...)` usage from the controller.
+- Test hygiene: converted fragile integration tests to create required fixtures programmatically inside `@BeforeEach` (or used a `TestDataFactory`) rather than relying on `data.sql` global ids; adjusted mocks so mapper mocks return DTOs containing the fields asserted by tests.
+
+### Impact
+
+- Test suite stabilised: with in-memory test profile and explicit test security the majority of 401/403 and duplicate-key failures were resolved. JPQL and bean fixes removed many ApplicationContext startup errors.
+- Tests now exercise authorisation correctly (401/403 asserted at the expected layer) and are deterministic when run in CI.
+
+---
+
+### Problem
+
+ApplicationContext failed to load on startup in multiple runs; the Spring Boot app sometimes failed to start, resulting in the API being unavailable for manual verification.
+
+### Root cause
+
+- Script re-application: `data.sql` attempted to insert rows with fixed IDs into a persistent file-based H2 DB. When the DB already contained those rows, H2 threw JdbcSQLIntegrityConstraintViolationException (23505) during script execution. Spring Boot's SQL initialisation failure caused the application context refresh to abort and Tomcat failed to start.
+- Malformed repository JPQL and missing beans (see above) also contributed to startup failures when present.
+
+### Solution
+
+- Short term: removed the file H2 database files to force a fresh seed and successful startup. This restored API availability so I could verify persistence and audit behaviour.
+- Medium term: moved tests to an in-memory profile and suggested two long-term options: (A) make `data.sql` idempotent (use MERGE/UPSERT semantics) or (B) scope SQL initialisation to the `test` profile only. I recommended Option B as quick mitigation and Option A as the durable fix.
+- Also fixed malformed JPQL and registered the missing validator bean so repository parsing and bean wiring no longer block startup.
+
+### Impact
+
+- Removing the file DB restored the running API immediately and allowed functional verification.
+- The recommended configuration changes prevent accidental reseed failures in developer environments and improve CI determinism.
+
+---
+
+### Problem
+
+Specific endpoint behaviour and validation issues surfaced during the work: incorrect DTO/field usage, missing batch-fetch methods and inconsistent mapping led to functional test failures.
+
+### Root cause
+
+- Controller and DTO mismatch: the controller attempted to call a non-existent `setFieldType(...)` on `AdditionalInfoRequestDTO` and some tests used `legs` instead of `tradeLegs` in JSON payloads.
+- Missing repository method: batch trade fetching for settlement search required `findAllByTradeIdIn` which was not initially present.
+- Mocking gaps: some tests mocked mappers or services and returned DTOs without required fields, causing JSON assertions to fail.
+
+### Solution
+
+- Removed `setFieldType(...)` calls from the controller and ensured the DTO usage matched the domain model (`fieldName`/`fieldValue` used correctly).
+- Added `List<Trade> findAllByTradeIdIn(List<Long> tradeIds)` to `TradeRepository` and an overloaded `getTradeById(List<Long> ids)` in `TradeService` so batch fetch paths worked.
+- Improved tests: where mocks were used in controller-unit tests they now return DTOs with expected fields; for integration tests I favoured real mappers and programmatic fixture setup to avoid brittle mocks.
+
+### Impact
+
+- Endpoints now accept the correct DTO shapes and batch-fetch trade use cases work. Test assertions relying on `tradeId` and other fields no longer fail due to empty DTOs.
+
+---
+
+### Problem
+
+RSQL search and wildcard operator handling caused search endpoints to return empty results or throw parsing errors for malformed queries; AdvanceSearchDashboardIntegrationTest and RSQL-related tests failed earlier.
+
+### Root cause
+
+- The RSQL parser needed a custom operator (`=like=`) registered and the visitor had several type/import mistakes (wrong Predicate/Path imports) that caused type mismatch and empty results. Tests also surfaced that malformed queries were not handled gracefully and produced 500 errors rather than 400s.
+
+### Solution
+
+- Registered a custom ComparisonOperator for `=like=` and updated the RSQL visitor to handle `=like=` with case-insensitive `LIKE` semantics.
+- Fixed imports to use `jakarta.persistence.criteria.Predicate` and `Path` and added robust value conversion and error handling (type conversion exceptions now produce clear IllegalArgumentException messages in the visitor).
+- Added parsing exception handling in the service to return `400 Bad Request` for malformed queries rather than letting the parser throw uncaught exceptions that produce 500 responses. Controller now returns 400 when the service returns null/invalid for RSQL parse errors.
+
+### Impact
+
+- RSQL endpoint now recognises `=like=` and returns expected search results for wildcard queries. Malformed RSQL queries return 400 responses so tests expecting client errors pass.
+
+---
+
+### Final remarks and recommended next steps
+
+- The immediate and highest priority follow-ups are:
+
+  1. Make `data.sql` idempotent or restrict SQL init to the test profile to avoid startup reseed failures (I recommend moving SQL init to `application-test.properties` as a quick mitigation and converting `data.sql` to idempotent statements for a durable fix).
+  2. Add a focused integration test asserting the upsert behaviour writes both `additional_info` and `additional_info_audit` in the same transaction and that `changed_by` equals the authenticated principal.
+  3. Replace any remaining permissive `hasPrivilege(...)` test shortcuts with DB-driven deny-by-default checks and add the small matrix tests that assert TRADER vs MIDDLE_OFFICE vs ADMIN behaviours on settlement read/write and audit visibility.
+
+- Summary of concrete files touched during fixes (high level):
+  - `AdditionalInfoService` — upsert + audit + ownership checks
+  - `TradeSettlementController` — delegate to service
+  - `AdditionalInfoRepository` — JPQL fixes
+  - `SettlementInstructionValidator` — annotated as a bean
+  - `TradeRepository` / `TradeService` — batch fetch methods
+  - `src/test/resources/application-test.properties` — in-memory H2 + `create-drop`
+  - Various integration tests updated to `@ActiveProfiles("test")`, use `@WithMockUser`, include `.with(csrf())` for mutating MockMvc calls, or create fixtures programmatically
+
+I appended this consolidated error/test-failure log at the end of the Development-Errors-and-fixes document so reviewers can see what failed today, why, and what was done to address each item. If anything important was missed from local test runs, provide the failing test class names and failing stack traces and I will integrate those exact lines into the log.

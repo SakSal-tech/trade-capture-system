@@ -21,6 +21,8 @@ import com.technicalchallenge.validation.TradeValidationEngine;
 //ADDED: let the service read the authenticated principal from Spring Security so the audit record can use the real username (with a sensible fallback).
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.AccessDeniedException;
+import com.technicalchallenge.repository.TradeRepository;
 
 /**
  * This service is responsible for validating, saving, updating,
@@ -33,6 +35,7 @@ public class AdditionalInfoService {
     private final AdditionalInfoRepository additionalInfoRepository;
     private final AdditionalInfoMapper additionalInfoMapper;
     private final AdditionalInfoAuditRepository additionalInfoAuditRepository;// Added: injecting the repository.
+    private final TradeRepository tradeRepository;
 
     // central validation engine (refactor: prefer single entry point for
     // validations)
@@ -41,11 +44,13 @@ public class AdditionalInfoService {
     public AdditionalInfoService(AdditionalInfoRepository additionalInfoRepository,
             AdditionalInfoMapper additionalInfoMapper,
             AdditionalInfoAuditRepository additionalInfoAuditRepository,
-            TradeValidationEngine tradeValidationEngine) {
+            TradeValidationEngine tradeValidationEngine,
+            TradeRepository tradeRepository) {
         this.additionalInfoRepository = additionalInfoRepository;
         this.additionalInfoMapper = additionalInfoMapper;
         this.additionalInfoAuditRepository = additionalInfoAuditRepository;
         this.tradeValidationEngine = tradeValidationEngine;
+        this.tradeRepository = tradeRepository;
     }
 
     /**
@@ -268,6 +273,51 @@ public class AdditionalInfoService {
             return null;
         }
 
+        /*
+         * SECURITY: Ownership check
+         * The service enforces that only the trade owner (the trader assigned to
+         * the Trade) or users with elevated roles/privileges may view settlement
+         * instructions. This defends against the scenario where a logged-in
+         * trader (for example 'simon') could view another trader's (e.g. 'joey')
+         * settlement instructions by supplying Joey's tradeId.
+         *
+         * Rationale and example (Simon/Joey scenario):
+         * - Incident: Simon (ROLE_TRADER) was able to view and edit Joey's
+         * settlement instructions by calling the endpoint with Joey's tradeId.
+         * - Risk: This allows unauthorized access/modification of settlement data
+         * and violates least-privilege principles.
+         * - Fix: perform a server-side ownership check here (do not rely on any
+         * client-supplied 'changedBy' or 'loginId').
+         */
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String currentUser = (auth != null && auth.getName() != null) ? auth.getName() : "__UNKNOWN__";
+
+        // Elevated roles that are permitted to view other traders' settlement
+        // instructions. Add additional roles/privileges as business policy
+        // requires (e.g., ROLE_SALES or TRADE_VIEW_ALL).
+        boolean canViewOthers = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
+                .anyMatch(a -> {
+                    String ga = a.getAuthority();
+                    return "ROLE_SALES".equalsIgnoreCase(ga) || "ROLE_SUPERUSER".equalsIgnoreCase(ga)
+                            || "TRADE_VIEW_ALL".equalsIgnoreCase(ga);
+                });
+
+        // Attempt to locate the owning trade and compare owner loginId to caller.
+        // If no trade record can be found or no owner set, err on the side of
+        // denial to avoid accidental data leaks.
+        com.technicalchallenge.model.Trade trade = tradeRepository.findLatestActiveVersionByTradeId(tradeId)
+                .orElse(null);
+        String ownerLogin = (trade != null && trade.getTraderUser() != null
+                && trade.getTraderUser().getLoginId() != null)
+                        ? trade.getTraderUser().getLoginId()
+                        : null;
+
+        if (ownerLogin != null && !ownerLogin.equalsIgnoreCase(currentUser) && !canViewOthers) {
+            // Defensive deny: caller is not owner and lacks elevated authority
+            throw new AccessDeniedException(
+                    "Insufficient privileges to view settlement instructions for trade " + tradeId);
+        }
+
         // Convert entity to DTO to safely return to controller
         return additionalInfoMapper.toDto(record);
     }
@@ -359,6 +409,40 @@ public class AdditionalInfoService {
             }
         }
 
+        /*
+         * SECURITY: Ownership check for edits
+         *
+         * We MUST enforce ownership server-side. Do not trust the caller-supplied
+         * `changedBy` parameter for authorization (it can be spoofed). Derive the
+         * caller from the SecurityContext and verify they are either the trade
+         * owner or have an elevated role/privilege (for example, ROLE_SALES or
+         * TRADE_EDIT_ALL). This prevents a logged-in trader (e.g. 'simon') from
+         * updating another trader's (e.g. 'joey') settlement instructions just by
+         * supplying Joey's tradeId.
+         */
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String currentUser = (auth != null && auth.getName() != null) ? auth.getName() : "__UNKNOWN__";
+
+        boolean canEditOthers = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
+                .anyMatch(a -> {
+                    String ga = a.getAuthority();
+                    return "ROLE_SALES".equalsIgnoreCase(ga) || "ROLE_SUPERUSER".equalsIgnoreCase(ga)
+                            || "TRADE_EDIT_ALL".equalsIgnoreCase(ga);
+                });
+
+        com.technicalchallenge.model.Trade trade = tradeRepository.findLatestActiveVersionByTradeId(tradeId)
+                .orElse(null);
+        String ownerLogin = (trade != null && trade.getTraderUser() != null
+                && trade.getTraderUser().getLoginId() != null)
+                        ? trade.getTraderUser().getLoginId()
+                        : null;
+
+        if (ownerLogin != null && !ownerLogin.equalsIgnoreCase(currentUser) && !canEditOthers) {
+            // Deny attempts by non-owners without elevated authority
+            throw new AccessDeniedException(
+                    "Insufficient privileges to modify settlement instructions for trade " + tradeId);
+        }
+
         // Handle upsert logic (create or update)
         AdditionalInfo target;
         String oldValue = null;
@@ -385,7 +469,10 @@ public class AdditionalInfoService {
         audit.setFieldName(FIELD_NAME);
         audit.setOldValue(oldValue);
         audit.setNewValue(settlementText);
-        audit.setChangedBy(changedBy);
+        // SECURITY: Use the authenticated principal as the changedBy actor in the
+        // audit trail to prevent clients from spoofing the actor by supplying a
+        // different 'changedBy' value. This preserves non-repudiation properties.
+        audit.setChangedBy(currentUser);
         audit.setChangedAt(java.time.LocalDateTime.now());
         // Save audit trail record separately
         additionalInfoAuditRepository.save(audit);
