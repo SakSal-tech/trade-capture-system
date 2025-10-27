@@ -54,10 +54,29 @@ public class TradeValidationEngine {
      */
     public TradeValidationResult validateSettlementInstructions(String text) {
         TradeValidationResult result = new TradeValidationResult();
-        // Field-level validator handles trimming, length and character rules
-        new SettlementInstructionValidator().validate(text, result);
+        // Delegate to injected field-level validator (uses Spring DI)
+        settlementInstructionValidator.validate(text, result);
         return result;
     }
-    // Adding this line to force commit
+
+    // Refactored:Replaced direct instantiation of the validator inside the engine.
+    // Before: validateSettlementInstructions created a new instance inline.
+    private final SettlementInstructionValidator settlementInstructionValidator;
+
+    // Dependency injection (DI): using constructor injection aligns
+    // TradeValidationEngine with Spring DI patterns
+    public TradeValidationEngine(SettlementInstructionValidator settlementInstructionValidator) {
+        this.settlementInstructionValidator = settlementInstructionValidator;
+    }
+
+    /**
+     * No-arg constructor kept for backwards compatibility in unit tests and
+     * situations where Spring DI is not used. It constructs a default
+     * SettlementInstructionValidator. Production Spring wiring will use the
+     * constructor that accepts a validator bean.
+     */
+    public TradeValidationEngine() {
+        this(new SettlementInstructionValidator());
+    }
 
 }
