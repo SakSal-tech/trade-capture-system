@@ -47,7 +47,7 @@ public class TradeController {
      * All three can view trades.
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')")
+    @PreAuthorize("(hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')) or hasAuthority('TRADE_VIEW')")
     public ResponseEntity<List<TradeDTO>> getAllTrades() {
         List<Trade> trades = tradeService.getAllTrades();
         List<TradeDTO> tradeDTOs = trades.stream().map(tradeMapper::toDto).toList();
@@ -61,7 +61,7 @@ public class TradeController {
      * SUPPORT has view-only access.
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')")
+    @PreAuthorize("(hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')) or hasAuthority('TRADE_VIEW')")
     public ResponseEntity<TradeDTO> getTradeById(@PathVariable Long id) {
         Optional<Trade> tradeOpt = tradeService.getTradeById(id);
         return tradeOpt.map(trade -> ResponseEntity.ok(tradeMapper.toDto(trade)))

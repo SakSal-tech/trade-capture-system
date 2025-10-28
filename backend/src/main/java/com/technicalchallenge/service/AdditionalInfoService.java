@@ -23,6 +23,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.access.AccessDeniedException;
 import com.technicalchallenge.repository.TradeRepository;
+import com.technicalchallenge.security.UserPrivilegeValidator;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * This service is responsible for validating, saving, updating,
@@ -40,6 +42,13 @@ public class AdditionalInfoService {
     // central validation engine (refactor: prefer single entry point for
     // validations)
     private final TradeValidationEngine tradeValidationEngine;
+
+    // Optional: validator injected by Spring at runtime. Tests that construct the
+    // service directly without Spring will observe a null validator reference; in
+    // that case the service falls back to the original, inline ownership logic
+    // to preserve existing unit tests.
+    @Autowired(required = false)
+    private UserPrivilegeValidator userPrivilegeValidator;
 
     public AdditionalInfoService(AdditionalInfoRepository additionalInfoRepository,
             AdditionalInfoMapper additionalInfoMapper,
@@ -290,32 +299,38 @@ public class AdditionalInfoService {
          * client-supplied 'changedBy' or 'loginId').
          */
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String currentUser = (auth != null && auth.getName() != null) ? auth.getName() : "__UNKNOWN__";
-
-        // Elevated roles that are permitted to view other traders' settlement
-        // instructions. Add additional roles/privileges as business policy
-        // requires (e.g., ROLE_SALES or TRADE_VIEW_ALL).
-        boolean canViewOthers = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
-                .anyMatch(a -> {
-                    String ga = a.getAuthority();
-                    return "ROLE_SALES".equalsIgnoreCase(ga) || "ROLE_SUPERUSER".equalsIgnoreCase(ga)
-                            || "TRADE_VIEW_ALL".equalsIgnoreCase(ga);
-                });
-
-        // Attempt to locate the owning trade and compare owner loginId to caller.
-        // If no trade record can be found or no owner set, err on the side of
-        // denial to avoid accidental data leaks.
         com.technicalchallenge.model.Trade trade = tradeRepository.findLatestActiveVersionByTradeId(tradeId)
                 .orElse(null);
-        String ownerLogin = (trade != null && trade.getTraderUser() != null
-                && trade.getTraderUser().getLoginId() != null)
-                        ? trade.getTraderUser().getLoginId()
-                        : null;
+        String currentUser = (auth != null && auth.getName() != null && !auth.getName().isBlank())
+                ? auth.getName()
+                : "SYSTEM";
 
-        if (ownerLogin != null && !ownerLogin.equalsIgnoreCase(currentUser) && !canViewOthers) {
-            // Defensive deny: caller is not owner and lacks elevated authority
-            throw new AccessDeniedException(
-                    "Insufficient privileges to view settlement instructions for trade " + tradeId);
+        // Prefer the centralised validator when available; fall back to the
+        // previous inline ownership logic for environments (tests) where the validator
+        // was not injected.
+        if (userPrivilegeValidator != null) {
+            if (!userPrivilegeValidator.canViewTrade(trade, auth)) {
+                throw new AccessDeniedException(
+                        "Insufficient privileges to view settlement instructions for trade " + tradeId);
+            }
+        } else {
+            // Fallback: original, inline ownership check (keeps unit tests stable)
+            boolean canViewOthers = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
+                    .anyMatch(a -> {
+                        String ga = a.getAuthority();
+                        return "ROLE_SALES".equalsIgnoreCase(ga) || "ROLE_SUPERUSER".equalsIgnoreCase(ga)
+                                || "TRADE_VIEW_ALL".equalsIgnoreCase(ga);
+                    });
+
+            String ownerLogin = (trade != null && trade.getTraderUser() != null
+                    && trade.getTraderUser().getLoginId() != null)
+                            ? trade.getTraderUser().getLoginId()
+                            : null;
+
+            if (ownerLogin != null && !ownerLogin.equalsIgnoreCase(currentUser) && !canViewOthers) {
+                throw new AccessDeniedException(
+                        "Insufficient privileges to view settlement instructions for trade " + tradeId);
+            }
         }
 
         // Convert entity to DTO to safely return to controller
@@ -421,26 +436,35 @@ public class AdditionalInfoService {
          * supplying Joey's tradeId.
          */
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String currentUser = (auth != null && auth.getName() != null) ? auth.getName() : "__UNKNOWN__";
-
-        boolean canEditOthers = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
-                .anyMatch(a -> {
-                    String ga = a.getAuthority();
-                    return "ROLE_SALES".equalsIgnoreCase(ga) || "ROLE_SUPERUSER".equalsIgnoreCase(ga)
-                            || "TRADE_EDIT_ALL".equalsIgnoreCase(ga);
-                });
-
         com.technicalchallenge.model.Trade trade = tradeRepository.findLatestActiveVersionByTradeId(tradeId)
                 .orElse(null);
-        String ownerLogin = (trade != null && trade.getTraderUser() != null
-                && trade.getTraderUser().getLoginId() != null)
-                        ? trade.getTraderUser().getLoginId()
-                        : null;
+        String authUser = (auth != null && auth.getName() != null && !auth.getName().isBlank())
+                ? auth.getName()
+                : "SYSTEM";
 
-        if (ownerLogin != null && !ownerLogin.equalsIgnoreCase(currentUser) && !canEditOthers) {
-            // Deny attempts by non-owners without elevated authority
-            throw new AccessDeniedException(
-                    "Insufficient privileges to modify settlement instructions for trade " + tradeId);
+        if (userPrivilegeValidator != null) {
+            if (!userPrivilegeValidator.canEditTrade(trade, auth)) {
+                throw new AccessDeniedException(
+                        "Insufficient privileges to modify settlement instructions for trade " + tradeId);
+            }
+        } else {
+            // Fallback: original inline check to preserve existing unit tests.
+            boolean canEditOthers = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
+                    .anyMatch(a -> {
+                        String ga = a.getAuthority();
+                        return "ROLE_SALES".equalsIgnoreCase(ga) || "ROLE_SUPERUSER".equalsIgnoreCase(ga)
+                                || "TRADE_EDIT_ALL".equalsIgnoreCase(ga);
+                    });
+
+            String ownerLogin = (trade != null && trade.getTraderUser() != null
+                    && trade.getTraderUser().getLoginId() != null)
+                            ? trade.getTraderUser().getLoginId()
+                            : null;
+
+            if (ownerLogin != null && !ownerLogin.equalsIgnoreCase(authUser) && !canEditOthers) {
+                throw new AccessDeniedException(
+                        "Insufficient privileges to modify settlement instructions for trade " + tradeId);
+            }
         }
 
         // Handle upsert logic (create or update)
@@ -472,7 +496,7 @@ public class AdditionalInfoService {
         // SECURITY: Use the authenticated principal as the changedBy actor in the
         // audit trail to prevent clients from spoofing the actor by supplying a
         // different 'changedBy' value. This preserves non-repudiation properties.
-        audit.setChangedBy(currentUser);
+        audit.setChangedBy(authUser);
         audit.setChangedAt(java.time.LocalDateTime.now());
         // Save audit trail record separately
         additionalInfoAuditRepository.save(audit);

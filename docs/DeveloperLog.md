@@ -396,6 +396,31 @@ Focus: Security configuration and creating database-backed UserDetails
 
 - I ran into a mismatch between the privileges stored in the database and the GrantedAuthority strings expected by the code; I added a small mapping layer in DatabaseUserDetailsService to normalise database privileges into the authority names used across the application.
 - Ensuring password encoding compatibility for test users required seeding the test database with encoded passwords; I added a TestDataBuilder to create those records.
+
+---
+
+## Monday, Oct 27, 2025
+
+**Focus:** Safe startup remediation — stop runtime reseed of file-backed H2
+
+### Summary
+
+- Problem: `src/main/resources/data.sql` contains many non-idempotent INSERT statements using fixed IDs. With `spring.sql.init.mode=always` enabled in the runtime profile the application attempted to re-apply the seed against the file-backed H2 DB (`./data/tradingdb.mv.db`) on startup which caused unique-key violations and prevented the ApplicationContext from refreshing.
+
+- Immediate remediation applied (27/10/2025): the runtime profile now sets `spring.sql.init.mode=never` so the `data.sql` file is not re-applied on local developer startup. The test profile retains SQL initialization for the in-memory DB so tests continue to seed deterministically.
+
+### Rationale
+
+- This is a low-risk, fast fix that avoids data loss (no deletion of `.mv.db`) and prevents accidental reseed failures during normal development. It buys time to make the seed idempotent or adopt a migration tool.
+
+### Recommended next steps
+
+1. Convert non-idempotent `INSERT` statements to idempotent `MERGE INTO ... KEY(id)` or use database `UPSERT` semantics to make `data.sql` safe to re-run.
+2. Consider adopting Flyway or Liquibase for schema and data migrations to get reliable, repeatable boots across environments.
+3. Add a small regression test that starts the app with an existing file-backed H2 DB and asserts startup succeeds (no SQL-init exceptions).
+
+Recorded by: developer automation — merged and logged after feature branch merge.
+
 - Swagger and the API explorer were intermittently inaccessible during development because the tightened security configuration blocked the swagger UI and the OpenAPI endpoints. I solved this by explicitly permitting the swagger UI endpoints under the local/test profile and ensuring health and swagger paths are only open in non-production profiles.
 
 ### Concept: Ownership and access control enforcement (service level)
@@ -1213,3 +1238,69 @@ Today focused on diagnosing and fixing an issue where settlement instructions an
 
 - Seed data must be idempotent or restricted to test runs to avoid fatal initialisation failures in a persistent dev DB. A safe approach is `MERGE INTO ... KEY(id)` or moving initialisation to the test profile.
 - Upsert + audit should run within a single transactional boundary so that audit and data changes commit or roll back together.
+
+---
+
+## Implementation plan: Convert `data.sql` INSERTs to idempotent MERGE statements (planned)
+
+Why need this
+
+- The current `src/main/resources/data.sql` is packed with many fixed‑ID `INSERT` statements. Re-running that file against an existing, file‑backed H2 database causes duplicate primary/unique key errors and aborts Spring startup. Temporarily disabling runtime SQL init (set `spring.sql.init.mode=never`) prevents the immediate crash, but it is a mitigation rather than a durable fix.
+- Converting the non‑idempotent `INSERT` statements to idempotent `MERGE` (H2) or `UPSERT` statements (DB specific) means the seed becomes safe to re-run: it will insert missing rows and update existing ones. That allows developers to safely re-seed environments, makes local bootstraps deterministic, and reduces accidental production/CI surprises.
+
+Detailed implementation plan (step-by-step)
+
+1. Scope & plan
+
+- Start by converting a small, high‑value subset of the seed: `application_user`, `book`, and `trade` blocks. These are the most likely to cause duplicate key failures and are referenced by many tests and code paths.
+- Create a short PR with just that subset so reviewers can validate semantics.
+
+2. Conversion rules (H2 specific)
+
+- For each single‑row INSERT like:
+  ```sql
+  INSERT INTO book (id, book_name, active, version, cost_center_id)
+  VALUES (1000, 'FX-BOOK-1', true, 1, 1000);
+  ```
+  replace with per‑row MERGE:
+  ```sql
+  MERGE INTO book (id, book_name, active, version, cost_center_id)
+  KEY(id)
+  VALUES (1000, 'FX-BOOK-1', TRUE, 1, 1000);
+  ```
+- For multi‑row INSERTs, split into multiple MERGE statements (H2's MERGE is evaluated row‑by‑row).
+- Preserve the original ordering of parent tables before child tables to honour FK constraints (e.g., desk → sub_desk → cost_center → book → trade → trade_leg).
+- For any timestamp/date literals, keep the format already used in the file (the current file has ISO strings which H2 accepts in many cases). If a conversion exposes a parsing issue, switch to explicit TIMESTAMP literals or CASTs.
+
+3. Safety & verification (local)
+
+- Run the app against the existing `.mv.db` with `spring.sql.init.mode=never` still set; confirm the app starts (baseline).
+- Temporarily set `spring.sql.init.mode=always` in a copied `application-local-merge-test.properties` to run only the revised `data.sql` against a fresh, file‑backed DB (or use a separate directory) to confirm the MERGE script runs without errors.
+- Start the app and confirm there are no H2 error 23505 duplicates in the logs.
+- Verify critical endpoints (GET /api/trades, GET /api/users) return expected seeded data.
+
+4. Test suite
+
+- Run `mvn test` (backend) to ensure integration tests still pass against the test profile (in‑memory DB). The in‑memory test DB will still use the original `data.sql` unless also update the test data. Optionally, update the `src/test/resources/data/data.sql` to match MERGE semantics so both runtime and test seeds are consistent.
+
+5. Rollout
+
+- Open a small PR with converted blocks and a clear PR description explaining the reason and verification steps.
+- After PR approval, either convert the entire `data.sql` or iterate block by block until all problematic INSERTs are replaced.
+
+Potential risks and mitigations
+
+- Risk: MERGE may unintentionally update rows that the team expects to remain unchanged in the dev DB. Mitigation: Scope initial PR to a few tables and review changes; avoid changing values that tests rely on unless tests are updated accordingly.
+- Risk: Formatting or type mismatches (date parsing) could surface when converting many rows. Mitigation: run small batches and fix issues per table.
+- Risk: Tests referencing exact creation timestamps may fail if MERGE overwrites them. Mitigation: keep the same literal timestamps where possible; when updating, prefer not to change timestamp columns.
+
+Impact (what changes for developers)
+
+- Short term (after conversion): Developers can safely re-run `data.sql` against a file‑backed H2 DB without deleting `.mv.db` or seeing startup failures. This makes local resets and environment bootstraps predictable.
+- Medium term: Reduced chance of accidental startup aborts in CI or shared environments, fewer manual recovery steps, and clearer provenance for seeded data changes.
+- Tests: If choose to update `src/test/resources/data/data.sql` to use MERGE as well, test runs become more consistent with runtime behaviour. Otherwise, tests will continue to use the in‑memory seeding approach and pass as before.
+
+Notes and next actions
+
+- I will not apply these changes automatically now since I am moving to front-end work. Keep this plan in the log as a task Ior someone on the team can pick up later.
+- When Iwant, I can implement Option A (subset conversion) and open a PR with the converted blocks for review.
