@@ -35,4 +35,9 @@ public interface TradeRepository extends JpaRepository<Trade, Long>, JpaSpecific
     @Query("SELECT t FROM Trade t WHERE t.tradeId = :tradeId AND t.active = true ORDER BY t.version DESC")
     Optional<Trade> findLatestActiveVersionByTradeId(@Param("tradeId") Long tradeId);
 
+    // Added: derived query to fetch active trades for a trader by their login id.
+    // This supports server-side scoping so a TRADER user can be shown only
+    // their own active trades (defence-in-depth ownership enforcement).
+    List<Trade> findAllByTraderUser_LoginIdAndActiveTrueOrderByTradeIdDesc(String loginId);
+
 }
