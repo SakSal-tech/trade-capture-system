@@ -4125,3 +4125,178 @@ RSQL search and wildcard operator handling caused search endpoints to return emp
   - Various integration tests updated to `@ActiveProfiles("test")`, use `@WithMockUser`, include `.with(csrf())` for mutating MockMvc calls, or create fixtures programmatically
 
 I appended this consolidated error/test-failure log at the end of the Development-Errors-and-fixes document so reviewers can see what failed today, why, and what was done to address each item. If anything important was missed from local test runs, provide the failing test class names and failing stack traces and I will integrate those exact lines into the log.
+
+## FRONTEND
+
+# Errors and Fixes Summary
+
+This document summarises code, build and test errors encountered while implementing settlement-instructions and related fixes across the frontend and backend. Each issue is documented with the headings: ### Problem, ### Root Cause, ### Solution and ### Impact. Language uses UK English.
+
+---
+
+## ESLint blocking error during frontend build
+
+### Problem
+
+ESLint reported a blocking error and prevented the frontend build: an explicit `any` cast was used while handling Axios errors. Several other lint warnings (unused variables, missing hook dependencies) were also present and caused build breaks in CI-local runs when linting was strict.
+
+### Root Cause
+
+Catch blocks used unsafe `any` casts such as `(err as any)?.response?.status`, and a few React hooks had missing dependency entries. The lint script initially scanned a broad set of files, which later allowed generated/bundled files to be included and produced many false positives.
+
+### Solution
+
+- Replace `any` casts with a typed narrowing using `axios.isAxiosError(err) && err.response?.status === 404` so the error object is correctly typed.
+- Fix React hook dependency arrays by adding missing dependencies (for example `touched`) where appropriate.
+- Remove or silence unused variables (use ignored tuple entries where necessary, e.g. `const [, setSearchParams] = useSearchParams()`).
+- Restrict lint scope and prevent generated files from being scanned (see separate entry about `.eslintignore`).
+
+### Impact
+
+The blocking ESLint error was cleared and the frontend build could proceed. Code is now aligned with the project's ESLint and TypeScript rules, reducing lint-related build failures.
+
+---
+
+## ESLint scanning generated/bundled files (thousands of errors)
+
+### Problem
+
+A later lint run produced thousands of errors (no-undef, unused-expressions, etc.) which overwhelmed the output and masked useful diagnostics.
+
+### Root Cause
+
+ESLint was configured (or invoked) to scan the entire workspace, including generated bundles (for example `dist/`, `.vite/` and vendor files). Those files contain minified or non-source constructs and are not suitable for source linting.
+
+### Solution
+
+- Add `frontend/.eslintignore` to exclude `dist/`, `.vite/`, `node_modules/`, coverage and similar generated artefacts.
+- Update `frontend/package.json` lint script to target source files only, e.g. `eslint "src/**/*.{js,jsx,ts,tsx}"`.
+
+### Impact
+
+ESLint output became actionable again; the enormous error list disappeared and developers can focus on real source issues only.
+
+---
+
+## Vite bundle-size warning (chunks > 500 KB)
+
+### Problem
+
+Vite reported that one or more chunks exceeded 500 kB after minification. This is a performance warning visible at build time.
+
+### Root Cause
+
+Large third-party libraries and monolithic imports are bundled into single chunks without manual chunk splitting or route-level dynamic imports.
+
+### Solution
+
+Recommended steps:
+
+1. Add a bundle visualiser plugin (for example `vite-plugin-visualizer`) and run the build to identify largest modules.
+2. Introduce code-splitting via dynamic imports (React.lazy / Suspense) for heavy routes or rarely-used components.
+3. Configure `build.rollupOptions.output.manualChunks` in `vite.config.ts` to split vendor libraries into separate chunks.
+
+### Impact
+
+No functional failure; however, initial page load may be negatively affected. The proposed optimisations will reduce initial payload and improve performance for users.
+
+---
+
+## Settlement-instructions editor missing and frontend wiring
+
+### Problem
+
+The frontend lacked a controlled settlement-instructions editor with templates, insert-at-cursor, validation, character counter and Save/Clear actions, plus server persistence.
+
+### Root Cause
+
+The backend AdditionalInfo endpoints existed but the frontend UI had not been implemented or wired to those endpoints.
+
+### Solution
+
+- Implement `SettlementTextArea` as a controlled React + TypeScript component with:
+  - Template dropdown and an `insertAtCursor` helper that preserves caret position using selectionStart/selectionEnd and requestAnimationFrame.
+  - Validation rules: trimmed length between 10 and 500 characters; reject `<` and `>` characters.
+  - Live character counter and accessible aria labels.
+  - Save and Clear buttons; Save is disabled while validation fails.
+- Wire the component into `TradeActionsModal` so selecting a trade triggers GET `/trades/{id}/settlement-instructions` and Save performs a PUT to `/trades/{id}/settlement-instructions` with the AdditionalInfoRequestDTO payload shape:
+
+```
+{ "entityType": "TRADE", "entityId": <tradeId>, "fieldName": "SETTLEMENT_INSTRUCTIONS", "fieldValue": "..." }
+```
+
+- Use the existing axios API instance for network calls and surface snackbars for success/errors.
+
+### Impact
+
+The editor is available in the modal, loads existing settlement text (404 returned as empty), and persists updates with server-side audit. Accessibility and client-side validation are implemented; server remains authoritative for final validation and audit of changes.
+
+## Frontend file-specific fixes
+
+### File: `frontend/src/modal/SettlementTextArea.tsx`
+
+### Problem
+
+The component had subtle behaviour and lint issues: the initialValue sync effect did not include all dependencies, caret restoration after template insertion was unreliable, client-side validation did not trim before checking length, and an unused `err` identifier in a catch block produced an ESLint warning.
+
+### Root Cause
+
+- The `useEffect` that synchronised `initialValue` into component state lacked the `touched` dependency and could overwrite user edits.
+- `insertAtCursor` updated the value but did not reliably restore selection when the DOM update happened asynchronously.
+- Validation tested raw value length rather than trimmed length and did not forbid `<` or `>` characters explicitly.
+- A `catch (err)` block left `err` unused, which ESLint flags as a warning/error under the repository rules.
+
+### Solution
+
+- Move the `initialValue` -> `value` sync into an effect that includes `touched` in its dependency array so programmatic updates do not clobber user edits.
+- When restoring caret and selection, use `requestAnimationFrame` (or setSelectionRange after the state update) so the DOM reflects the new value before selection is applied.
+- Normalise the value for validation by trimming whitespace before length checks and explicitly reject characters `<` and `>` using a regex test.
+- Remove the unused `err` identifier or replace `catch (err)` with `catch { }` where the error is intentionally ignored; prefer `axios.isAxiosError(err)` where the error must be inspected.
+
+### Impact
+
+The textarea now preserves user edits, templates insert at the expected caret position and the caret is restored reliably. Validation is accurate (trimmed) and forbids unsafe characters. ESLint warnings related to unused catch parameters were removed.
+
+---
+
+### File: `frontend/src/modal/TradeActionsModal.tsx`
+
+### Problem
+
+After wiring the settlement editor, the modal produced an ESLint error caused by an `any` cast in axios error handling. Additionally, the GET/PUT interactions with the backend were not present until wiring, and some imports were unused after refactoring.
+
+### Root Cause
+
+- Error handling used patterns like `(err as any)?.response?.status === 404` which violate the linter's no-explicit-any rule.
+- The component had not yet been wired to call the backend settlement endpoints and to pass an `onSave` handler to the editor.
+- Refactoring left unused imports and variables which ESLint flagged.
+
+### Solution
+
+- Replace `any` casts with a typed guard: `axios.isAxiosError(err) && err.response?.status === 404` so that the linter and TypeScript can validate code safely.
+- Implement `onSave` handler that constructs the `AdditionalInfoRequestDTO` payload and performs a PUT to `/trades/${tradeId}/settlement-instructions`. Show snackbars on success and failure and disable Save when the editor's `isValid` returns false.
+- Remove unused imports/variables and fix hook dependency arrays to satisfy ESLint.
+
+### Impact
+
+The modal loads the existing settlement instructions (treating 404 as ‘none’), persists updates via the correct API shape, and surfaces success/failure to the user. Linting errors related to `any` and unused variables were eliminated and the build is no longer blocked by these issues.
+
+---
+
+### File: `frontend/src/components/Sidebar.tsx` (small lint fix)
+
+### Problem
+
+ESLint warned about an unused `searchParams` binding imported via `useSearchParams()`.
+
+### Root Cause
+
+The code called `const [searchParams, setSearchParams] = useSearchParams()` but only `setSearchParams` was used; the unused `searchParams` variable triggered an unused-variable lint rule.
+
+### Solution
+
+Change the destructuring to ignore the first element: `const [, setSearchParams] = useSearchParams()`.
+
+### Impact
+
+Lint warning removed. No behavioural change; intent and functionality of the component remain the same.

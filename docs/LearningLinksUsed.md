@@ -291,3 +291,17 @@ https://www.baeldung.com/java-logging-best-practices
 javadoc.io (searchable Javadoc hosting)
 https://www.javadoc.io/
 (Quick access to Javadoc for SLF4J, Logback and other logging APIs by version.)
+
+## FrontEnd
+
+### React Component Components
+
+https://react.dev/reference/react/Component
+
+#### How to Implement Notification Messages in React (Snackbar)
+
+https://www.youtube.com/watch?v=SFyjnuyYj4I
+
+### React TypeScript Loading Spinner
+
+https://www.youtube.com/watch?v=jUwMb0zF2H4

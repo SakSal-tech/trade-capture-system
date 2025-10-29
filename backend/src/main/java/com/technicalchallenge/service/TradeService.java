@@ -80,7 +80,8 @@ public class TradeService {
 
     private PayRecRepository payRecRepository;
 
-    // Security validator used to check ownership/edit privileges at the service layer.
+    // Security validator used to check ownership/edit privileges at the service
+    // layer.
     // We prefer the Spring-injected validator, but keep a null-check fallback so
     // unit tests that construct this service directly (without Spring) continue
     // to work. The fallback reproduces the minimal ownership logic used
