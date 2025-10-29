@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --port 3000",
     "build": "pnpm lint && vite build",
-    "lint": "eslint .",
+    "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\"",
     "preview": "vite preview",
     "test": "vitest"
   },
