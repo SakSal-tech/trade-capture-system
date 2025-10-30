@@ -4,8 +4,8 @@
 
 - Typing props ensures initialValue is handled as a string, so your useState(initialValue) is typed and safe.
 - Templates dropdown: typing each template as {value,label} makes mapping and inserting safe (no accidental undefined).
-- Validation & tests: Type annotations help write tests (you know the shape) and catch type-related bugs early.
-- Readability & future maintenance: other people (or future you) can see the expected inputs/outputs for the component.
+- Validation & tests: Type annotations help write tests (I know the shape) and catch type-related bugs early.
+- Readability & future maintenance: other people (or future I) can see the expected inputs/outputs for the component.
 
 ### ??
 
@@ -33,14 +33,14 @@ If selectionStart is null/undefined, it falls back to value.length.
 Why it helps:
 
 - UX: Don’t show "This field is required" before the user tries to edit — show validation only after they've touched/blurred the field.
-- Safety when syncing props: If the parent updates initialValue, you usually want to update the textarea only when the user hasn't started typing. touched lets you avoid stomping their edits. e.g.
+- Safety when syncing props: If the parent updates initialValue, I usually want to update the textarea only when the user hasn't started typing. touched lets I avoid stomping their edits. e.g.
   ` setTouched(false); // treat as fresh content`
 
 ### Use of Controlled textarea:
 
 - Keeps the visible text and your internal state in sync so the component is “controlled” (required for predictable validation, saving, tests).
 - Validation & UI: because state updates on each keystroke, your validators/char-counter can read value and render live feedback or disable Save.
-- Insert-at-cursor / templates: after inserting template text you also update value (same state path), so all code reads a single source of truth.
+- Insert-at-cursor / templates: after inserting template text I also update value (same state path), so all code reads a single source of truth.
   Tests: easy to simulate user typing by calling onchange and asserting value changes.
 
 ### function handleChange
@@ -56,7 +56,7 @@ Why it helps:
 
 - The cursor or selection start index inside the settlement-instructions textarea.
   Trade example: a trader clicks into the instructions after “Reference: ” (cursor at position 45). start becomes 45 so an inserted template (e.g., “BENEFICIARY: …”) goes exactly after the Reference text.
-- Why the fallback: if the browser can’t report selectionStart (rare), the code uses txtArea.value.length (append to the end). That prevents losing the template — e.g., when the textarea isn’t fully mounted you still add the template at the end of the current settlement text.
+- Why the fallback: if the browser can’t report selectionStart (rare), the code uses txtArea.value.length (append to the end). That prevents losing the template — e.g., when the textarea isn’t fully mounted I still add the template at the end of the current settlement text.
 - UX reason for ?? : preserves 0 (cursor at document start). If the cursor is at index 0 we must treat 0 as valid — ?? does that; || would mistakenly treat 0 as “missing” and append instead.
 
 `const end = txtArea.selectionEnd ?? start;`
@@ -89,7 +89,7 @@ Why it helps:
 
 ### defaultTemplates ready made array with settlements trader can edit
 
-DefaultTemplates is a local fallback list of common settlement instruction blocks (examples) — it does NOT automatically write into a trade. It’s only shown/inserted when the user chooses a template. The array exists to speed and standardize trader input; if you prefer traders always type from scratch you can remove it or replace it with an empty list or load templates from the server per-user.
+DefaultTemplates is a local fallback list of common settlement instruction blocks (examples) — it does NOT automatically write into a trade. It’s only shown/inserted when the user chooses a template. The array exists to speed and standardize trader input; if I prefer traders always type from scratch I can remove it or replace it with an empty list or load templates from the server per-user.
 
 Quick line-by-line
 
@@ -131,7 +131,7 @@ Safety: because all edits go through component state, validation and the save fl
 
 29/10/25
 
-What’s already done (from the file you shared)
+What’s already done (from the file I shared)
 
 Controlled textarea with state (value, setValue).
 DOM ref attached (textareaRef) and insertAtCursor implemented.
@@ -147,7 +147,7 @@ Clear should setValue("") and setTouched(false).
 Async UX (medium priority)
 Loading state for an in-flight save and a Snackbar for success/error.
 Template UI (UX)
-You still need a visible templates picker (native <select> or the project Dropdown) that calls insertAtCursor(...) — currently templatesToUse is defined but not used in the JSX.
+I still need a visible templates picker (native <select> or the project Dropdown) that calls insertAtCursor(...) — currently templatesToUse is defined but not used in the JSX.
 Decide template semantics: if an explicit empty array from parent should mean “no templates”, change fallback to const templatesToUse = templates === undefined ? defaultTemplates : templates;
 Accessibility and small fixes
 Link the label to the textarea for screen-readers: give the textarea an id and change label to <label htmlFor="settlement-instructions">.
@@ -158,13 +158,13 @@ README/UX note describing validation rules and template behavior.
 Server-side: ensure server validates/sanitizes — client checks are UX-only.
 Potential code/quality notes
 
-Linter might warn that the useEffect references touched but doesn't list it in deps — this is intentional (you prevent stomping user edits), but consider documenting the intention in a comment or using a clearer effect condition.
+Linter might warn that the useEffect references touched but doesn't list it in deps — this is intentional (I prevent stomping user edits), but consider documenting the intention in a comment or using a clearer effect condition.
 isValid currently tests text for </> rather than trimmed; either is fine, but be consistent.
 The label isn't linked to the textarea id (accessibility gap).
-No obvious syntax errors in the snippet you shared.
+No obvious syntax errors in the snippet I shared.
 Suggested next step (one small change)
 
-I need first adding the accessibility fix (small, safe, and quick). If you want, I can give the exact single line to paste now:
+I need first adding the accessibility fix (small, safe, and quick). If I want, I can give the exact single line to paste now:
 
 Replace the label line with:
 <label htmlFor="settlement-instructions"> Settlement Instructions</label>

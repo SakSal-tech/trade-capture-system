@@ -11,7 +11,7 @@ import Button from "../components/Button";
 import LoadingSpinner from "../components/LoadingSpinner"; // A small SVG spinner used to indicate loading state (visual cue while an async action is in progress).
 // This component will use plain elements so no other imports are required.
 
-//To type the component props so callers know what to pass and I  get autocompletion. it defines the "shape" (the property names and types). typing props gives you editor autocompletion and lets TypeScript check callers pass the correct fields (helps prevent bugs
+//To type the component props so callers know what to pass and I  get autocompletion. it defines the "shape" (the property names and types). typing props gives me editor autocompletion and lets TypeScript check callers pass the correct fields (helps prevent bugs
 export interface SettlementTextareaProps {
   initialValue?: string; //Optional prop to pre-fill the textarea (e.g., existing settlement instructions when editing a trade)
   templates?: { value: string; label: string }[]; // ? means Optional array of templates the component can show in a dropdown; each template has a machine
@@ -19,12 +19,23 @@ export interface SettlementTextareaProps {
   // Allows the component to remain UI-only when not provided.
   onSave?: (text: string) => Promise<void> | void;
 }
-//types the variable as SettlementTextareaProps meaning TypeScript what kind of value a variable will hold. This says “the variable SettlementTextArea has the type FC<SettlementTextareaProps. So TypeScript will error if callers pass wrong props or if you use the props incorrectly inside the component
+//types the variable as SettlementTextareaProps meaning TypeScript what kind of value a variable will hold. This says “the variable SettlementTextArea has the type FC<SettlementTextareaProps. So TypeScript will error if callers pass wrong props or if I use the props incorrectly inside the component
 export const SettlementTextArea: FC<SettlementTextareaProps> = ({
   initialValue = "",
   templates = [], //Destructing: take props, pull out initialValue and templates, and if thye're undefined give them default values
   onSave,
 }) => {
+  // REFACTOR NOTE:
+  // This component was intentionally refactored to be a UI-only, controlled
+  // textarea with helper features (templates, insert-at-cursor, validation)
+  // and an optional `onSave` callback. The component does not perform any
+  // network calls itself; instead it delegates persistence to a parent
+  // handler. Rationale:
+  // - Separation of concerns: UI logic stays in this component, networking
+  //   and transactional flow remain in the parent modal.
+  // - Testability: the component can be unit-tested without mocking HTTP.
+  // - Consistency: the parent can orchestrate saving settlement together
+  //   with the associated trade (single Save Trade action).
   const textareaRef = useRef<HTMLTextAreaElement | null>(null); //useRef is a React hook that gives a stable, per-instance ref object.
 
   // A React state hook that creates a piece of component state named value and an updater function setValue. initialValue: the runtime initial value for that state (comes from props via destructuring).
@@ -153,25 +164,35 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
     This gives traders a quick, editable way to insert standard settlement instructions. */}
       {/* mb-3 = 0.75rem (12px) */}
 
-      <select
-        className="mb-3"
-        value={templateSelectValue}
-        onChange={(event) => {
-          const v = event.currentTarget.value; // the template string chosen by the user
-          setTemplateSelectValue(v); // keep select controlled (helpful for tests and clear reset)
-          if (v) {
-            insertAtCursor(v); // insert template at caret/replace selection
-            setTemplateSelectValue(""); // reset to placeholder so user can pick again
-          }
-        }}
-      >
-        <option value="">Insert template…</option>
-        {templatesToUse.map((t) => (
-          <option key={t.label} value={t.value}>
-            {t.label}
-          </option>
-        ))}
-      </select>
+      <div className="mb-3">
+        {/* Accessible label so users and screen readers know what this dropdown is for */}
+        <label
+          htmlFor="template-select"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
+          Drop Down Quick templates
+        </label>
+        <select
+          id="template-select"
+          className="w-full"
+          value={templateSelectValue}
+          onChange={(event) => {
+            const v = event.currentTarget.value; // the template string chosen by the user
+            setTemplateSelectValue(v); // keep select controlled (helpful for tests and clear reset)
+            if (v) {
+              insertAtCursor(v); // insert template at caret/replace selection
+              setTemplateSelectValue(""); // reset to placeholder so user can pick again
+            }
+          }}
+        >
+          <option value="">Insert template…</option>
+          {templatesToUse.map((t) => (
+            <option key={t.label} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </div>
       {/* The editable multi-line input used for settlement instructions */}
       {/* DOM ref so insertAtCursor can read/set selection and focus */}
       {/* Controlled value comes from component state */}
@@ -204,37 +225,29 @@ Turns red when the count exceeds 500, giving immediate visual feedback before Sa
           Must be 10-500 chars and may not contain &lt; or &gt;.
         </div>
       )}
-      {/* Save / Clear actions: Save is disabled when validation fails or while saving. Clear resets the field and focuses the textarea. */}
-      <div className="flex gap-2 mt-2">
-        {/*The disabled expression prevents clicks while the current text is invalid or a save is already in progress. That stops both submission of bad input (isValid(value) false) and accidental double-submits (isSaving true). The onClick handler is async and does a no-op when no onSave callback is provided, avoiding runtime errors. It sets a local saving flag (setIsSaving(true)) before calling the parent-supplied onSave and uses finally to clear the flag so the UI always returns to a non-saving state even if onSave rejects or throws. Awaiting onSave(value) makes the component wait for the save to complete before toggling isSaving back off. Because without try/catch await onSave(value), any error will propagate to the caller which may be fine if a higher-level error handler exists,  to show a local error message unless I added try/catch handling here*/}
-        <Button
-          disabled={!onSave || !isValid(value) || isSaving}
-          onClick={async () => {
-            if (!onSave) return;
-            const payload = value; // capture current text
-            setIsSaving(true);
-            try {
-              await onSave(payload);
-            } catch (err) {
-              // show feedback / log error
-              console.error("Save failed", err);
-            } finally {
-              setIsSaving(false);
-            }
-          }}
-        >
-          {isSaving ? <LoadingSpinner /> : "Save"}
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={() => {
-            setValue("");
-            setTouched(false);
-            textareaRef.current?.focus();
-          }}
-        >
-          Clear
-        </Button>
+      {/* Actions: Clear remains available. The small per-field Save button
+          was removed in favour of saving settlement together with the trade
+          (user clicks 'Save Trade'). This avoids duplicate save buttons and
+          ensures settlement is persisted as part of the same booking
+          transaction. */}
+      <div className="flex flex-col gap-2 mt-2">
+        <div className="text-sm text-gray-600">
+          Settlement is saved when you click "Save Trade". Use the Clear button
+          to reset the settlement textarea locally.
+        </div>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setValue("");
+              setTouched(false);
+              textareaRef.current?.focus();
+            }}
+          >
+            Clear
+          </Button>
+        </div>
       </div>
     </div>
   );

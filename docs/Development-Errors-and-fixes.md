@@ -3933,7 +3933,6 @@ wiring audit usernames and getting tests to run in the backend module.
 
 ### Additional fixes and lessons from the settlement-instructions refactor (2025-10-26)
 
-The following entries document the errors and test failures encountered while centralising settlement instruction validation, wiring the authenticated principal into audit records, and stabilising tests. Each item follows the same Problem / Root cause / Solution / Impact format used throughout this document. Language is UK English and narrative is first person.
 
 ---
 
@@ -4130,8 +4129,6 @@ I appended this consolidated error/test-failure log at the end of the Developmen
 
 # Errors and Fixes Summary
 
-This document summarises code, build and test errors encountered while implementing settlement-instructions and related fixes across the frontend and backend. Each issue is documented with the headings: ### Problem, ### Root Cause, ### Solution and ### Impact. Language uses UK English.
-
 ---
 
 ## ESLint blocking error during frontend build
@@ -4300,3 +4297,106 @@ Change the destructuring to ignore the first element: `const [, setSearchParams]
 ### Impact
 
 Lint warning removed. No behavioural change; intent and functionality of the component remain the same.
+
+---
+
+## 2025-10-30 — Frontend errors encountered while wiring settlement editor and persistence
+
+---
+
+### Problem
+
+Authenticated POST/PUT requests from the frontend were rejected with HTTP 403 (Forbidden) when saving trades or settlement instructions. In later attempts, trade creation returned HTTP 400 (Bad Request).
+
+### Root Cause
+
+There were two separate issues:
+
+- For the 403: my axios client did not include cookies in cross-origin requests by default, so the backend did not receive the JSESSIONID and treated the request as unauthenticated. The backend requires cookies for session authentication in the current dev setup.
+- For the 400: I accidentally passed username strings into fields that the backend expects to be numeric user IDs (for example `traderUserId` and `tradeInputterUserId`). This occurred because some dropdown options used the user name as the value during refactor, and the client sent those strings in the trade DTO. The backend validation rejected the payload.
+
+### Solution
+
+- I enabled credentials on the axios instance used by the frontend (`withCredentials: true`) so cookies are sent with API requests. This resolved the 403 and allowed authenticated POST/PUT requests to reach the backend as the authenticated principal.
+- I normalised the dropdown option values to supply numeric ids (value = userId) and adjusted the trade DTO construction to coerce values to numbers (Number(...)) before sending. I removed the accidental username injection that caused the 400 Bad Request.
+
+### Impact
+
+After these fixes I could create and update trades (HTTP 201/200). The authentication and payload-type errors no longer block the requests. This also removed a blocking developer friction point when testing the modal.
+
+---
+
+### Problem
+
+Settlement updates appeared to be sent but I could not always see the `additional_info` row or the audit entry in the dev database after saving — sometimes the UI reported success but the DB did not show the row after restarting the app.
+
+### Root Cause
+
+Three contributing causes:
+
+1. The frontend Save flow initially tried to persist settlement instructions independently (separate Save button) which caused ordering issues — the trade had to exist (business trade_id) before writing AdditionalInfo. In some cases the PUT ran before the trade was created and the backend returned 404 or silently ignored the request.
+2. The dev environment used a file-backed H2 DB with `data.sql` re-seeding configured; on restart that reseed occasionally failed with duplicate-key errors and the application aborted initialization, making it look like rows were missing.
+3. I had not yet verified the exact AdditionalInfoRequestDTO shape the backend expects in every code path; small mismatches in `entityId` vs `id` or `entityType` values could cause the upsert to be skipped.
+
+### Solution
+
+1. I centralised settlement persistence into the parent Save Trade flow: the per-field Save button was removed and the `saveSettlement(tradeId, settlement)` handler is called only after the trade POST/PUT returns the persistent business trade id. This guarantees `entityId` is available and avoids race conditions.
+2. I advised and performed a local dev recovery step: remove the file H2 DB artefacts and restart so `data.sql` can seed a fresh DB. Longer term I recommended scoping SQL init to the test profile or making `data.sql` idempotent to avoid repeated reseed failures.
+3. I verified and used the exact AdditionalInfo payload shape the backend expects: { entityType: 'TRADE', entityId: <trade_business_id>, fieldName: 'SETTLEMENT_INSTRUCTIONS', fieldValue: '...' } and confirmed the PUT call went to `/api/trades/{tradeId}/settlement-instructions`.
+
+### Impact
+
+After centralising the save, persisting settlement became reliable when the trade creation succeeded. Removing the problematic file-backed DB files allowed the application to start cleanly and the upsert + audit rows were visible in the database. The audit `changed_by` now correctly shows the authenticated principal for requests performed via the UI.
+
+---
+
+### Problem
+
+> Local UI/UX: the settlement editor behaviour needed to be accessible and predictable: template insertion must preserve caret position, char counter must update correctly and validation should be clear.
+
+### Root Cause
+
+The initial implementation updated textarea value and selection synchronously which sometimes lost caret position. Validation used raw rather than trimmed length and allowed unsafe characters. Also, the component exposed a Save button which caused confusion with the overall Save Trade action.
+
+### Solution
+
+- Implemented a controlled `SettlementTextArea` with an `insertAtCursor` helper that restores selection using `requestAnimationFrame` so the DOM update has completed before setting selection range.
+- Validation now trims the value and enforces a min/max length and forbids `<` and `>` characters. The character counter shows the trimmed length.
+- Removed the per-field Save button and instead surface settlement as part of the Save Trade flow. The editor exposes `onChange`, `isValid` and `clear` actions for the parent modal to use.
+
+### Impact
+
+The editor now behaves accessibly and predictably. Keyboard users keep caret position when inserting templates. Validation messages are clear and Save is centralised, avoiding accidental partial saves.
+
+---
+
+### Problem
+
+TypeScript / ESLint issues introduced by recent edits (implicit any, unused imports, and catching axios errors with `any`) were blocking builds and CI lint steps.
+
+### Root Cause
+
+Refactors introduced implicit-`any` signatures in a few API helpers and some error handlers used `catch (err: any)` patterns to inspect axios responses. Additionally, some files had unused imports after moving the settlement editor.
+
+### Solution
+
+- Added explicit types (for example a `User` interface in `frontend/src/types/User.ts`) and updated relevant API function signatures to remove implicit `any`.
+- Replaced `any` error casts with `axios.isAxiosError(err)` guards, and used typed access to `err.response` where appropriate.
+- Cleaned up unused imports and added `frontend/.eslintignore` to avoid linting generated files.
+
+### Impact
+
+The frontend linter and TypeScript checks no longer block the build. The changes also made runtime error handling safer and easier to reason about.
+
+---
+
+### Files I changed (quick summary)
+
+- `frontend/src/modal/SettlementTextArea.tsx` — controlled textarea, templates, insertAtCursor, validation, clear handler, accessibility labels.
+- `frontend/src/modal/TradeActionsModal.tsx` — moved settlement editor to right column, added `saveSettlement(tradeId, text)` handler, wired GET/PUT calls and snackbars.
+- `frontend/src/modal/SingleTradeModal.tsx` — call parent `saveSettlement` after trade POST/PUT; coerced user id fields to Number(...).
+- `frontend/src/stores/staticStore.ts` — normalised dropdown options to `{ value, label }` where value is numeric id.
+- `frontend/src/utils/api.ts` and `frontend/src/types/User.ts` — explicit types and `withCredentials` on axios instance.
+- `frontend/.eslintignore` — ignore generated files (dist, .vite, node_modules).
+
+---
