@@ -1,25 +1,26 @@
-import React from 'react';
-import { render, RenderOptions } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from "react";
+import { render, RenderOptions } from "@testing-library/react";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Create a fresh QueryClient for each test
-const createTestQueryClient = () => new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: false,
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
     },
-  },
-});
+  });
 
 // Custom render function with common providers
 export function renderWithProviders(
   ui: React.ReactElement,
   {
-    initialRoute = '/',
-    path = '/',
+    initialRoute = "/",
+    path = "/",
     ...renderOptions
-  }: RenderOptions & { initialRoute?: string, path?: string } = {}
+  }: RenderOptions & { initialRoute?: string; path?: string } = {}
 ) {
   const queryClient = createTestQueryClient();
 
@@ -38,19 +39,17 @@ export function renderWithProviders(
   return render(ui, { wrapper: Wrapper, ...renderOptions });
 }
 
-// Use this wrapper when you need just a basic router without routes
+// Use this wrapper when needed just a basic router without routes
 export function renderWithRouter(
   ui: React.ReactElement,
   {
-    initialRoute = '/',
+    initialRoute = "/",
     ...renderOptions
   }: RenderOptions & { initialRoute?: string } = {}
 ) {
   function Wrapper({ children }: { children: React.ReactNode }) {
     return (
-      <MemoryRouter initialEntries={[initialRoute]}>
-        {children}
-      </MemoryRouter>
+      <MemoryRouter initialEntries={[initialRoute]}>{children}</MemoryRouter>
     );
   }
 
@@ -66,9 +65,7 @@ export function renderWithQueryClient(
 
   function Wrapper({ children }: { children: React.ReactNode }) {
     return (
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
   }
 

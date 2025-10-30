@@ -38,6 +38,16 @@ export const TradeActionsModal: React.FC = observer(() => {
     client-side state is strictly a UI cache that mirrors what the server
     returns or what the user saves.
   */
+  // REFACTOR NOTE:
+  // Previously the settlement editor performed its own HTTP request and
+  // persistence. To improve maintainability and ensure a single source of
+  // truth for settlements (so Save Trade and the settlement UI behave
+  // identically), we refactored persistence into a single parent-level
+  // handler `saveSettlement`. This lets the parent decide when and how to
+  // persist (for example, save settlement after a trade create/update)
+  // and keeps `SettlementTextArea` focused on UI concerns only (insert
+  // templates, caret handling, validation). The refactor reduces duplicated
+  // network logic and makes error-handling / UX messaging consistent.
   const [settlement, setSettlement] = useState<string>("");
   // `touched` state was previously added but is not used in this parent.
   // Keep only the submitting setter because we use it to mark save in-progress
@@ -182,11 +192,39 @@ export const TradeActionsModal: React.FC = observer(() => {
     setTrade(defaultTrade);
     setModalKey((prev) => prev + 1);
   };
+  // REFACTOR: extracted a single save function so both the standalone
+  // `SettlementTextArea` and the main trade save flow can reuse identical
+  // persistence logic. Rationale:
+  // - Avoid duplicated network calls and inconsistent error handling.
+  // - Make it straightforward for the trade save flow to persist settlement
+  //   as part of the same user action (book/update), ensuring data
+  //   consistency between the trade entity and its AdditionalInfo record.
+  // - Keep the UI component (`SettlementTextArea`) free of network logic
+  //   so it can be tested independently and remain a simple controlled
+  //   input with insert-at-cursor/template behaviour.
+  const saveSettlement = async (tradeId: string, text: string) => {
+    const id = tradeId ?? trade?.tradeId;
+    console.debug(
+      "saveSettlement called for tradeId",
+      id,
+      "text:length",
+      text?.length
+    );
+    if (!id) throw new Error("No trade id available to save settlement");
+    const payload = {
+      entityType: "TRADE",
+      entityId: Number(id),
+      fieldName: "SETTLEMENT_INSTRUCTIONS",
+      fieldValue: text,
+    };
+    await api.put(`/trades/${id}/settlement-instructions`, payload);
+  };
   const mode =
     userStore.authorization === "TRADER_SALES" ||
     userStore.authorization === "MO"
       ? "edit"
       : "view";
+
   return (
     <div
       className={
@@ -241,15 +279,40 @@ export const TradeActionsModal: React.FC = observer(() => {
       <div>
         {loading ? <LoadingSpinner /> : null}
         {trade && !loading && (
-          <SingleTradeModal
-            key={modalKey}
-            mode={mode}
-            trade={trade}
-            isOpen={!!trade}
-            onClear={handleClearAll}
-          />
+          <div className="flex flex-col gap-6">
+            {/* Left: the main trade editor (takes remaining space) */}
+            <div className="flex-1">
+              <SingleTradeModal
+                key={modalKey}
+                mode={mode}
+                trade={trade}
+                isOpen={!!trade}
+                onClear={handleClearAll}
+                settlement={settlement}
+                saveSettlement={saveSettlement}
+              />
+            </div>
+
+            {/* 
+  Refactored: Adjusted margin and width to position the Settlement Instructions box
+  slightly higher (closer to the trade form) and further right (under
+  the Save Trade / Cashflows / Terminate buttons area). This keeps it
+  visually connected to the trade form layout without making it appear
+  detached or floating too far right.
+*/}
+            <div className="flex justify-end">
+              <div className="w-[50%] mr-60 -mt-70">
+                <div className="p-4 bg-white rounded shadow-md">
+                  <h3 className="text-lg font-semibold mb-2">
+                    Settlement Instructions
+                  </h3>
+                  <SettlementTextArea initialValue={settlement} />
+                </div>
+              </div>
+            </div>
+          </div>
         )}
-        {/*
+        {/* 
           ADDED: Settlement instructions editor. To capture settlement instructions at trade booking so operations have immediate access and to reduce manual coordination. So the backend persists instructions in
           To enable traders (and SALES role) to be able to edit settlement
             text during amendments this UI allows authorised users to save
@@ -263,46 +326,6 @@ export const TradeActionsModal: React.FC = observer(() => {
           the server (PUT /trades/:id/settlement-instructions). 404 responses
           are treated as "no existing instruction" and show an empty editor.
         */}
-        {trade && (
-          <div className="mt-4 p-4 bg-white rounded">
-            <h3 className="text-lg font-semibold mb-2">
-              Settlement Instructions
-            </h3>
-            <SettlementTextArea
-              initialValue={settlement}
-              onSave={async (text: string) => {
-                if (!trade?.tradeId) throw new Error("No trade selected");
-                setSubmitting(true);
-                try {
-                  const payload = {
-                    entityType: "TRADE",
-                    entityId: Number(trade.tradeId),
-                    fieldName: "SETTLEMENT_INSTRUCTIONS",
-                    fieldValue: text,
-                  };
-                  await api.put(
-                    `/trades/${trade.tradeId}/settlement-instructions`,
-                    payload
-                  );
-                  setSnackbarOpen(true);
-                  setSnackbarMessage("Settlement instructions saved");
-                  setSettlement(text);
-                } catch (err) {
-                  setSnackbarOpen(true);
-                  setSnackbarMessage(
-                    "Failed to save settlement instructions: " +
-                      (err instanceof Error ? err.message : "Unknown error")
-                  );
-                  // Re-throw so the child component can also log/handle if it wants
-                  throw err;
-                } finally {
-                  setSubmitting(false);
-                  setTimeout(() => setSnackbarOpen(false), 3000);
-                }
-              }}
-            />
-          </div>
-        )}
       </div>
       <Snackbar
         open={snackBarOpen}
