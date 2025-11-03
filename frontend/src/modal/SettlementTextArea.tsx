@@ -35,6 +35,23 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
   // - Testability: the component can be unit-tested without mocking HTTP.
   // - Consistency: the parent can orchestrate saving settlement together
   //   with the associated trade (single Save Trade action).
+  //
+  // USER-FRIENDLY REFACTOR SUMMARY:
+  // This refactor was driven by UX goals – the textarea and template picker
+  // are explicitly designed to be easy to discover, read and operate on by
+  // traders. Key user-friendly choices made here:
+  // - Controlled component model: keeps the parent and textarea in sync so
+  //   template inserts always appear in the outgoing DTO.
+  // - Templates insert at caret and restore focus/caret reliably (requestAnimationFrame)
+  //   so users can quickly insert and edit standard instructions.
+  // - Increased template control visibility (larger font, accent background,
+  //   focus ring and chevron) so the picker is easy to find and use.
+  // - Validation uses trimmed length and explicit forbidden characters to
+  //   provide immediate, clear feedback before network requests.
+  // - Accessibility: label + aria-describedby and keyboard focus styles were
+  //   added so the control is usable by keyboard and screen-reader users.
+  // The overall goal: make settlement editing faster, less error-prone and more
+  // discoverable while keeping persistence and audit responsibilities in the parent service.
   const textareaRef = useRef<HTMLTextAreaElement | null>(null); //useRef is a React hook that gives a stable, per-instance ref object.
 
   // A React state hook that creates a piece of component state named value and an updater function setValue. initialValue: the runtime initial value for that state (comes from props via destructuring).
@@ -187,26 +204,51 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
         >
           Drop Down Quick templates
         </label>
-        <select
-          id="template-select"
-          className="w-full"
-          value={templateSelectValue}
-          onChange={(event) => {
-            const v = event.currentTarget.value; // the template string chosen by the user
-            setTemplateSelectValue(v); // keep select controlled (helpful for tests and clear reset)
-            if (v) {
-              insertAtCursor(v); // insert template at caret/replace selection
-              setTemplateSelectValue(""); // reset to placeholder so user can pick again
-            }
-          }}
-        >
-          <option value="">Insert template…</option>
-          {templatesToUse.map((t) => (
-            <option key={t.label} value={t.value}>
-              {t.label}
+        <div className="relative">
+          <select
+            id="template-select"
+            className="w-full appearance-none px-4 py-3 text-base bg-yellow-50 border-2 border-yellow-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
+            aria-describedby="template-help"
+            value={templateSelectValue}
+            onChange={(event) => {
+              const v = event.currentTarget.value; // the template string chosen by the user
+              setTemplateSelectValue(v); // keep select controlled (helpful for tests and clear reset)
+              if (v) {
+                insertAtCursor(v); // insert template at caret/replace selection
+                setTemplateSelectValue(""); // reset to placeholder so user can pick again
+              }
+            }}
+          >
+            <option value="" disabled>
+              Choose from dropdown
             </option>
-          ))}
-        </select>
+            {/* Render an <option> for each template: */}
+            {templatesToUse.map((txt) => (
+              // key: unique id for React's list diffing
+              // value: the template text inserted into the textarea
+              // visible label: shown to the user in the dropdown
+              <option key={txt.label} value={txt.value}>
+                {txt.label}
+              </option>
+            ))}
+          </select>
+
+          {/* Decorative chevron to indicate dropdown */}
+          <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+            <svg
+              className="h-5 w-5 text-gray-600"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.06z" />
+            </svg>
+          </div>
+        </div>
+
+        <p id="template-help" className="text-xs text-gray-600 mt-1">
+          Select a template to insert at the caret — editable after insertion.
+        </p>
       </div>
       {/* The editable multi-line input used for settlement instructions */}
       {/* DOM ref so insertAtCursor can read/set selection and focus */}
