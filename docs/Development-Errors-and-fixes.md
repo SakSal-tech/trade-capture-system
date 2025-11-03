@@ -1355,7 +1355,7 @@ I created two different test config classes for different purposes:
 
 - `GlobalTestSecurityConfig` — a temporary permit-all configuration used for quick triage. It registers a `SecurityFilterChain` that permits all requests and typically disables CSRF. I placed it under `src/test/java` so it only affects test runs.
 
-- `TestSecurityConfig` — a realistic test security config that defines an in-memory `UserDetailsService`, enables method security and registers a standard `SecurityFilterChain` that requires authentication. Use this for Phase 2 when remove global permit-all and want tests to assert correct authorisation.
+- `TestSecurityConfig` — a realistic test security config that defines an in-memory `UserDetailsService`, enables method security and registers a standard `SecurityFilterChain` that requires authentication. .
 
 ## Next steps (Phase 2)
 
@@ -4510,3 +4510,137 @@ tsconfig.json:18:37
 - Fixed mapper to read `AdditionalInfo` by (entity_type, entity_id, field_name) and expose `settlementInstructions` on the Trade DTO.
 - Added frontend defensive helpers (`toNumberOrNull`, `convertEmptyStringsToNull`) to reduce 400s.
 - Ensured axios `withCredentials` so session cookies are sent and adjusted logging for 403 diagnosis.
+
+## Detailed post-mortem: Errors observed and test failures (03/11/2025)
+
+### 1) Frontend omitted `settlementInstructions` from create payload
+
+- Symptom: When creating a trade from the UI the POST /api/trades body did not contain the `settlementInstructions` key, so the controller's createTrade() never persisted settlement into `additional_info`.
+- Example POST payload (broken case):
+
+```json
+{
+  "bookName": "RATES-BOOK-1",
+  "counterpartyName": "MegaFund",
+  "tradeType": "Swap",
+  "tradeSubType": "Vanilla",
+  "tradeDate": "2025-11-03T00:00"
+  // ... many fields ...
+  // NOTE: Missing "settlementInstructions"
+}
+```
+
+- Root cause: The settlement textarea component (`SettlementTextArea`) kept its value internally and the parent (`TradeActionsModal`) owned the `settlement` string, but the submit path in `SingleTradeModal.handleSaveTrade()` assembled the DTO from `editableTrade` and not the parent's `settlement` state.
+- Files/methods involved:
+  - frontend/src/modal/SingleTradeModal.tsx -> handleSaveTrade()
+  - frontend/src/modal/TradeActionsModal.tsx -> passed `settlement` and `saveSettlement` into `SingleTradeModal`
+  - frontend/src/modal/SettlementTextArea.tsx -> internal state for textarea
+- Fix applied:
+  - Add `dto.settlementInstructions = props.settlement ?? dto.settlement ?? "";` before sending DTO in `SingleTradeModal` so the POST/PUT always contains the key (even if empty string).
+  - Comment added explaining rationale and interplay with backend create logic.
+
+### 2) Template selection didn't update parent -> empty-string payload
+
+- Symptom: User selected a template from the dropdown; the textarea visually changed, but the POST payload showed `settlementInstructions: ""` (empty string) because the parent never received the inserted text.
+- Example observed payload after picking template (broken):
+
+```json
+{
+  "settlementInstructions": ""
+}
+```
+
+- Root cause: `SettlementTextArea.insertAtCursor()` used `setValue()` only and did not call the provided `onChange` prop, so the parent `settlement` state remained stale/empty.
+- Files/methods involved:
+  - frontend/src/modal/SettlementTextArea.tsx -> insertAtCursor(text)
+  - frontend/src/modal/TradeActionsModal.tsx -> keeps `settlement` state and passes `onChange={(text)=>setSettlement(text)}` to the textarea
+- Fix applied:
+  - In `insertAtCursor()` compute the new value deterministically from the textarea DOM, call `setValue(newValue)` and `onChange?.(newValue)` so the parent `settlement` receives the template text.
+  - Added a fallback branch to call `onChange` when the DOM ref is not available.
+
+### 3) Duplicate AdditionalInfo rows created on create (UI PUT + controller create)
+
+- Symptom: After creating a trade two nearly-identical `additional_info` rows appeared for the same `entity_id` with the same `field_value` (see DB rows id 33 and 34 in the cluster log). This looked like either duplicate inserts or an upsert that created a second active row.
+- Example DB snippet (two rows for trade 10033):
+
+```
+additional_info_id | entity_id | field_name               | field_type | field_value
+33                 | 10033     | SETTLEMENT_INSTRUCTIONS  | STRING     | INTERMEDIARY: UBS AG ...
+34                 | 10033     | SETTLEMENT_INSTRUCTIONS  | STRING     | INTERMEDIARY: UBS AG ...
+```
+
+- Root cause: Two separate persistence actions ran in sequence:
+  1. Controller `TradeController.createTrade()` detected `tradeDTO.getSettlementInstructions()` and called `additionalInfoService.createAdditionalInfo(...)` while saving the trade.
+  2. The UI then immediately called the parent's `saveSettlement` PUT (via saveSettlementAsync) after receiving the new trade id, which attempted an upsert and created/updated another row depending on race/timing.
+- Files/methods involved:
+  - backend/src/main/java/com/technicalchallenge/controller/TradeController.java -> createTrade()
+  - frontend/src/modal/SingleTradeModal.tsx -> after create: called saveSettlementAsync(newTradeId, props.settlement)
+  - backend/src/main/java/com/technicalchallenge/service/AdditionalInfoService.java -> createAdditionalInfo()/upOrInsertTradeSettlementInstructions()
+- Fix applied:
+  - Removed the post-create `saveSettlementAsync(...)` call in `SingleTradeModal` — controller already persisted settlement from the DTO during create; keep the separate PUT only for explicit updates/amendments.
+  - Added comments clarifying this reasoning.
+
+### 4) HTTP 500 on saving settlement: DB NOT NULL `field_type` constraint
+
+- Symptom: When the frontend sent the settlement save payload, the backend sometimes returned HTTP 500 rather than 200/201. The backend log showed a ConstraintViolationException referencing `additional_info.field_type not-null`.
+- Example log fragment:
+
+```
+Caused by: org.hibernate.exception.ConstraintViolationException:
+    could not execute statement; constraint [additional_info.field_type not-null]
+```
+
+- Root cause: `AdditionalInfoRequestDTO` used by the controller contains only `entityType`, `entityId`, `fieldName`, `fieldValue` (no `fieldType`). Some call-sites/builders (frontends or tests) omitted `fieldType`. The JPA `AdditionalInfo` entity maps `fieldType` to a NOT NULL DB column. If the entity was persisted with `fieldType == null` Hibernate issued an INSERT with NULL field_type and the DB refused it — this surfaces as a 500 and rolls back the transaction, leaving no row.
+- Files/methods involved:
+  - backend/src/main/java/com/technicalchallenge/dto/AdditionalInfoRequestDTO.java (does not include fieldType)
+  - backend/src/main/java/com/technicalchallenge/mapper/AdditionalInfoMapper.java -> toEntity(...) sets fieldType default in some code paths but not all
+  - backend/src/main/java/com/technicalchallenge/service/AdditionalInfoService.java -> createAdditionalInfo(), upOrInsertTradeSettlementInstructions()
+- Fix applied (defensive backend fix):
+  - Ensure the entity has a safe default `fieldType = "STRING"` before saving. Changes made in `AdditionalInfoService.createAdditionalInfo()` and in the upsert creation branch to set `entity.setFieldType("STRING")` when missing. Comments added explaining the 500 and why we set a default.
+  - Rationale: Making the service tolerant avoids 500s from clients that omit the optional `fieldType`. (Alternative: add `fieldType` to DTO and require clients to send it — this is a breaking contract change. The service-level default is safer.)
+
+### 5) tradeId remained null on the frontend after create
+
+- Symptom: After successfully creating a trade the UI still showed `tradeId: null` and some subsequent UI flows attempted to operate on the unsaved trade state.
+- Example broken client state observed (after create response):
+
+```
+{ tradeId: null, version: null, bookName: "RATES-BOOK-1", ... }
+```
+
+- Root cause: The create branch in `SingleTradeModal.handleSaveTrade()` did not update the local `editableTrade.tradeId` from the backend response in all cases, leaving the UI state pointing at the pre-save object. Tests and flows that relied on `editableTrade.tradeId` to be set (e.g., saving settlement asynchronously) failed or used wrong IDs. There was also earlier code that assumed response.data.tradeId or response.data.id could contain the value; inconsistent mapping caused confusion.
+- Files/methods involved:
+  - frontend/src/modal/SingleTradeModal.tsx -> create branch of handleSaveTrade(): `const response = await api.post("/trades", tradeDto); const newTradeId = response.data?.tradeId || response.data?.id || "";`
+- Fix applied:
+  - After post, set `setEditableTrade(prev => prev ? {...prev, tradeId: newTradeId} : prev)` and show the snackbar. This ensures subsequent actions have the persisted tradeId.
+  - Added comments and made the DTO mapping explicit to avoid ambiguity between `id` and `tradeId` in different endpoints/responses.
+
+### 6) Integration test failures (UserPrivilegeIntegrationTest) — 404 for cancel/delete
+
+- Symptom (observed earlier during CI/local runs): Two test failures in `UserPrivilegeIntegrationTest`:
+  - testTradeCancelRoleAllowed expected 200 but got 404
+  - testTradeDeleteRoleAllowed expected 204 but got 404
+- Root cause: Test fixtures were persisted inside a transactional @BeforeEach or not flushed; MockMvc requests run in a different transaction and could not see the unflushed changes. Additionally service code performed lookups by DB PK in some flows instead of business `tradeId`, causing mismatch when tests used business tradeId (e.g., 100001) rather than entity PK.
+- Files/tests involved:
+  - backend/src/test/java/com/technicalchallenge/controller/UserPrivilegeIntegrationTest.java -> test setup used repository.save(...) without saveAndFlush()
+  - backend/src/main/java/com/technicalchallenge/service/TradeService.java -> cancelTrade/deleteTrade looked up by different keys in earlier code
+- Fix applied:
+  - In tests, replaced `save(...)` with `saveAndFlush(...)` in @BeforeEach to ensure data visible to MockMvc.
+  - In `TradeService`, adjusted cancel/delete to lookup trade by business `tradeId` using `findByTradeIdAndActiveTrue(tradeId)` for consistent behaviour; added diagnostic logging in getTradeById() to assist future diagnosis.
+  - These changes fixed the 404s; re-running the focused test class returned all green.
+
+### 7) Validation/response shape mismatches (TradeLegControllerTest)
+
+- Symptom: Some controller tests expected a raw string body but the global `ApiExceptionHandler` changed error shapes into structured JSON (field-level `errors` map or `message`). Tests failed asserting on the old raw strings.
+- Files/tests involved:
+  - backend/src/test/java/com/technicalchallenge/controller/TradeLegControllerTest.java
+  - backend/src/main/java/com/technicalchallenge/controller/ApiExceptionHandler.java
+- Fix applied:
+  - Updated test assertions to match the new structured error responses (or updated the controller tests to call the new global handler shapes). Also added an explicit handler for MethodArgumentNotValidException returning field-level validation errors.
+
+### 8) Misc / Environment notes observed during the session
+
+- TS type missing: `@types/tailwindcss` referenced in tsconfig caused local tsc to fail (setup issue).
+- Frontend dev server often restarted during manual testing (exit code 130) — typically manual interruption.
+
+---

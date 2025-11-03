@@ -8,6 +8,8 @@ import com.technicalchallenge.service.TradeService;
 import com.technicalchallenge.service.AdditionalInfoService;
 
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +32,8 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/trades")
 public class TradeController {
+
+    private static final Logger logger = LoggerFactory.getLogger(TradeController.class);
 
     @Autowired
     private TradeService tradeService;
@@ -174,6 +178,7 @@ public class TradeController {
             tradeService.cancelTrade(id);
             return ResponseEntity.ok().build();
         } catch (RuntimeException e) {
+            logger.debug("cancelTrade failed for id {}: {}", id, e.getMessage(), e);
             return ResponseEntity.notFound().build();
         }
     }
@@ -213,6 +218,7 @@ public class TradeController {
             tradeService.deleteTrade(id);
             return ResponseEntity.noContent().build();
         } catch (RuntimeException e) {
+            logger.debug("deleteTrade failed for id {}: {}", id, e.getMessage(), e);
             return ResponseEntity.notFound().build();
         }
     }

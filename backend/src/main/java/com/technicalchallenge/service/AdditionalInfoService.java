@@ -132,6 +132,14 @@ public class AdditionalInfoService {
 
         // Map validated DTO to entity and save it
         AdditionalInfo additionalInfo = additionalInfoMapper.toEntity(additionalInfoRequestDTO);
+
+        // Defensive fix at entity-level: ensure fieldType is present before
+        // saving. This prevents a DB NOT NULL constraint (field_type) from
+        // causing a ConstraintViolationException which surfaces as HTTP 500.
+        if (additionalInfo.getFieldType() == null || additionalInfo.getFieldType().trim().isEmpty()) {
+            additionalInfo.setFieldType("STRING");
+        }
+
         AdditionalInfo savedInfo = additionalInfoRepository.save(additionalInfo);
         return additionalInfoMapper.toDto(savedInfo);
     }
@@ -381,6 +389,10 @@ public class AdditionalInfoService {
         request.setEntityId(tradeId); // Links record to the correct trade
         request.setFieldName("SETTLEMENT_INSTRUCTIONS");
         request.setFieldValue(instructions); // The new or updated instruction text
+        // Note: we do NOT set fieldType on the DTO (request object) because
+        // AdditionalInfoRequestDTO does not include that property. The mapper
+        // and the entity-level defensive check in createAdditionalInfo will
+        // ensure fieldType is populated before persistence to avoid 500 errors.
 
         // If the record already exists, update it else create a new one
         if (existing != null) {
@@ -483,8 +495,16 @@ public class AdditionalInfoService {
             dto.setEntityId(tradeId);
             dto.setFieldName(FIELD_NAME);
             dto.setFieldValue(settlementText);
-
-            target = additionalInfoRepository.save(additionalInfoMapper.toEntity(dto));
+            // Convert DTO to entity via mapper and then defensively ensure
+            // fieldType is set on the entity before saving. This prevents the
+            // database NOT NULL constraint on field_type from causing a
+            // ConstraintViolationException (HTTP 500) if a caller omitted
+            // the field type.
+            AdditionalInfo entity = additionalInfoMapper.toEntity(dto);
+            if (entity.getFieldType() == null || entity.getFieldType().trim().isEmpty()) {
+                entity.setFieldType("STRING");
+            }
+            target = additionalInfoRepository.save(entity);
         }
 
         // Write to audit trail

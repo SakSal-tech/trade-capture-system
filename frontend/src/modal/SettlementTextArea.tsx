@@ -73,7 +73,10 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
     const txtArea = textareaRef.current;
     //If null (the DOM node isn’t available — e.g., not mounted, ref not attached, or running on server
     if (!txtArea) {
-      setValue((prevValue) => prevValue + text); //takes the current state (prevValue) and concatenates text to it.If prevValue is an empty string, result becomes "" + text.
+      // Update internal state and inform parent when no DOM ref is available
+      const newVal = (value || "") + text;
+      setValue(newVal);
+      onChange?.(newVal);
       return;
     }
     //reads the settlement-instructions textarea caret/selection start index (an integer). If that value is null/undefined, it falls back to the end of the current text (txtArea.value.length).
@@ -86,9 +89,12 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
     // Insert the template at the caret/selection using a functional state updater
     // so we never clobber concurrent updates. We calculate the new caret position
     // (start + text.length) now and restore it after React updates the DOM below.
-    setValue(
-      (prevValue) => prevValue.slice(0, start) + text + prevValue.slice(end)
-    );
+    // Compute the new value deterministically from the textarea DOM so we can
+    // synchronously inform the parent via onChange with the exact new content.
+    const newValue =
+      txtArea.value.slice(0, start) + text + txtArea.value.slice(end);
+    setValue(newValue);
+    onChange?.(newValue);
 
     // 1) Mark the field as "touched" because template insertion is explicit user input.
     //    This ensures inline validation and "Save" enablement behave consistently.

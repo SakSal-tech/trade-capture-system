@@ -1,6 +1,5 @@
 package com.technicalchallenge.controller;
 
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ActiveProfiles;
 
 import org.junit.jupiter.api.DisplayName;
@@ -26,14 +25,10 @@ import com.technicalchallenge.model.Book;
 import com.technicalchallenge.model.Counterparty;
 import com.technicalchallenge.model.Trade;
 
-import jakarta.transaction.Transactional;
-
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 @WithAnonymousUser
 @ActiveProfiles("test")
-@Transactional
-@Rollback
 public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
 
         @Autowired
@@ -86,7 +81,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                 // Create minimal Book and Counterparty entries used by Trade
                 var book = new Book();
                 book.setBookName("Book-Test");
-                book = bookRepository.save(book);
+                book = bookRepository.saveAndFlush(book);
 
                 // Also created a book matching the create-trade test payload. The
                 // create-trade controller uses populateReferenceDataByName() which
@@ -94,17 +89,17 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                 // flow finds the Book and avoids `Book not found` runtime errors.
                 var createBook = new Book();
                 createBook.setBookName("TestBook");
-                createBook = bookRepository.save(createBook);
+                createBook = bookRepository.saveAndFlush(createBook);
 
                 var counterparty = new Counterparty();
                 counterparty.setName("CounterOne");
-                counterparty = counterpartyRepository.save(counterparty);
+                counterparty = counterpartyRepository.saveAndFlush(counterparty);
 
                 // Create a counterparty the create-trade payload expects so the
                 // controller's populateReferenceDataByName() can resolve it.
                 var createCounterparty = new Counterparty();
                 createCounterparty.setName("BigBank");
-                createCounterparty = counterpartyRepository.save(createCounterparty);
+                createCounterparty = counterpartyRepository.saveAndFlush(createCounterparty);
 
                 /*
                  * Persist a Trade so tests exercise the full path. Important:
@@ -122,7 +117,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                 trade.setBook(book);
                 trade.setCounterparty(counterparty);
                 trade.setTradeDate(LocalDate.now());
-                trade = tradeRepository.save(trade);
+                trade = tradeRepository.saveAndFlush(trade);
                 savedTradeBusinessId = trade.getTradeId();
 
                 // no TradeDTO field — tests create payloads inline when needed

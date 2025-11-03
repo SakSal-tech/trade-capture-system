@@ -127,7 +127,37 @@ public class TradeService {
     // Fetch a single trade
     public Optional<Trade> getTradeById(Long tradeId) {
         logger.debug("Retrieving trade by id: {}", tradeId);
-        Optional<Trade> opt = tradeRepository.findByTradeIdAndActiveTrue(tradeId);
+        // Debug: also query all trades with the business tradeId so we can see if
+        // rows exist but are not active. This helps diagnose integration-test
+        // visibility issues where a trade may be present but flagged inactive.
+        try {
+            var allMatches = tradeRepository.findByTradeId(tradeId);
+            logger.debug("Found {} trades with tradeId={}", allMatches == null ? 0 : allMatches.size(), tradeId);
+            if (allMatches != null && !allMatches.isEmpty()) {
+                for (Trade t : allMatches) {
+                    logger.debug("trade row id={} active={}", t.getId(), t.getActive());
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Error while debugging trade lookup: {}", e.getMessage());
+        }
+
+        // Try to pick an active trade from the list we already fetched. This
+        // works around cases where the derived query with a boolean predicate
+        // may not match due to subtle dialect/nullable-boolean handling in
+        // the test environment.
+        Optional<Trade> opt = java.util.Optional.empty();
+        try {
+            var allMatches = tradeRepository.findByTradeId(tradeId);
+            if (allMatches != null) {
+                opt = allMatches.stream().filter(t -> Boolean.TRUE.equals(t.getActive())).findFirst();
+            }
+        } catch (Exception e) {
+            logger.debug("Fallback active-filter failed: {}", e.getMessage());
+        }
+        if (opt.isEmpty()) {
+            opt = tradeRepository.findByTradeIdAndActiveTrue(tradeId);
+        }
 
         // Enforce server-side ownership checks: a TRADER should only be able to
         // access their own trade unless they hold elevated privileges.
@@ -369,7 +399,19 @@ public class TradeService {
     // NEW METHOD: Delete trade (mark as cancelled)
     @Transactional
     public void deleteTrade(Long tradeId) {
-        logger.info("Deleting (cancelling) trade with ID: {}", tradeId);
+        // CHANGE: Use business tradeId lookup to find the trade (not DB PK).
+        // Previously this delegated directly to cancelTrade but that method
+        // performed additional ownership logic; here we make the intent
+        // explicit: find the trade by its business id and then cancel it.
+        logger.info("Deleting (cancelling) trade with business ID: {}", tradeId);
+        // Lookup by business id (tradeId) rather than DB primary key (id).
+        var tradeOpt = tradeRepository.findByTradeIdAndActiveTrue(tradeId);
+        if (tradeOpt.isEmpty()) {
+            // Keep behaviour consistent with controller expectation: throw a
+            // runtime exception so controller returns 404 (not found).
+            throw new RuntimeException("Trade not found: " + tradeId);
+        }
+        // Delegate to cancelTrade to perform status change and permission checks.
         cancelTrade(tradeId);
     }
 
@@ -469,8 +511,11 @@ public class TradeService {
     @Transactional
     public Trade cancelTrade(Long tradeId) {
         logger.info("Cancelling trade with ID: {}", tradeId);
-
-        Optional<Trade> tradeOpt = getTradeById(tradeId);
+        // CHANGE: Lookup the trade by its business tradeId (trade.tradeId)
+        // rather than assuming the controller passed a database primary key.
+        // This ensures controller endpoints that supply business IDs (as the
+        // tests do) are resolved correctly.
+        Optional<Trade> tradeOpt = tradeRepository.findByTradeIdAndActiveTrue(tradeId);
         if (tradeOpt.isEmpty()) {
             throw new RuntimeException("Trade not found: " + tradeId);
         }
@@ -482,7 +527,14 @@ public class TradeService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         boolean allowedToEdit = false;
         if (userPrivilegeValidator != null) {
-            allowedToEdit = userPrivilegeValidator.canEditTrade(trade, auth);
+            try {
+                boolean validatorResult = userPrivilegeValidator.canEditTrade(trade, auth);
+                logger.debug("UserPrivilegeValidator present - canEditTrade returned: {}", validatorResult);
+                allowedToEdit = validatorResult;
+            } catch (Exception e) {
+                logger.warn("UserPrivilegeValidator threw an exception: {}", e.getMessage());
+                allowedToEdit = false;
+            }
         } else {
             // Fallback inline check: only the owning trader or users with
             // elevated edit privileges may cancel a trade. This mirrors the
@@ -518,6 +570,16 @@ public class TradeService {
             // incorrectly indicate absence rather than lack of permission.
             throw new AccessDeniedException("Insufficient privileges to cancel trade " + tradeId);
         }
+        // Debug: log whether CANCELLED status exists to help diagnose 404s in
+        // integration tests where the controller maps a RuntimeException to 404.
+        try {
+            var cancelledOpt = tradeStatusRepository.findByTradeStatus("CANCELLED");
+            logger.debug("CANCELLED status present: {}", cancelledOpt.isPresent());
+            cancelledOpt.ifPresent(cs -> logger.debug("CANCELLED status id={}", cs.getId()));
+        } catch (Exception e) {
+            logger.warn("Error while checking CANCELLED trade status: {}", e.getMessage());
+        }
+
         TradeStatus cancelledStatus = tradeStatusRepository.findByTradeStatus("CANCELLED")
                 .orElseThrow(() -> new RuntimeException("CANCELLED status not found"));
 
