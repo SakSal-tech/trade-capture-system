@@ -33,6 +33,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 // Added. Security imports to implement access rights
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handles Settlement Instructions integration for trades.
@@ -51,6 +53,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 @Tag(name = "Trade Settlement Instructions", description = "Endpoints for managing trade settlement instructions and audit history")
 @RequestMapping("/api/trades")
 public class TradeSettlementController {
+
+    // Short: logger for diagnostic traces (principal and authorities)
+    private static final Logger logger = LoggerFactory.getLogger(TradeSettlementController.class);
 
     @Autowired
     private TradeService tradeService;
@@ -240,14 +245,20 @@ public class TradeSettlementController {
 
         // Extract the settlement text (can be null or blank)
         String text = infoRequest.getFieldValue();
-        // Refactored:Added Security measures which reads the current authenticated
-        // principal from
-        // Spring Security and uses its username if available to show and record who
-        // made
-        // the change fallback is ANONYMOUS to used when there is no authenticated user
+        // Read current authenticated principal for audit and diagnostics
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String changedBy = (auth != null && auth.getName() != null && !auth.getName().isBlank()) ? auth.getName()
                 : "ANONYMOUS";
+
+        // Short: log principal and granted authorities to aid debugging of 403 cases
+        try {
+            logger.debug("Settlement PUT principal='{}' authorities='{}' tradeId='{}'",
+                    auth != null ? auth.getName() : "ANONYMOUS",
+                    auth != null ? auth.getAuthorities() : "NONE",
+                    id);
+        } catch (Exception logEx) {
+            // keep main flow unchanged if logging fails
+        }
 
         // Delegate logic to service layer (handles both create & update)
         AdditionalInfoDTO result = additionalInfoService.upOrInsertTradeSettlementInstructions(id, text, changedBy);

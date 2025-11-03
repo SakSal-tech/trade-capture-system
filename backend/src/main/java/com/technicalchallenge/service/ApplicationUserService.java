@@ -25,7 +25,11 @@ public class ApplicationUserService {
 
     public boolean validateCredentials(String loginId, String password) {
         logger.debug("Validating credentials for user: {}", loginId);
-        Optional<ApplicationUser> user = applicationUserRepository.findByLoginId(loginId);
+        // refactored to accept either loginId or first name. Avoids type mismatch
+        // errors.Returns the first matching user
+        Optional<ApplicationUser> user = applicationUserRepository.findAll().stream()
+                .filter(u -> loginId.equals(u.getLoginId()) || loginId.equals(u.getFirstName()))
+                .findFirst();
         // Use PasswordEncoder.matches to support encoded stored passwords.
         // (This is the important change: previously a plain-string compare would
         // fail when passwords in the DB are encoded or prefixed with an encoding

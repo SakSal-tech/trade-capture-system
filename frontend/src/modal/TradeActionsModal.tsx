@@ -3,10 +3,6 @@ import Input from "../components/Input";
 import Button from "../components/Button";
 import api from "../utils/api";
 import axios from "axios";
-// ADDED: import the SettlementTextArea UI component so this modal can
-// display and persist settlement instructions for the selected trade.
-// Maps to business requirements: capture at booking, editable during
-// amendments, and support for audit/ownership enforced by the backend.
 import { SettlementTextArea } from "./SettlementTextArea";
 import { SingleTradeModal } from "./SingleTradeModal";
 import { getDefaultTrade } from "../utils/tradeUtils";
@@ -17,6 +13,7 @@ import { observer } from "mobx-react-lite";
 import { useQuery } from "@tanstack/react-query";
 import staticStore from "../stores/staticStore";
 import { Trade, TradeLeg } from "../utils/tradeTypes";
+import { text } from "stream/consumers";
 
 export const TradeActionsModal: React.FC = observer(() => {
   const [tradeId, setTradeId] = React.useState<string>("");
@@ -192,6 +189,10 @@ export const TradeActionsModal: React.FC = observer(() => {
     setTrade(defaultTrade);
     setModalKey((prev) => prev + 1);
   };
+  // DEV: Parent modal owns settlement persistence. The saveSettlement
+  // function below centralises persistence for the SettlementTextArea and
+  // ensures consistency and single-point error handling. See
+  // docs/DeveloperLog-30-10-2025-detailed.md
   // REFACTOR: extracted a single save function so both the standalone
   // `SettlementTextArea` and the main trade save flow can reuse identical
   // persistence logic. Rationale:
@@ -217,7 +218,27 @@ export const TradeActionsModal: React.FC = observer(() => {
       fieldName: "SETTLEMENT_INSTRUCTIONS",
       fieldValue: text,
     };
-    await api.put(`/trades/${id}/settlement-instructions`, payload);
+    try {
+      await api.put(`/trades/${id}/settlement-instructions`, payload);
+    } catch (err) {
+      // Surface permission issues clearly so caller can show appropriate UX
+      // Log the full axios error for diagnostics
+      console.error("saveSettlement failed", err);
+      if (axios.isAxiosError(err)) {
+        const status = err.response?.status;
+        const serverMsg = err.response?.data ?? err.message;
+        if (status === 403) {
+          throw new Error(
+            `Forbidden (403): insufficient privilege to edit settlement for trade ${id}`
+          );
+        }
+        // Propagate server-sent message when available
+        throw new Error(
+          `API error ${status || ""}: ${JSON.stringify(serverMsg)}`
+        );
+      }
+      throw err;
+    }
   };
   const mode =
     userStore.authorization === "TRADER_SALES" ||
@@ -306,7 +327,13 @@ export const TradeActionsModal: React.FC = observer(() => {
                   <h3 className="text-lg font-semibold mb-2">
                     Settlement Instructions
                   </h3>
-                  <SettlementTextArea initialValue={settlement} />
+                  {/*Refactored: to solve issues with settlement not saving as I was not passing any onChange or onSave callback to update the local settlement state*/}
+                  <SettlementTextArea
+                    initialValue={settlement}
+                    onSave={(text) => setSettlement(text)} //Optional save trigger
+                    // Also uodate on every change to keep parent in sync
+                    onChange={(text) => setSettlement(text)}
+                  />
                 </div>
               </div>
             </div>

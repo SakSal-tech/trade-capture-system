@@ -1,14 +1,11 @@
-import React, { FC, useState, useRef, useEffect } from "react"; // React: JSX runtime
+import { FC, useState, useRef, useEffect, ChangeEvent } from "react"; // React: JSX runtime
 // FC: Functional Component type for typing the component
 // useState: controlled value storage for the textarea
 // useRef: hold a reference to the <textarea> so we can insert at cursor
 // useEffect: small lifecycle needs (e.g., focus or syncing initial value)
-
-//This exports a TypeScript type (compile-time only) so Other files can import it for typing props or variables
-import type { ChangeEvent } from "react";
+// ChangeEvent: Type for the textarea onChange handler (keeps TS happy)
 // ChangeEvent: Type for the textarea onChange handler (keeps TS happy)
 import Button from "../components/Button";
-import LoadingSpinner from "../components/LoadingSpinner"; // A small SVG spinner used to indicate loading state (visual cue while an async action is in progress).
 // This component will use plain elements so no other imports are required.
 
 //To type the component props so callers know what to pass and I  get autocompletion. it defines the "shape" (the property names and types). typing props gives me editor autocompletion and lets TypeScript check callers pass the correct fields (helps prevent bugs
@@ -18,12 +15,14 @@ export interface SettlementTextareaProps {
   // Optional callback the parent can pass to save the settlement instructions.
   // Allows the component to remain UI-only when not provided.
   onSave?: (text: string) => Promise<void> | void;
+  onChange?: (text: string) => void; //Added: to pass onChange from TradeActionModel
 }
 //types the variable as SettlementTextareaProps meaning TypeScript what kind of value a variable will hold. This says “the variable SettlementTextArea has the type FC<SettlementTextareaProps. So TypeScript will error if callers pass wrong props or if I use the props incorrectly inside the component
 export const SettlementTextArea: FC<SettlementTextareaProps> = ({
   initialValue = "",
-  templates = [], //Destructing: take props, pull out initialValue and templates, and if thye're undefined give them default values
+  templates = [], //Destructuring: take props, pull out initialValue and templates, and if they're undefined give them default values
   onSave,
+  onChange,
 }) => {
   // REFACTOR NOTE:
   // This component was intentionally refactored to be a UI-only, controlled
@@ -56,15 +55,19 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
 
   //Reads the string from the textarea event and calls setValue(...) to update component state so the textarea can be used as a controlled component.
   function handleChange(evt: ChangeEvent<HTMLTextAreaElement>) {
-    setValue(evt.currentTarget.value);
+    const newValue = evt.currentTarget.value;
+    setValue(newValue);
     // Mark as touched when the user types so validation/Save state updates immediately
     // (keeps UX responsive rather than waiting for blur).
     setTouched(true);
+    onChange?.(newValue); // To inform parent every time the text changes
   }
 
-  // Local saving indicator for async onSave handlers so the UI can show a spinner
-  // and disable the Save button while the parent persists data.
-  const [isSaving, setIsSaving] = useState<boolean>(false);
+  // Note: the component remains UI-only and delegates persistence to the parent.
+  // Reference `onSave` so linters do not mark it as unused when callers omit it.
+  useEffect(() => {
+    void onSave;
+  }, [onSave]);
   // Take a template (or any text) and insert it into  textarea at the current caret/selection position. ChangeEvent<HTMLTextAreaElement>, which gives the handler a correctly typed event.
   function insertAtCursor(text: string) {
     const txtArea = textareaRef.current;
@@ -114,27 +117,27 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
     {
       value:
         "BENEFICIARY: UBS AG, Zurich / SWIFT: UBSWCHZH80A / IBAN: CHxx xxxx xxxx xxxx xxxx x",
-      label: "UBS AG — Beneficiary (IBAN placeholder)",
+      label: "UBS AG - Beneficiary (IBAN placeholder)",
     },
     {
       value:
         "OUR BANK: UBS AG, Zurich / SWIFT: UBSWCHZH80A / Account: 123-456789.0 (local format)",
-      label: "UBS AG — Our account (local)",
+      label: "UBS AG - Our account (local)",
     },
     {
       value:
         "PAYMENT: UBS AG / UBS ADDRESS: Bahnhofstrasse 45, CH-8001 Zurich / SWIFT: UBSWCHZH80A / CHARGES: OUR",
-      label: "UBS — Payment block (OUR charges)",
+      label: "UBS - Payment block (OUR charges)",
     },
     {
       value:
         "INTERMEDIARY: UBS AG NY / SWIFT: BKTRUS33 / FOR CREDIT TO: UBS AG Zurich / IBAN: CHxx xxxx xxxx xxxx xxxx x",
-      label: "UBS — Intermediary + credit instruction",
+      label: "UBS - Intermediary + credit instruction",
     },
     {
       value:
-        "UBS PAYMENT INSTRUCTIONS: Please pay via UBS AG (SWIFT UBSWCHZH80A). Beneficiary: [NAME]. Account/IBAN: [IBAN]. Reference: [TRADE ID].",
-      label: "UBS — Short payment instruction (templated)",
+        "UBS PAYMENT INSTRUCTIONS: Please pay via UBS AG (SWIFT UBSWCHZH80A). Beneficiary: (NAME). Account/IBAN: (IBAN). Reference: (TRADE ID).",
+      label: "UBS - Short payment instruction (templated)",
     },
   ];
   //Picks which template list the component should use. If the parent passes a non-empty list of templates (e.g., desk- or user-specific templates from the server), traders will see those choices.If no templates were provided (or the provided array is empty), the UI falls back to defaultTemplates so traders still have useful quick-insert options
@@ -148,7 +151,13 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
     // whitespace can't be used to bypass the length check and so the
     // angle-bracket check is applied to the visible content.
     // [<>] — matches either < or > which we forbid to reduce XSS risk.
-    if (trimmed.length < 10 || trimmed.length > 500 || /[<>]/.test(trimmed))
+    // ADDED: validation rules enforced by the UI for settlement text.
+    // These match server expectations where possible and provide
+    // immediate feedback before attempting to persist:
+    // - Must be between 10 and 500 characters (trimmed)
+    // - Forbid characters that the backend rejects (semicolon, single/double quotes,
+    //   and angle brackets) to reduce invalid input and XSS-like content.
+    if (trimmed.length < 10 || trimmed.length > 500 || /[;'"<>]/.test(trimmed))
       return false;
     return true;
   }

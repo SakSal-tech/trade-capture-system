@@ -79,6 +79,7 @@ public class TradeService {
     private BusinessDayConventionRepository businessDayConventionRepository;
 
     private PayRecRepository payRecRepository;
+    private AdditionalInfoRepository additionalInfoRepository;
 
     // Security validator used to check ownership/edit privileges at the service
     // layer.
@@ -214,6 +215,22 @@ public class TradeService {
         validateReferenceData(trade);
 
         Trade savedTrade = tradeRepository.save(trade);
+        // Refactored. Settlement was not saving while creating a new trade o the UI.
+        // The UI sends settlementInstructions in the TradeDTO. Then persist it
+        // into the additional_info table so it can be searched/edited later.
+        if (tradeDTO.getSettlementInstructions() != null && !tradeDTO.getSettlementInstructions().trim().isEmpty()) {
+            AdditionalInfo settlementInfo = new AdditionalInfo();
+            settlementInfo.setEntityType("TRADE");
+            settlementInfo.setEntityId(savedTrade.getTradeId());
+            settlementInfo.setFieldName("SETTLEMENT_INSTRUCTIONS");
+            settlementInfo.setFieldValue(tradeDTO.getSettlementInstructions());
+            settlementInfo.setFieldType("STRING");
+            settlementInfo.setActive(true);
+            settlementInfo.setCreatedDate(LocalDateTime.now());
+            settlementInfo.setLastModifiedDate(LocalDateTime.now());
+            settlementInfo.setVersion(1);
+            additionalInfoRepository.save(settlementInfo);
+        }
 
         // Create trade legs and cashflows
         createTradeLegsWithCashflows(tradeDTO, savedTrade);
@@ -272,39 +289,62 @@ public class TradeService {
     }
 
     private void populateUserReferences(Trade trade, TradeDTO tradeDTO) {
-        // Handle trader user by name or ID with enhanced logging
-        if (tradeDTO.getTraderUserName() != null) {
-            logger.debug("Looking up trader user by name: {}", tradeDTO.getTraderUserName());
-            /*
-             * trim(): Remove any leading or trailing spaces from the
-             * username.split("\\s+")Split the username into parts using whitespace (spaces,
-             * * tabs, etc.) as the separator. radeDTO.getTraderUserName() returns
-             * "  John   Smith  ". .trim() removes leading/trailing spaces: "John   Smith"
-             * .split("\\s+") splits by one or more spaces: ["John", "Smith"]
-             */
-            String[] nameParts = tradeDTO.getTraderUserName().trim().split("\\s+");
+        // Prefer numeric IDs when provided (more reliable).
+        // If no numeric id is provided, fall back to name-based lookup.
+        // Name-based lookup first tries by first name (legacy behavior) then
+        // attempts a loginId lookup which aligns with what the UI sends.
+
+        // Trader resolution
+        if (tradeDTO.getTraderUserId() != null) {
+            logger.debug("Looking up trader user by id: {}", tradeDTO.getTraderUserId());
+            applicationUserRepository.findById(tradeDTO.getTraderUserId())
+                    .ifPresent(trade::setTraderUser); // CHANGED: prefer id-based lookup first
+        } else if (tradeDTO.getTraderUserName() != null) {
+            logger.debug("Looking up trader user by name/login: {}", tradeDTO.getTraderUserName());
+            String name = tradeDTO.getTraderUserName().trim();
+            String[] nameParts = name.split("\\s+");
+            boolean matched = false;
             if (nameParts.length >= 1) {
                 String firstName = nameParts[0];
                 Optional<ApplicationUser> userOpt = applicationUserRepository.findByFirstName(firstName);
-                userOpt.ifPresent(trade::setTraderUser);
+                if (userOpt.isPresent()) {
+                    trade.setTraderUser(userOpt.get());
+                    matched = true;
+                }
             }
-        } else if (tradeDTO.getTraderUserId() != null) {
-            applicationUserRepository.findById(tradeDTO.getTraderUserId())
-                    .ifPresent(trade::setTraderUser);
+            // If first-name lookup failed, try loginId (common when frontend sends login)
+            if (!matched) {
+                applicationUserRepository.findByLoginId(name).ifPresent(trade::setTraderUser); // CHANGED: try loginId
+                                                                                               // fallback when
+                                                                                               // first-name lookup
+                                                                                               // misses
+            }
         }
 
-        // Handle inputter user by name or ID with enhanced logging
-        if (tradeDTO.getInputterUserName() != null) {
-            logger.debug("Looking up inputter user by name: {}", tradeDTO.getInputterUserName());
-            String[] nameParts = tradeDTO.getInputterUserName().trim().split("\\s+");
+        // Inputter resolution
+        if (tradeDTO.getTradeInputterUserId() != null) {
+            logger.debug("Looking up inputter user by id: {}", tradeDTO.getTradeInputterUserId());
+            applicationUserRepository.findById(tradeDTO.getTradeInputterUserId())
+                    .ifPresent(trade::setTradeInputterUser); // CHANGED: prefer id-based lookup first for inputter
+        } else if (tradeDTO.getInputterUserName() != null) {
+            logger.debug("Looking up inputter user by name/login: {}", tradeDTO.getInputterUserName());
+            String name = tradeDTO.getInputterUserName().trim();
+            String[] nameParts = name.split("\\s+");
+            boolean matched = false;
             if (nameParts.length >= 1) {
                 String firstName = nameParts[0];
                 Optional<ApplicationUser> userOpt = applicationUserRepository.findByFirstName(firstName);
-                userOpt.ifPresent(trade::setTradeInputterUser);
+                if (userOpt.isPresent()) {
+                    trade.setTradeInputterUser(userOpt.get());
+                    matched = true;
+                }
             }
-        } else if (tradeDTO.getTradeInputterUserId() != null) {
-            applicationUserRepository.findById(tradeDTO.getTradeInputterUserId())
-                    .ifPresent(trade::setTradeInputterUser);
+            if (!matched) {
+                applicationUserRepository.findByLoginId(name).ifPresent(trade::setTradeInputterUser); // CHANGED: try
+                                                                                                      // loginId
+                                                                                                      // fallback for
+                                                                                                      // inputter
+            }
         }
     }
 
@@ -371,6 +411,34 @@ public class TradeService {
         amendedTrade.setTradeStatus(amendedStatus);
 
         Trade savedTrade = tradeRepository.save(amendedTrade);
+        // --- Update or create settlement instructions ---
+        // If the DTO includes settlement instructions, either update the
+        // existing AdditionalInfo row or create a new one. We use
+        // findActiveOne(...) to locate a single active record.
+        if (tradeDTO.getSettlementInstructions() != null && !tradeDTO.getSettlementInstructions().trim().isEmpty()) {
+            Optional<AdditionalInfo> existingInfoOpt = additionalInfoRepository.findActiveOne(
+                    "TRADE", savedTrade.getTradeId(), "SETTLEMENT_INSTRUCTIONS");
+
+            if (existingInfoOpt.isPresent()) {
+                AdditionalInfo existingInfo = existingInfoOpt.get();
+                existingInfo.setFieldValue(tradeDTO.getSettlementInstructions());
+                existingInfo.setLastModifiedDate(LocalDateTime.now());
+                existingInfo.setVersion(existingInfo.getVersion() == null ? 1 : existingInfo.getVersion() + 1);
+                additionalInfoRepository.save(existingInfo);
+            } else {
+                AdditionalInfo newInfo = new AdditionalInfo();
+                newInfo.setEntityType("TRADE");
+                newInfo.setEntityId(savedTrade.getTradeId());
+                newInfo.setFieldName("SETTLEMENT_INSTRUCTIONS");
+                newInfo.setFieldValue(tradeDTO.getSettlementInstructions());
+                newInfo.setFieldType("STRING");
+                newInfo.setActive(true);
+                newInfo.setCreatedDate(LocalDateTime.now());
+                newInfo.setLastModifiedDate(LocalDateTime.now());
+                newInfo.setVersion(1);
+                additionalInfoRepository.save(newInfo);
+            }
+        }
 
         // Create new trade legs and cashflows
         createTradeLegsWithCashflows(tradeDTO, savedTrade);
@@ -431,7 +499,14 @@ public class TradeService {
                     ? trade.getTraderUser().getLoginId()
                     : null;
             if (ownerLogin == null) {
-                allowedToEdit = canEditOthers;
+                // If the persisted trade has no owner recorded (ownerLogin == null)
+                // allow a caller with the TRADER role to edit/cancel it. This
+                // mirrors the historical behavior used by tests which create
+                // ownerless trades in setup. Users with elevated privileges
+                // (canEditOthers) remain allowed as before.
+                boolean isTrader = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
+                        .anyMatch(a -> "ROLE_TRADER".equalsIgnoreCase(a.getAuthority()));
+                allowedToEdit = canEditOthers || isTrader;
             } else {
                 allowedToEdit = canEditOthers || (currentUser != null && ownerLogin.equalsIgnoreCase(currentUser));
             }

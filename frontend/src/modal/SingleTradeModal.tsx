@@ -16,6 +16,21 @@ import {
 import { formatDatesFromBackend } from "../utils/dateUtils";
 import LoadingSpinner from "../components/LoadingSpinner";
 import userStore from "../stores/userStore";
+import staticStore from "../stores/staticStore";
+// REFACTOR SUMMARY:
+// This file was updated to integrate settlement instructions into the
+// main trade save flow. Key reasons for the edits:
+// - Make settlement persistence a parent-controlled responsibility
+//   (saveSettlement prop) so the UI component remains UI-only and the
+//   parent can orchestrate saving trade + settlement together.
+// - Save settlement asynchronously (non-blocking) after the trade is
+//   created/updated so a missing or failing settlement save does not
+//   prevent the trade from being stored. Failures set `settlementUnsaved`
+//   so the user can retry.
+// - Add defensive DTO assignments and extra debug logging to help
+//   diagnose missing backend fields (e.g., `uti_code`, `trader_user_id`) and
+//   to coerce string ids into numbers before sending to the backend.
+// See developer log entry: docs/DeveloperLog-30-10-2025-detailed.md
 
 /**
  * Props for SingleTradeModal component
@@ -54,6 +69,8 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
     "success"
   );
   const [loading, setLoading] = React.useState(false);
+  // Tracks whether the settlement upsert failed and requires a retry.
+  const [settlementUnsaved, setSettlementUnsaved] = React.useState(false);
 
   React.useEffect(() => {
     setEditableTrade(props.trade ?? getDefaultTrade());
@@ -63,6 +80,48 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
     setSnackbarMsg("");
     setSnackbarType("success");
   }, [props.trade, props.isOpen]);
+
+  // Refactor: save settlement asynchronously after trade save so trade is not
+  // blocked when settlement is optional. This triggers a retry UI state on
+  // failure rather than preventing the trade save.
+  const saveSettlementAsync = async (tradeId: string, text: string) => {
+    // Check whether the parent provided a saveSettlement function on props
+    if (!props.saveSettlement) return;
+    // Log for debugging so we can confirm the async save was initiated
+    console.debug("Initiating async settlement save", { tradeId, text });
+    try {
+      await props.saveSettlement(tradeId, text); //Calls the parent-provided saveSettlement function with the trade id and tex
+      // If previously marked unsaved, clear that state and inform user
+      if (settlementUnsaved) setSettlementUnsaved(false);
+      setSnackbarMsg((prevMsg) =>
+        prevMsg ? prevMsg + " (Settlement saved)" : "Settlement saved"
+      );
+      setSnackbarType("success");
+      setSnackbarOpen(true);
+    } catch (err) {
+      console.error("Async settlement save failed", err);
+      setSettlementUnsaved(true);
+      // Extract useful message from axios error if present
+      let detail = "";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const anyErr: any = err;
+      if (anyErr && anyErr.message) detail = String(anyErr.message);
+      if (anyErr && anyErr.response && anyErr.response.data) {
+        try {
+          detail = JSON.stringify(anyErr.response.data);
+        } catch (e) {
+          detail = String(anyErr.response.data);
+        }
+      }
+      setSnackbarMsg((prevMsg) =>
+        prevMsg
+          ? prevMsg + " (Settlement save failed: " + detail + ")"
+          : "Settlement save failed: " + detail
+      );
+      setSnackbarType("error");
+      setSnackbarOpen(true);
+    }
+  };
 
   /**
    * Handles field changes in the trade header
@@ -161,12 +220,23 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
   const handleSaveTrade = async () => {
     setLoading(true);
     if (!editableTrade) return;
+    // Auto-generate UTI if missing
+    if (!editableTrade.utiCode || String(editableTrade.utiCode).trim() === "") {
+      const datePart = new Date().toISOString().split("T")[0].replace(/-/g, "");
+      const randomPart = Math.floor(Math.random() * 10000)
+        .toString()
+        .padStart(4, "0");
+      const generatedUti = `UTI-${datePart}-${randomPart}`;
+      // Update UI state so generated UTI is visible to the user
+      setEditableTrade((prev) =>
+        prev ? { ...prev, utiCode: generatedUti } : prev
+      );
+    }
     const validationError = validateTrade(editableTrade);
     if (validationError) {
       setSnackbarMsg(validationError);
       setSnackbarType("error");
       setSnackbarOpen(true);
-      setTimeout(() => setSnackbarOpen(false), 3000);
       return;
     }
 
@@ -188,24 +258,167 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
     // infer it here. Keep the payload minimal and predictable.
     console.debug("Prepared trade DTO for save:", tradeDto);
 
-    // Coerce user-id style fields that may be stored as strings in the UI
-    // into numbers so the backend receives the expected Long values.
+    // DEV: Defensive DTO coercion and UTI handling. Use safe numeric parsing
+    // and explicit null fallbacks to avoid sending NaN or unexpected types
+    // to the backend which can cause ownership checks to fail.
+    const editable: any = editableTrade as any;
+    const dto: any = tradeDto as any;
+
+    const toNumberOrNull = (v: unknown) => {
+      if (v === undefined || v === null || v === "") return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    // CHANGED: introduced safe numeric coercion helper above to avoid sending
+    // NaN or non-numeric values to the backend. Previously code used Number()
+    // directly which could produce NaN and trigger server-side errors.
+
+    // UTI: prefer a non-empty UTI from the UI; otherwise keep existing DTO
+    // value or null so the backend can auto-generate where appropriate.
+    dto.utiCode =
+      editable?.utiCode && String(editable.utiCode).trim() !== ""
+        ? editable.utiCode
+        : dto.utiCode ?? null;
+
+    // Helper: resolve a user id either from an explicit id, a displayed name
+    // (mapped via staticStore.userValues), or fallback to null.
+    const resolveUserId = (idField: unknown, nameField: unknown) => {
+      // 1) explicit id (string or number)
+      const explicit = toNumberOrNull(idField);
+      if (explicit !== null) return explicit;
+
+      // 2) try mapping from displayed name using staticStore.userValues
+      if (nameField) {
+        const nameStr = String(nameField);
+        const match = staticStore.userValues.find(
+          (u) => String(u.label) === nameStr || String(u.value) === nameStr
+        );
+        const mapped = match ? toNumberOrNull(match.value) : null;
+        if (mapped !== null) return mapped;
+      }
+
+      return null;
+    };
+
+    // CHANGED: resolveUserId tries (1) explicit numeric id, (2) mapping from
+    // displayed name via staticStore.userValues. This avoids sending login
+    // names in numeric id fields and keeps backend DTO types consistent.
+
+    // Refactored to fix 400 error: If the UI accidentally put a non-numeric login
+    // string into the id fields (e.g. editable.traderUserId === "sakhiya"),
+    // move that string into the corresponding name field and ensure the id
+    // field is null so the JSON types match the backend DTO (Long vs String).
+    // We add explicit per-line comments below to make the intent clear.
     if (
-      (editableTrade as any).traderUserId &&
-      typeof (editableTrade as any).traderUserId === "string"
+      typeof editable?.traderUserId === "string" &&
+      toNumberOrNull(editable.traderUserId) === null
     ) {
-      (tradeDto as any).traderUserId = Number(
-        (editableTrade as any).traderUserId
-      );
+      // Move non-numeric trader id string into traderUserName so backend will
+      // see it as a name (String) rather than try to parse it as a Long.
+      dto.traderUserName = dto.traderUserName ?? String(editable.traderUserId); // set name if missing
+      dto.traderUserId = null; // clear numeric id so Spring doesn't try to deserialize a string  // CHANGED: moved non-numeric id to name to preserve backend types
     }
     if (
-      (editableTrade as any).tradeInputterUserId &&
-      typeof (editableTrade as any).tradeInputterUserId === "string"
+      typeof editable?.tradeInputterUserId === "string" &&
+      toNumberOrNull(editable.tradeInputterUserId) === null
     ) {
-      (tradeDto as any).tradeInputterUserId = Number(
-        (editableTrade as any).tradeInputterUserId
-      );
+      // Move non-numeric inputter id string into inputterUserName similarly.
+      dto.inputterUserName =
+        dto.inputterUserName ?? String(editable.tradeInputterUserId); // set name fallback
+      dto.tradeInputterUserId = null; // ensure numeric id is null  // CHANGED: moved non-numeric id to inputterUserName to avoid type mismatch
     }
+
+    // Resolve trader and inputter ids safely
+    // CHANGED: assign resolved numeric ids into the DTO. We intentionally
+    // avoid overwriting name fields here; names are sent via separate fields
+    // (`traderUserName` / `inputterUserName`) when the UI uses them.
+    dto.traderUserId =
+      resolveUserId(editable?.traderUserId, editable?.traderUserName) ??
+      dto.traderUserId ??
+      null; // CHANGED: ensure traderUserId is numeric or null before send
+    dto.tradeInputterUserId =
+      resolveUserId(
+        editable?.tradeInputterUserId,
+        editable?.inputterUserName
+      ) ??
+      dto.tradeInputterUserId ??
+      null;
+
+    // FALLBACK: auto-assign from currently authenticated user ONLY when
+    // the values are still null. Ensure the current user id is numeric.
+    try {
+      const currentUser = (userStore && userStore.user) || null;
+      // CHANGED: Auto-assign numeric user ids from the authenticated user
+      // only when still missing. This ensures the DTO includes numeric ids
+      // (Long) rather than login strings. We also populate username fallbacks
+      // for display where available.
+      if (
+        (dto.traderUserId === undefined || dto.traderUserId === null) &&
+        currentUser &&
+        toNumberOrNull(currentUser.id) !== null
+      ) {
+        dto.traderUserId = toNumberOrNull(currentUser.id);
+        dto.traderUserName =
+          dto.traderUserName ??
+          String(currentUser.loginId ?? currentUser.loginId ?? "");
+        console.debug(
+          "Auto-assigned traderUserId from current user",
+          dto.traderUserId
+        );
+        // CHANGED: auto-fill trader id from authenticated user when missing
+      }
+      if (
+        (dto.tradeInputterUserId === undefined ||
+          dto.tradeInputterUserId === null) &&
+        currentUser &&
+        toNumberOrNull(currentUser.id) !== null
+      ) {
+        dto.tradeInputterUserId = toNumberOrNull(currentUser.id);
+        dto.inputterUserName =
+          dto.inputterUserName ??
+          String(currentUser.loginId ?? currentUser.loginId ?? "");
+        console.debug(
+          "Auto-assigned tradeInputterUserId from current user",
+          dto.tradeInputterUserId
+        );
+        // CHANGED: auto-fill inputter id from authenticated user when missing
+      }
+    } catch (ex) {
+      console.warn("Could not auto-assign current user ids", ex);
+    }
+
+    // Debug: print the final DTO we are about to send to the backend
+    console.debug("Sending trade DTO to backend", dto);
+
+    // ADDED: client-side settlement validation helper.
+    // Purpose: Check settlement text before attempting async persistence.
+    // Rules enforced here match the UI rules in SettlementTextArea:
+    // - Trim whitespace
+    // - Length must be between 10 and 500 characters
+    // - Forbid characters ; ' " < > which are considered invalid
+    // Behaviour: show a snackbar error and return false when invalid.
+    const validateSettlementText = (text?: string) => {
+      if (!text) return true; // nothing to validate
+      const trimmedText = String(text).trim();
+      const invalidChars = /[;'\"<>]/; // ADDED: illegal-character guard used by validation
+      // Validate length: settlement text must be between 10 and 500 characters
+      if (trimmedText.length < 10 || trimmedText.length > 500) {
+        setSnackbarMsg(
+          "Settlement instructions must be between 10 and 500 characters long."
+        );
+        setSnackbarType("error");
+        setSnackbarOpen(true);
+        return false;
+      }
+      if (invalidChars.test(trimmedText)) {
+        setSnackbarMsg("Settlement instructions contain invalid characters.");
+        setSnackbarType("error");
+        setSnackbarOpen(true);
+        return false;
+      }
+      return true;
+    };
 
     try {
       if (editableTrade.tradeId) {
@@ -223,21 +436,23 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
         // stored. Note we intentionally do not fail the whole operation if
         // settlement persistence fails; the trade update succeeded and we
         // surface the settlement failure in the UI.
-        if (props.saveSettlement) {
+        if (props.saveSettlement && props.settlement) {
           try {
             console.debug(
               "Saving settlement after trade update",
               editableTrade.tradeId
             );
-            await props.saveSettlement(
-              editableTrade.tradeId,
-              props.settlement ?? ""
-            );
-            setSnackbarMsg((s) => s + " (Settlement saved)");
+            // Validate settlement text before attempting async save. If
+            // validation fails we skip saving settlement but do not roll
+            // back the trade update.
+            if (validateSettlementText(props.settlement)) {
+              void saveSettlementAsync(
+                editableTrade.tradeId,
+                props.settlement ?? ""
+              );
+            }
           } catch (err) {
-            console.error("Failed to save settlement after update", err);
-            // Don't fail the trade save, but inform the user
-            setSnackbarMsg((s) => s + " (Settlement save failed)");
+            console.error("Failed to initiate async settlement save", err);
           }
         }
 
@@ -256,14 +471,16 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
         // new trade id from the backend. If settlement persistence fails we
         // do not rollback the trade create (trade creation succeeded) but
         // will inform the user that settlement saving failed.
-        if (props.saveSettlement) {
-          try {
-            console.debug("Saving settlement after new trade", newTradeId);
-            await props.saveSettlement(newTradeId, props.settlement ?? "");
-          } catch (err) {
-            console.error("Failed to save settlement for new trade", err);
-            // we do not throw because trade creation succeeded; surface note to user
-            setSnackbarMsg((s) => s + " (Settlement save failed)");
+        // Persist settlement (non-blocking) for new trades. We do this
+        // after receiving the new trade id from the backend, but we do not
+        // await it so the UI remains responsive and the trade create
+        // cannot be rolled back due to settlement save issues.
+        if (props.saveSettlement && props.settlement) {
+          // Validate settlement text before attempting to save. For new
+          // trades we also do not block trade creation if settlement is
+          // invalid; we simply skip the settlement save and inform user.
+          if (validateSettlementText(props.settlement)) {
+            void saveSettlementAsync(newTradeId, props.settlement ?? "");
           }
         }
         setSnackbarMsg(`Trade saved successfully! Trade ID: ${newTradeId}`);
@@ -278,12 +495,8 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
       setSnackbarType("error");
       setSnackbarOpen(true);
     } finally {
+      // Snackbar auto-closes itself; do not forcibly hide it here.
       setLoading(false);
-      setTimeout(() => {
-        setSnackbarOpen(false);
-        setSnackbarMsg("");
-        setSnackbarType("success");
-      }, 3000);
     }
   };
 
@@ -332,11 +545,8 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
       setSnackbarType("error");
       setSnackbarOpen(true);
     } finally {
-      setTimeout(() => {
-        setSnackbarOpen(false);
-        setSnackbarMsg("");
-        setSnackbarType("success");
-      }, 3000);
+      // Let the Snackbar handle auto-dismiss so messages remain visible
+      // long enough for users to read them.
       setLoading(false);
     }
   };
@@ -447,6 +657,20 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
         message={snackbarMsg}
         type={snackbarType}
         onClose={() => setSnackbarOpen(false)}
+        // Added: Retry action when settlement save previously failed
+        actionLabel={settlementUnsaved ? "Retry" : undefined}
+        onAction={
+          settlementUnsaved
+            ? () => {
+                if (editableTrade?.tradeId && props.settlement) {
+                  void saveSettlementAsync(
+                    editableTrade.tradeId,
+                    props.settlement
+                  );
+                }
+              }
+            : undefined
+        }
       />
     </div>
   );

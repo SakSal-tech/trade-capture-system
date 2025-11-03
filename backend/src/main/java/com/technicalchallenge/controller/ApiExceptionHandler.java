@@ -4,12 +4,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * ApiExceptionHandler
@@ -120,5 +122,33 @@ public class ApiExceptionHandler {
         body.put("message", ex.getMessage() == null ? "Bad request" : ex.getMessage());
         body.put("path", request.getRequestURI() == null ? "" : request.getRequestURI());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    /**
+     * Handle javax validation failures (@Valid) and return field-level messages
+     * so clients can show precise validation errors instead of a generic 400.
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    // CHANGED: added handler to return field-level validation errors
+    public ResponseEntity<Map<String, Object>> handleValidationErrors(MethodArgumentNotValidException ex,
+            HttpServletRequest request) {
+        // CHANGED: Added this handler to return field-level validation
+        // messages for @Valid failures. Previously the client received a
+        // generic 400 with no detail; this makes debugging frontend payload
+        // issues (missing fields / invalid values) much easier.
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", OffsetDateTime.now().toString());
+        body.put("status", HttpStatus.BAD_REQUEST.value());
+        body.put("error", HttpStatus.BAD_REQUEST.getReasonPhrase());
+
+        // Collect field -> message
+        Map<String, String> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
+                .collect(Collectors.toMap(err -> err.getField(), err -> err.getDefaultMessage(),
+                        (a, b) -> a + "; " + b));
+
+        body.put("message", "Validation failed");
+        body.put("errors", fieldErrors);
+        body.put("path", request.getRequestURI() == null ? "" : request.getRequestURI());
+        return ResponseEntity.badRequest().body(body);
     }
 }
