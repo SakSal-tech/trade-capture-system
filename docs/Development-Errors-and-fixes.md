@@ -4400,3 +4400,113 @@ The frontend linter and TypeScript checks no longer block the build. The changes
 - `frontend/.eslintignore` — ignore generated files (dist, .vite, node_modules).
 
 ---
+
+### Errors and test failures — 02/11/2025 (detailed)
+
+1. Missing field in frontend payload -> backend saved null
+
+- Symptom (what I saw): when saving a trade from the UI the POST/PUT JSON body did not include `settlementInstructions`. The backend therefore received null and saved nothing. The trade DTO returned from GET showed `"settlementInstructions": null`.
+- Example request body (before fix):
+
+```json
+{
+  "bookName": "FX-BOOK-1",
+  "counterpartyName": "BigBank",
+  "utiCode": "UTI-20251102-8898"
+}
+```
+
+- Example response (showing null):
+
+```json
+{
+    "tradeId": 10024,
+    "settlementInstructions": null,
+    ...
+}
+```
+
+- Root cause: the frontend form definition file did not include the `settlementInstructions` key, so the form builder never rendered a field and the DTO never contained the property.
+- Fix applied: added `settlementInstructions` textarea to `frontend/src/utils/tradeFormFields.ts`. After the change the request body included the settlement text and the backend code saved it.
+
+2. Backend returned null despite AdditionalInfo existing (mapper bug)
+
+- Symptom: An `AdditionalInfo` row existed in the DB for the trade, but GET /api/trades/{id} still returned `settlementInstructions: null`.
+- Example DB row (conceptual):
+
+| id  | entity_type | entity_id | field_name              | field_value                           |
+| --- | ----------- | --------- | ----------------------- | ------------------------------------- |
+| 42  | TRADE       | 10024     | SETTLEMENT_INSTRUCTIONS | Pay USD to account 123-456 at BigBank |
+
+- Root cause: the Trade -> TradeDTO mapper used a broad search/search-by-key approach and missed the exact AdditionalInfo row for the trade. The lookup was not scoped to (entity_type, entity_id, field_name).
+- Fix applied: changed the mapper to call a targeted service method `additionalInfoService.getSettlementInstructionsByTradeId(trade.getTradeId())` and set `dto.setSettlementInstructions(...)` when present.
+
+3. 400 validation error caused by sending strings in numeric ID fields
+
+- Symptom: POST/PUT returned HTTP 400 with structured field errors when the UI sent non-numeric values into numeric fields (for example `traderUserId` containing a username string).
+- Example validation response:
+
+```json
+{
+  "message": "Validation failed",
+  "errors": {
+    "traderUserId": "must be a number"
+  }
+}
+```
+
+- Root cause: some UI inputs (for example copy/pasted values in select/auto-complete) produced string values like `"jsmith"` for fields that the backend expects to be numeric IDs. Jackson/Bean validation flagged the mismatch in the DTO/parameter binding.
+- Fixes applied:
+  - Frontend: added `toNumberOrNull` helper and an "Option A" quick-fix that moves a non-numeric id string into the corresponding `traderUserName` field and sets the id to `null` — this prevents backend validation errors and preserves the user's input as a name.
+  - Backend: added id-first user resolution so the server will try numeric id, then try to resolve by first-name or loginId as a fallback.
+
+4. Authorization (403) on settlement PUTs observed intermittently
+
+- Symptom: PUT to `/trades/{id}/settlement-instructions` returned HTTP 403 for some users; the frontend sometimes showed a Retry snackbar for the settlement-only save.
+- Example (HTTP response):
+
+HTTP/1.1 403 Forbidden
+
+- Root cause (investigated): two likely causes were discovered:
+  - The axios instance did not always include cookies/credentials from the browser session, so the server saw an unauthenticated or differently-authenticated principal. (This produces a 403 if the user lacks authority.)
+  - The user/role-check on the AdditionalInfo write path could block certain principals if the ownership logic rejected the caller.
+- Fixes applied:
+  - Frontend: configured axios with `withCredentials = true` to ensure cookies are sent with requests.
+  - Backend: added logging in the settlement controller to record the authenticated principal and authorities on PUT to help triage 403s. Also adjusted user-resolution where appropriate.
+  - UX: made settlement save fire-and-forget (non-blocking) and surfaced a Retry action in the UI so users can attempt the settlement write again without re-saving the whole trade.
+
+5. TypeScript compiler error when running `pnpm tsc --noEmit`
+
+- Symptom: running the TypeScript check failed with `TS2688: Cannot find type definition file for 'tailwindcss'`.
+- Exact message seen:
+
+```
+error TS2688: Cannot find type definition file for 'tailwindcss'.
+    The file is in the program because:
+        Entry point of type library 'tailwindcss' specified in compilerOptions
+
+tsconfig.json:18:37
+        18     "types": ["react", "react-dom", "tailwindcss"]
+                                                                                     ~~~~~~~~~~~~~
+```
+
+- Root cause: local dev environment missing the tailwind type declarations referenced in `tsconfig.json`. This is an environment/setup issue and not caused by the settlement changes.
+- Workarounds and fixes:
+  - I tried to run the dev server without the global type-check (the app still runs in many setups). I then installed the missing type package if want to pass `tsc` locally: `pnpm add -D @types/tailwindcss` (if available) or adjust `tsconfig.json` `types` array.
+
+6. `pnpm dev` exited with code 130 during local work
+
+- Symptom: the frontend dev server was stopped (exit code 130) — this typically means the process was interrupted (Ctrl+C) or hit an unhandled signal.
+- Root cause: likely manual interruption while testing. Not a code failure.
+
+7. Notes about tests
+
+- Backend build was done with `mvn -DskipTests package`, so unit/integration tests were not executed during the quick verification build.
+- No automated test failures were recorded in the CI run today because tests were skipped during the packaging run. I recommend adding a focused backend integration test asserting that posting a trade with `settlementInstructions` creates an `additional_info` row, and a frontend unit test that asserts the form DTO includes `settlementInstructions` when the textarea is filled.
+
+## Summary of immediate fixes applied
+
+- Added `settlementInstructions` to `frontend/src/utils/tradeFormFields.ts` so the browser sends the field.
+- Fixed mapper to read `AdditionalInfo` by (entity_type, entity_id, field_name) and expose `settlementInstructions` on the Trade DTO.
+- Added frontend defensive helpers (`toNumberOrNull`, `convertEmptyStringsToNull`) to reduce 400s.
+- Ensured axios `withCredentials` so session cookies are sent and adjusted logging for 403 diagnosis.

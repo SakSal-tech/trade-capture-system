@@ -59,6 +59,11 @@ export const TRADE_FIELDS = [
   { key: "utiCode", label: "UTI Code", type: "input" },
   { key: "lastTouchTimestamp", label: "Last Touch Timestamp", type: "date" },
   { key: "validityStartDate", label: "Version Active Since", type: "date" },
+  {
+    key: "settlementInstructions",
+    label: "Settlement Instructions",
+    type: "textarea",
+  },
 ];
 
 /**

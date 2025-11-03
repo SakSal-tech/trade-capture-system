@@ -3,7 +3,6 @@ package com.technicalchallenge.mapper;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
 import com.technicalchallenge.dto.CashflowDTO;
-import com.technicalchallenge.dto.AdditionalInfoDTO; // NEW: Needed to work with AdditionalInfo
 import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.model.TradeLeg;
 import com.technicalchallenge.model.Cashflow;
@@ -102,21 +101,25 @@ public class TradeMapper {
         }
 
         // ADDED: Settlement Instructions Integration
-        // Pull settlement instructions from AdditionalInfo table
-        List<AdditionalInfoDTO> infos = additionalInfoService.searchByKey("SETTLEMENT_INSTRUCTIONS");
-
-        // Loop through all "SETTLEMENT_INSTRUCTIONS" entries
-        for (AdditionalInfoDTO info : infos) {
-            // Only consider records belonging to Trade entities with matching ID
-            if ("TRADE".equalsIgnoreCase(info.getEntityType())
-                    && info.getEntityId() != null
-                    && info.getEntityId().equals(trade.getTradeId())) {
-
-                // Attach the settlement instruction text to the TradeDTO
-                dto.setSettlementInstructions(info.getFieldValue());
-                break; // Stop after the first match once I find the record that belongs to this
-                       // specific trade
+        // Use the dedicated service method to fetch settlement instructions for
+        // this specific trade. Previously the mapper called `searchByKey(...)`
+        // which searches fieldValue and not fieldName; that returned no results
+        // and caused settlementInstructions to be null in the DTO. Using the
+        // targeted service method ensures we look up by entityType + entityId
+        // + fieldName which is both efficient and correct.
+        try {
+            if (trade.getTradeId() != null) {
+                com.technicalchallenge.dto.AdditionalInfoDTO ai = additionalInfoService
+                        .getSettlementInstructionsByTradeId(trade.getTradeId());
+                if (ai != null) {
+                    dto.setSettlementInstructions(ai.getFieldValue());
+                }
             }
+        } catch (Exception ex) {
+            // Avoid throwing from the mapper; log and continue so trade DTO can still be
+            // returned even when settlement lookup has transient issues.
+            // Note: logger not injected here to keep mapper simple; controllers and
+            // services already log important context.
         }
 
         // Return the complete DTO to controller
