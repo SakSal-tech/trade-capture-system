@@ -164,13 +164,12 @@ public class TradeLegControllerTest extends BaseIntegrationTest {
         // server, but simulates the request/response cycle in-memory.
         mockMvc.perform(post("/api/tradeLegs")
                 .contentType(MediaType.APPLICATION_JSON)
-                // objectMapper.writeValueAsString(tradeLegDTO) converts the DTO object to a
-                // JSON string by calling the method in objectmapper class writeValueAsString
-                // because the API expects JSON input. it uses Jackson serialization (with
-                // SegmentStringWriter, JsonFactory, etc.) to turn Java objects into JSON.
                 .content(objectMapper.writeValueAsString(tradeLegDTO)))
                 .andExpect(status().isBadRequest())
-                .andExpect(content().string("Notional must be positive"));
+                // ApiExceptionHandler now returns a structured JSON payload for
+                // validation failures: { message: "Validation failed", errors: { field: msg } }
+                .andExpect(jsonPath("$.message", is("Validation failed")))
+                .andExpect(jsonPath("$.errors.notional", is("Notional must be positive")));
 
         verify(tradeLegService, never()).saveTradeLeg(any(TradeLeg.class), any(TradeLegDTO.class));
     }

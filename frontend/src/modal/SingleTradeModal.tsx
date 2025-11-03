@@ -391,6 +391,18 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
     // Debug: print the final DTO we are about to send to the backend
     console.debug("Sending trade DTO to backend", dto);
 
+    // Ensure the settlementInstructions key is present in the DTO so the
+    // backend sees the field during create/update requests. The UI keeps
+    // settlement text in the parent (`props.settlement`) so prefer that
+    // when available. If there is no settlement text we still add the
+    // key as an empty string so swagger-like payloads and programmatic
+    // consumers behave consistently.
+    // NOTE: tradeUtils.convertEmptyStringsToNull will later convert an
+    // explicit empty string to null for fields listed there when called
+    // earlier; we intentionally include the key here to ensure the
+    // backend mapping receives the field in the JSON payload.
+    dto.settlementInstructions = props.settlement ?? dto.settlement ?? "";
+
     // ADDED: client-side settlement validation helper.
     // Purpose: Check settlement text before attempting async persistence.
     // Rules enforced here match the UI rules in SettlementTextArea:
@@ -465,24 +477,21 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
         // Save new trade
         const response = await api.post("/trades", tradeDto);
         const newTradeId = response.data?.tradeId || response.data?.id || "";
-        // REFACTOR: After creating a new trade, persist settlement (if any)
-        // using the parent's handler so the booking includes both the trade
-        // and its settlement in sequence. We do this after receiving the
-        // new trade id from the backend. If settlement persistence fails we
-        // do not rollback the trade create (trade creation succeeded) but
-        // will inform the user that settlement saving failed.
-        // Persist settlement (non-blocking) for new trades. We do this
-        // after receiving the new trade id from the backend, but we do not
-        // await it so the UI remains responsive and the trade create
-        // cannot be rolled back due to settlement save issues.
-        if (props.saveSettlement && props.settlement) {
-          // Validate settlement text before attempting to save. For new
-          // trades we also do not block trade creation if settlement is
-          // invalid; we simply skip the settlement save and inform user.
-          if (validateSettlementText(props.settlement)) {
-            void saveSettlementAsync(newTradeId, props.settlement ?? "");
-          }
+        // Ensure UI state reflects the newly created trade id so subsequent
+        // actions (e.g., saving settlement or navigating) operate on the
+        // persisted trade. Previously the UI left editableTrade.tradeId as
+        // null which made it look like the trade wasn't created.
+        if (newTradeId) {
+          setEditableTrade((prev) =>
+            prev ? { ...prev, tradeId: newTradeId } : prev
+          );
         }
+        // NOTE: The createTrade controller already persists settlement when
+        // `settlementInstructions` is present in the POST payload. To avoid
+        // duplicate records we do NOT call the separate settlement PUT here
+        // for new trades. The parent `saveSettlement` handler is still used
+        // for explicit updates (see update branch above) where the controller
+        // does not persist settlement on PUT.
         setSnackbarMsg(`Trade saved successfully! Trade ID: ${newTradeId}`);
         setSnackbarType("success");
         setSnackbarOpen(true);
