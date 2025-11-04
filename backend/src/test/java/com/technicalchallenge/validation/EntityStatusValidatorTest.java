@@ -1,6 +1,12 @@
 package com.technicalchallenge.validation;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.util.Optional;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -9,6 +15,9 @@ import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.model.ApplicationUser;
 import com.technicalchallenge.model.Book;
 import com.technicalchallenge.model.Counterparty;
+import com.technicalchallenge.repository.ApplicationUserRepository;
+import com.technicalchallenge.repository.BookRepository;
+import com.technicalchallenge.repository.CounterpartyRepository;
 
 public class EntityStatusValidatorTest {
 
@@ -19,30 +28,41 @@ public class EntityStatusValidatorTest {
     private Book book;
     private Counterparty counterparty;
 
+    private BookRepository bookRepo;
+    private CounterpartyRepository counterpartyRepo;
+    private ApplicationUserRepository userRepo;
+
     @BeforeEach
     void setUp() {
-        validator = new EntityStatusValidator();
-        result = new TradeValidationResult();
+        // Create lightweight model objects
         trade = new TradeDTO();
         user = new ApplicationUser();
         book = new Book();
         counterparty = new Counterparty();
+
+        // Mock repositories and inject into strict validator
+        bookRepo = mock(BookRepository.class);
+        counterpartyRepo = mock(CounterpartyRepository.class);
+        userRepo = mock(ApplicationUserRepository.class);
+
+        validator = new EntityStatusValidator(bookRepo, counterpartyRepo, userRepo);
+        result = new TradeValidationResult();
     }
 
-    @DisplayName("Should fail when user, book, or counterparty is inactive")
+    @DisplayName("Should fail when user is inactive")
     @Test
-    void shouldFailWhenAnyEntityIsInactive() {
-        // GIVEN an inactive user, book, and counterparty
+    void shouldFailWhenUserIsInactive() {
+        // GIVEN an inactive user referenced by id
         user.setActive(false);
-        book.setActive(true);
-        counterparty.setActive(true);
+        trade.setTraderUserId(3L);
+        when(userRepo.findById(anyLong())).thenReturn(Optional.of(user));
 
         // WHEN validation runs
-        boolean isValid = validator.validateEntityStatus(user, book, counterparty, result);
+        validator.validate(trade, result);
 
-        // THEN the validation should fail and show the correct error
-        assertFalse(isValid);
-        assertTrue(result.getErrors().contains("ApplicationUser must be active"));
+        // THEN the validation should record the trader user inactive error
+        assertFalse(result.isValid());
+        assertTrue(result.getErrors().stream().anyMatch(e -> e.contains("Trader user is not active")));
     }
 
     @DisplayName("Should fail when reference IDs are missing")
@@ -52,12 +72,13 @@ public class EntityStatusValidatorTest {
         trade.setBookId(null);
         trade.setCounterpartyId(null);
 
-        // WHEN reference validation runs
-        boolean isValid = validator.validateEntityReferences(trade, result);
+        // WHEN validation runs
+        validator.validate(trade, result);
 
         // THEN validation should fail due to missing reference data
-        assertFalse(isValid);
-        assertTrue(result.getErrors().contains("Missing both book and counterparty reference"));
+        assertFalse(result.isValid());
+        assertTrue(result.getErrors().stream().anyMatch(e -> e.contains("Book reference is required")));
+        assertTrue(result.getErrors().stream().anyMatch(e -> e.contains("Counterparty reference is required")));
     }
 
     @DisplayName("Should pass when all references exist and entities are active")
@@ -66,19 +87,20 @@ public class EntityStatusValidatorTest {
         // GIVEN properly linked and active entities
         trade.setBookId(100L);
         trade.setCounterpartyId(200L);
+        trade.setTraderUserId(300L);
         user.setActive(true);
         book.setActive(true);
         counterparty.setActive(true);
 
-        // WHEN both validations run
-        boolean referencesValid = validator.validateEntityReferences(trade, result);
-        boolean statusValid = validator.validateEntityStatus(user, book, counterparty, result);
+        when(bookRepo.findById(100L)).thenReturn(Optional.of(book));
+        when(counterpartyRepo.findById(200L)).thenReturn(Optional.of(counterparty));
+        when(userRepo.findById(300L)).thenReturn(Optional.of(user));
 
-        // THEN all should pass
-        assertTrue(referencesValid);
-        assertTrue(statusValid);
+        // WHEN validation runs
+        validator.validate(trade, result);
+
+        // THEN validation should be valid
         assertTrue(result.isValid());
     }
-    // Adding this line to force commit
 
 }

@@ -682,7 +682,7 @@ public class TradeDashboardService {
                             case "ROLE_TRADER": // ADDED: controller-level TRADER role should count for TRADE_VIEW
                             case "ROLE_MIDDLE_OFFICE": // ADDED: MO role authorised to view other traders' dashboards
                             case "ROLE_SUPPORT": // ADDED: SUPPORT role allowed to view per controller config
-                            case "ROLE_SUPERUSER": // ADDED: SUPERUSER has full access
+                            case "ADMIN": // ADDED: SUPERUSER has full access
                                 return true; // ADDED: short-circuit permit when these standard roles are present
                             default:
                                 break;
