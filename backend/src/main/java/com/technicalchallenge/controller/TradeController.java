@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 import java.util.Optional;
@@ -85,6 +86,17 @@ public class TradeController {
     @PreAuthorize("hasAnyRole('TRADER','SALES')")
     public ResponseEntity<TradeDTO> createTrade(@Valid @RequestBody TradeDTO tradeDTO) {
         Trade trade = tradeMapper.toEntity(tradeDTO);
+
+        // Ensure the authenticated principal is used as the trader when the
+        // client did not provide an explicit trader reference. This aligns
+        // controller behaviour with expectations in integration tests and
+        // production where the booking user becomes the trade owner.
+        if (tradeDTO.getTraderUserName() == null || tradeDTO.getTraderUserName().trim().isEmpty()) {
+            var auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getName() != null) {
+                tradeDTO.setTraderUserName(auth.getName());
+            }
+        }
 
         // Explicitly called here to satisfy TradeControllerTest expectation
         tradeService.populateReferenceDataByName(trade, tradeDTO);

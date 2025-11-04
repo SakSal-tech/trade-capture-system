@@ -10,28 +10,45 @@ public class TradeDateValidator {
     // messages
     public void validate(TradeDTO trade, TradeValidationResult result) {
 
-        // Business rule 1: Maturity date cannot be before start date or trade date
-
-        if ((trade.getTradeMaturityDate().isBefore(trade.getTradeStartDate())
-                || (trade.getTradeStartDate().isBefore(trade.getTradeDate())))) {
-            result.setError("Maturity date cannot be before start date");
+        // Strict presence validation: treat missing required dates as
+        // validation errors rather than allowing NPEs.
+        // 1) tradeDate is always required
+        if (trade.getTradeDate() == null) {
+            result.setError("tradeDate is required");
         }
-        // Business rule 2: Start date cannot be before trade date
 
-        if (trade.getTradeStartDate().isBefore(trade.getTradeDate())) {
-            result.setError("Start date cannot be before trade date");
-
+        // 2) If trade contains legs, start and maturity dates are required to
+        // support cashflow generation and scheduling
+        boolean hasLegs = (trade.getTradeLegs() != null && !trade.getTradeLegs().isEmpty());
+        if (hasLegs) {
+            if (trade.getTradeStartDate() == null) {
+                result.setError("tradeStartDate is required when trade legs are present");
+            }
+            if (trade.getTradeMaturityDate() == null) {
+                result.setError("tradeMaturityDate is required when trade legs are present");
+            }
         }
-        // Business rule 3:Trade date cannot be more than 30 days in the past
-        // long because because the number of days between two points in time can be
-        // very large.
-        // ChronoUnit, tells Java what unit of time want to measure between two
-        // temporal objects
-        long daysBetween = ChronoUnit.DAYS.between(trade.getTradeDate(), LocalDate.now());
 
-        if (daysBetween > 30) {
-            result.setError("Trade date cannot be more than 30 days in the past");
+        // After presence checks, perform logical comparisons only when values
+        // exist to avoid NPEs.
+        if (trade.getTradeMaturityDate() != null && trade.getTradeStartDate() != null) {
+            if (trade.getTradeMaturityDate().isBefore(trade.getTradeStartDate())) {
+                result.setError("Maturity date cannot be before start date");
+            }
+        }
 
+        if (trade.getTradeStartDate() != null && trade.getTradeDate() != null) {
+            if (trade.getTradeStartDate().isBefore(trade.getTradeDate())) {
+                result.setError("Start date cannot be before trade date");
+            }
+        }
+
+        // Trade date recency check
+        if (trade.getTradeDate() != null) {
+            long daysBetween = ChronoUnit.DAYS.between(trade.getTradeDate(), LocalDate.now());
+            if (daysBetween > 30) {
+                result.setError("Trade date cannot be more than 30 days in the past");
+            }
         }
 
     }

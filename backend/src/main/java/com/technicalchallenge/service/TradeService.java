@@ -23,6 +23,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.access.AccessDeniedException;
 import com.technicalchallenge.security.UserPrivilegeValidator;
+import com.technicalchallenge.validation.TradeValidationEngine;
+import com.technicalchallenge.validation.TradeValidationResult;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 @Service
 @Transactional
@@ -89,6 +93,9 @@ public class TradeService {
     // elsewhere (defence-in-depth) to avoid allowing remote clients to bypass
     // server-side checks.
     private UserPrivilegeValidator userPrivilegeValidator;
+
+    // Centralized validation engine (business rules + field validators)
+    private TradeValidationEngine tradeValidationEngine;
 
     public List<Trade> getAllTrades() {
         logger.info("Retrieving all trades");
@@ -223,8 +230,22 @@ public class TradeService {
             logger.info("Generated trade ID: {}", generatedTradeId);
         }
 
-        // Validate business rules
+        // Validate business rules (existing light checks)
         validateTradeCreation(tradeDTO);
+
+        // Run centralized validation engine when available. This consolidates
+        // business-rule checks and field-level validators (e.g. settlement
+        // instructions). In test contexts where the engine may not be provided,
+        // skip with a debug log to preserve existing unit-test behaviour.
+        if (tradeValidationEngine != null) {
+            TradeValidationResult validationResult = tradeValidationEngine.validateTradeBusinessRules(tradeDTO);
+            if (!validationResult.isValid()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Validation failed: " + String.join("; ", validationResult.getErrors()));
+            }
+        } else {
+            logger.debug("TradeValidationEngine not present - skipping centralized validation");
+        }
 
         // Create trade entity
         Trade trade = mapDTOToEntity(tradeDTO);
@@ -249,6 +270,16 @@ public class TradeService {
         // The UI sends settlementInstructions in the TradeDTO. Then persist it
         // into the additional_info table so it can be searched/edited later.
         if (tradeDTO.getSettlementInstructions() != null && !tradeDTO.getSettlementInstructions().trim().isEmpty()) {
+            // Validate settlement instructions via validation engine (if present)
+            if (tradeValidationEngine != null) {
+                TradeValidationResult settlementResult = tradeValidationEngine
+                        .validateSettlementInstructions(tradeDTO.getSettlementInstructions());
+                if (!settlementResult.isValid()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Settlement instructions invalid: " + String.join("; ", settlementResult.getErrors()));
+                }
+            }
+
             AdditionalInfo settlementInfo = new AdditionalInfo();
             settlementInfo.setEntityType("TRADE");
             settlementInfo.setEntityId(savedTrade.getTradeId());
@@ -425,6 +456,24 @@ public class TradeService {
         }
 
         Trade existingTrade = existingTradeOpt.get();
+
+        // Centralized validation (null-safe). Validate business rules and
+        // settlement instructions before creating the amended trade.
+        if (tradeValidationEngine != null) {
+            TradeValidationResult validationResult = tradeValidationEngine.validateTradeBusinessRules(tradeDTO);
+            if (!validationResult.isValid()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Validation failed: " + String.join("; ", validationResult.getErrors()));
+            }
+            TradeValidationResult settlementResult = tradeValidationEngine
+                    .validateSettlementInstructions(tradeDTO.getSettlementInstructions());
+            if (!settlementResult.isValid()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Settlement instructions invalid: " + String.join("; ", settlementResult.getErrors()));
+            }
+        } else {
+            logger.debug("TradeValidationEngine not present - skipping centralized validation for amendTrade");
+        }
 
         // Deactivate existing trade
         existingTrade.setActive(false);

@@ -9,8 +9,8 @@ import com.technicalchallenge.dto.TradeLegDTO;
 @Service
 public class TradeValidationEngine {
 
-    // This engine now only validates trade-related business rules, not user
-    // privileges or entity status.
+    // This engine now validates trade-related business rules and, when
+    // available, repository-backed entity status via EntityStatusValidationEngine.
     public TradeValidationResult validateTradeBusinessRules(TradeDTO tradeDTO) {
         TradeValidationResult result = new TradeValidationResult();
         TradeDateValidator dateValidator = new TradeDateValidator();
@@ -36,6 +36,20 @@ public class TradeValidationEngine {
                 }
             }
         }
+
+        // Run repository-backed entity status validation when available. The
+        // EntityStatusValidationEngine is injected in production/integration
+        // tests; the no-arg constructor used in lightweight unit tests keeps
+        // this field null to avoid requiring DB wiring.
+        if (this.entityStatusValidationEngine != null) {
+            TradeValidationResult entityResult = this.entityStatusValidationEngine.validate(tradeDTO);
+            if (!entityResult.isValid()) {
+                for (String err : entityResult.getErrors()) {
+                    result.setError(err);
+                }
+            }
+        }
+
         return result;
     }
 
@@ -47,10 +61,6 @@ public class TradeValidationEngine {
      * rather than a full TradeDTO validation. Providing a single entry point on
      * the validation engine keeps validation orchestration consistent across the
      * codebase and makes future additions easier.
-     *
-     * This method intentionally instantiates the field validator directly to
-     * avoid changing bean wiring elsewhere; it adapts the existing validator to
-     * the engine's orchestration model.
      */
     public TradeValidationResult validateSettlementInstructions(String text) {
         TradeValidationResult result = new TradeValidationResult();
@@ -59,24 +69,29 @@ public class TradeValidationEngine {
         return result;
     }
 
-    // Refactored:Replaced direct instantiation of the validator inside the engine.
+    // Refactored: Replaced direct instantiation of the validator inside the engine.
     // Before: validateSettlementInstructions created a new instance inline.
     private final SettlementInstructionValidator settlementInstructionValidator;
 
+    // Entity status validation engine - repository-backed, strict checks.
+    private final EntityStatusValidationEngine entityStatusValidationEngine;
+
     // Dependency injection (DI): using constructor injection aligns
     // TradeValidationEngine with Spring DI patterns
-    public TradeValidationEngine(SettlementInstructionValidator settlementInstructionValidator) {
+    public TradeValidationEngine(SettlementInstructionValidator settlementInstructionValidator,
+            EntityStatusValidationEngine entityStatusValidationEngine) {
         this.settlementInstructionValidator = settlementInstructionValidator;
+        this.entityStatusValidationEngine = entityStatusValidationEngine;
     }
 
     /**
      * No-arg constructor kept for backwards compatibility in unit tests and
      * situations where Spring DI is not used. It constructs a default
      * SettlementInstructionValidator. Production Spring wiring will use the
-     * constructor that accepts a validator bean.
+     * constructor that accepts the validator and entity engine beans.
      */
     public TradeValidationEngine() {
-        this(new SettlementInstructionValidator());
+        this(new SettlementInstructionValidator(), null);
     }
 
 }
