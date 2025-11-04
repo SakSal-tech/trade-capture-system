@@ -8,9 +8,7 @@ import com.technicalchallenge.model.TradeLeg;
 import com.technicalchallenge.model.Cashflow;
 import com.technicalchallenge.model.Book;
 import com.technicalchallenge.model.Counterparty;
-import com.technicalchallenge.service.AdditionalInfoService; // NEW: Injected to pull settlement instructions
-
-import org.springframework.beans.factory.annotation.Autowired;
+// Removed dependency on AdditionalInfoService to keep mapper pure (no service calls)
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -26,9 +24,8 @@ import java.util.stream.Collectors;
 @Component
 public class TradeMapper {
 
-    // Gives mapper access to settlement data stored in AdditionalInfo table
-    @Autowired
-    private AdditionalInfoService additionalInfoService;
+    // Mapper should be pure and not call other services to avoid triggering
+    // transactional behavior or security checks during simple DTO conversion.
 
     public TradeDTO toDto(Trade trade) {
         if (trade == null) {
@@ -100,27 +97,12 @@ public class TradeMapper {
             dto.setTradeLegs(legDTOs);
         }
 
-        // ADDED: Settlement Instructions Integration
-        // Use the dedicated service method to fetch settlement instructions for
-        // this specific trade. Previously the mapper called `searchByKey(...)`
-        // which searches fieldValue and not fieldName; that returned no results
-        // and caused settlementInstructions to be null in the DTO. Using the
-        // targeted service method ensures we look up by entityType + entityId
-        // + fieldName which is both efficient and correct.
-        try {
-            if (trade.getTradeId() != null) {
-                com.technicalchallenge.dto.AdditionalInfoDTO ai = additionalInfoService
-                        .getSettlementInstructionsByTradeId(trade.getTradeId());
-                if (ai != null) {
-                    dto.setSettlementInstructions(ai.getFieldValue());
-                }
-            }
-        } catch (Exception ex) {
-            // Avoid throwing from the mapper; log and continue so trade DTO can still be
-            // returned even when settlement lookup has transient issues.
-            // Note: logger not injected here to keep mapper simple; controllers and
-            // services already log important context.
-        }
+        // NOTE: Settlement instructions are intentionally NOT fetched here to keep
+        // the mapper side-effect free. If callers require settlement instructions
+        // they should call AdditionalInfoService from the service/controller
+        // layer and enrich the DTO explicitly. This prevents validation/ownership
+        // checks in AdditionalInfoService from causing an outer transaction to
+        // be marked rollback-only during read-only dashboard operations.
 
         // Return the complete DTO to controller
         return dto;

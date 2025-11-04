@@ -13,7 +13,7 @@ import { observer } from "mobx-react-lite";
 import { useQuery } from "@tanstack/react-query";
 import staticStore from "../stores/staticStore";
 import { Trade, TradeLeg } from "../utils/tradeTypes";
-import { text } from "stream/consumers";
+// removed unused import 'text'
 
 export const TradeActionsModal: React.FC = observer(() => {
   const [tradeId, setTradeId] = React.useState<string>("");
@@ -47,9 +47,7 @@ export const TradeActionsModal: React.FC = observer(() => {
   // network logic and makes error-handling / UX messaging consistent.
   const [settlement, setSettlement] = useState<string>("");
   // `touched` state was previously added but is not used in this parent.
-  // Keep only the submitting setter because we use it to mark save in-progress
-  // for UX reasons; the value itself isn't read here.
-  const [, setSubmitting] = useState(false);
+  // If we later need to show saving state, reintroduce submitting state.
 
   const { isSuccess, error } = useQuery({
     queryKey: ["staticValues"],
@@ -285,7 +283,7 @@ export const TradeActionsModal: React.FC = observer(() => {
         >
           Clear
         </Button>
-        {userStore.authorization === "TRADER_SALES" && (
+        {mode === "edit" && (
           <Button
             variant={"primary"}
             type={"button"}
@@ -299,8 +297,100 @@ export const TradeActionsModal: React.FC = observer(() => {
       </div>
       <div>
         {loading ? <LoadingSpinner /> : null}
+        {/* When no trade is selected (empty workspace), show a helpful
+            Instructions panel so users understand what actions are
+            available and how to use the trade actions modal. This mirrors
+            the guidance previously provided on the standalone /trade page
+            and keeps the application streamlined by consolidating
+            instructions into the trade action area. */}
+        {!trade && !loading && (
+          <div className="w-full p-6">
+            <h1 className="text-3xl font-bold">Instructions</h1>
+
+            <section className="w-full mt-4">
+              <h2 className="text-2xl font-semibold mb-2">
+                How to search for an existing trade
+              </h2>
+              <p className="text-lg text-gray-700">
+                Use the Search input above to find trades by trade id,
+                counterparty, or date. If you don&apos;t see a trade, try
+                widening the date range.
+              </p>
+            </section>
+
+            <section className="w-full mt-4">
+              <h2 className="text-2xl font-semibold mb-2">
+                How to add settlement details
+              </h2>
+              <p className="text-lg text-gray-700">
+                Open the trade and select "Edit" or "Add settlement". Fill in
+                the settlement date, currency and amount. The system will
+                validate required fields and notify you if anything is missing
+                or inconsistent.
+              </p>
+            </section>
+
+            <section className="w-full mt-4">
+              <h2 className="text-2xl font-semibold mb-2">
+                How to use the Trade Dashboard
+              </h2>
+              <p className="text-lg text-gray-700">
+                The Trade Dashboard provides an at-a-glance view of recent
+                activity and exposures. Use it to spot unusual items and drill
+                into trades for details. Filters at the top let you focus on
+                specific books, desks or date ranges.
+              </p>
+            </section>
+
+            <section className="w-full mt-4">
+              <h2 className="text-2xl font-semibold mb-2">
+                How to book a new trade
+              </h2>
+              <p className="text-lg text-gray-700 mb-3">
+                Click "Book New" above to create a trade. The form checks
+                important business rules before the trade is accepted — below is
+                a friendly list of the key checks.
+              </p>
+
+              <ul className="list-disc pl-6 space-y-2 text-lg text-gray-700">
+                <li>
+                  <strong>Both legs must have identical maturity dates</strong>—
+                  each side of the trade should settle on the same date.
+                </li>
+                <li>
+                  <strong>Legs must have opposite pay/receive flags</strong> —
+                  one side pays and the other receives.
+                </li>
+                <li>
+                  <strong>Floating legs must have an index specified</strong> —
+                  enter the appropriate reference rate (e.g. LIBOR-like index).
+                </li>
+                <li>
+                  <strong>Fixed legs must have a valid rate</strong> — enter the
+                  agreed fixed rate for the fixed leg.
+                </li>
+              </ul>
+
+              <h3 className="text-xl font-semibold mt-4">
+                Entity status checks
+              </h3>
+              <ul className="list-disc pl-6 space-y-2 text-lg text-gray-700">
+                <li>
+                  <strong>User, book, and counterparty must be active</strong>—
+                  trades can only be booked against active records in the
+                  system.
+                </li>
+                <li>
+                  <strong>All reference data must exist and be valid</strong> —
+                  currencies, indices, and other lookup values must be present.
+                </li>
+              </ul>
+            </section>
+          </div>
+        )}
+
         {trade && !loading && (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-row gap-6 items-start">
             {/* Left: the main trade editor (takes remaining space) */}
             <div className="flex-1">
               <SingleTradeModal
@@ -314,26 +404,52 @@ export const TradeActionsModal: React.FC = observer(() => {
               />
             </div>
 
-            {/* 
-  Refactored: Adjusted margin and width to position the Settlement Instructions box
-  slightly higher (closer to the trade form) and further right (under
-  the Save Trade / Cashflows / Terminate buttons area). This keeps it
-  visually connected to the trade form layout without making it appear
-  detached or floating too far right.
-*/}
-            <div className="flex justify-end">
-              <div className="w-[50%] mr-60 -mt-70">
-                <div className="p-4 bg-white rounded shadow-md">
-                  <h3 className="text-lg font-semibold mb-2">
-                    Settlement Instructions
-                  </h3>
-                  {/*Refactored: to solve issues with settlement not saving as I was not passing any onChange or onSave callback to update the local settlement state*/}
-                  <SettlementTextArea
-                    initialValue={settlement}
-                    onSave={(text) => setSettlement(text)} //Optional save trigger
-                    // Also uodate on every change to keep parent in sync
-                    onChange={(text) => setSettlement(text)}
-                  />
+            {/* Right: settlement editor as a fixed-width column aligned to top
+                so it lines up with the trade form (execution date / pay/rec area).
+            */}
+            <div className="w-80 self-start">
+              <div className="p-4 bg-white rounded shadow-md">
+                <h3 className="text-lg font-semibold mb-2">
+                  Settlement Instructions
+                </h3>
+                <SettlementTextArea
+                  initialValue={settlement}
+                  onSave={(text) => setSettlement(text)}
+                  onChange={(text) => setSettlement(text)}
+                />
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        if (!trade?.tradeId) {
+                          setSnackbarOpen(true);
+                          setSnackbarMessage(
+                            "Save the trade first to persist settlement"
+                          );
+                          return;
+                        }
+                        await saveSettlement(String(trade.tradeId), settlement);
+                        setSnackbarOpen(true);
+                        setSnackbarMessage("Settlement saved");
+                      } catch (err) {
+                        setSnackbarOpen(true);
+                        setSnackbarMessage(
+                          err instanceof Error ? err.message : String(err)
+                        );
+                      }
+                    }}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setSettlement("")}
+                  >
+                    Clear
+                  </Button>
                 </div>
               </div>
             </div>

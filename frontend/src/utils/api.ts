@@ -54,4 +54,17 @@ export const authenticate = (user: string, pass: string) => {
 export const getUserByLogin = (login: string) => {
   return api.get(`/users/loginId/${login}`);
 };
+
+// Dashboard endpoints
+export const getDashboardMyTrades = (traderId: string) =>
+  api.get(`/dashboard/my-trades`, { params: { traderId } });
+
+export const getDashboardSummary = (traderId: string) =>
+  api.get(`/dashboard/summary`, { params: { traderId } });
+
+export const getDashboardDailySummary = (traderId: string) =>
+  api.get(`/dashboard/daily-summary`, { params: { traderId } });
+
+export const getTradesByBook = (bookId: number | string) =>
+  api.get(`/dashboard/book/${bookId}/trades`);
 export default api;

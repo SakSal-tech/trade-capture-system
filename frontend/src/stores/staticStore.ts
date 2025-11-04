@@ -244,13 +244,20 @@ class StaticStore {
       const rawUsers = users.data;
       const normalizedUsers: Array<{ value: string; label: string }> =
         Array.isArray(rawUsers)
-          ? rawUsers.map((u: any) => {
+          ? rawUsers.map((u: unknown) => {
               if (!u) return { value: "", label: "" };
               if (typeof u === "string") return { value: u, label: u };
               // Common shapes: { id, username } or { loginId, username }
+              const obj = u as Record<string, unknown>;
               const id =
-                u.id ?? u.userId ?? u.loginId ?? u.login ?? u.value ?? "";
-              const label = u.username ?? u.name ?? u.label ?? String(id);
+                obj["id"] ??
+                obj["userId"] ??
+                obj["loginId"] ??
+                obj["login"] ??
+                obj["value"] ??
+                "";
+              const label =
+                obj["username"] ?? obj["name"] ?? obj["label"] ?? String(id);
               return { value: String(id), label: String(label) };
             })
           : [];
