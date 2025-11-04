@@ -136,16 +136,17 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
   }
 
   // The array exists to speed and standardise trader input if UBS prefers traders always type from scratch, I can remove it or replace it with an empty.
+
   const defaultTemplates = [
     {
       value:
-        "BENEFICIARY: UBS AG, Zurich / SWIFT: UBSWCHZH80A / IBAN: CHxx xxxx xxxx xxxx xxxx x",
-      label: "UBS AG - Beneficiary (IBAN placeholder)",
+        "Settle via JPM New York, Account: 123456789, Further Credit: ABC Corp Trading Account",
+      label: "UBS JPM - Beneficiary (IBAN placeholder)",
     },
     {
       value:
-        "OUR BANK: UBS AG, Zurich / SWIFT: UBSWCHZH80A / Account: 123-456789.0 (local format)",
-      label: "UBS AG - Our account (local)",
+        "DVP settlement through Euroclear, ISIN confirmation required before settlement",
+      label: "UBS DVP - Our account (local)",
     },
     {
       value:
@@ -154,13 +155,13 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
     },
     {
       value:
-        "INTERMEDIARY: UBS AG NY / SWIFT: BKTRUS33 / FOR CREDIT TO: UBS AG Zurich / IBAN: CHxx xxxx xxxx xxxx xxxx x",
-      label: "UBS - Intermediary + credit instruction",
+        "Cash settlement only, wire instructions: Federal Reserve Bank routing 123456789",
+      label: "UBS - FRB + credit instruction",
     },
     {
       value:
-        "UBS PAYMENT INSTRUCTIONS: Please pay via UBS AG (SWIFT UBSWCHZH80A). Beneficiary: (NAME). Account/IBAN: (IBAN). Reference: (TRADE ID).",
-      label: "UBS - Short payment instruction (templated)",
+        "Physical delivery to warehouse facility, contact operations team for coordination",
+      label: "UBS - Short delivery instructio",
     },
   ];
   //Picks which template list the component should use. If the parent passes a non-empty list of templates (e.g., desk- or user-specific templates from the server), traders will see those choices.If no templates were provided (or the provided array is empty), the UI falls back to defaultTemplates so traders still have useful quick-insert options
@@ -261,6 +262,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
         value={value}
         onChange={handleChange}
         onBlur={() => setTouched(true)}
+        className="w-full min-h-[140px] border border-gray-300 rounded p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
       />
       {/*Shows current trimmed char count and the 500-char limit.
 Turns red when the count exceeds 500, giving immediate visual feedback before Save is wired.
@@ -289,8 +291,8 @@ Turns red when the count exceeds 500, giving immediate visual feedback before Sa
           transaction. */}
       <div className="flex flex-col gap-2 mt-2">
         <div className="text-sm text-gray-600">
-          Settlement is saved when you click "Save Trade". Use the Clear button
-          to reset the settlement textarea locally.
+          Settlement is saved when you click &quot;Save Trade&quot;. Use the
+          Clear button to reset the settlement textarea locally.
         </div>
         <div className="flex gap-2">
           <Button

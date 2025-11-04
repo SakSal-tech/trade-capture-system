@@ -29,14 +29,14 @@ public class ApiExceptionHandler {
 
     // ADDED: Provide a compact, user-friendly response for AccessDeniedException
     // so clients (UI) see a short message instead of a full stack trace JSON.
-    // NOTE: This controller advice only formats AccessDeniedException responses.
+    // This controller advice only formats AccessDeniedException responses.
     // It does not perform authorization checks or change authentication state.
     // Any logic that allows or denies data access lives in security configuration
     // or service/controller guards (e.g., TradeDashboardService).
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex,
             HttpServletRequest request) {
-        // NOTE (refactor rationale):
+        // Refactored::
         // Centralized handling of AccessDeniedException was added to ensure
         // the UI receives a short, business-friendly message instead of a
         // verbose Spring Security stack/trace. Previously callers saw long

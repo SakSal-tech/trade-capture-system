@@ -123,11 +123,8 @@ export const UserActionsModal: React.FC<UserActionsModalProps> = observer(
         let userProfileValue = userProfile;
 
         if (userProfileValue && typeof userProfileValue === "object") {
-          // Cast to any because the dropdown option is an ad-hoc object
-          // shape ({ value, label }) and TypeScript cannot infer that
-          // from the untyped state. This is a small, local cast to
-          // extract the label/value and avoid a compile error.
-          const up = userProfileValue as any;
+          // Dropdown option expected shape: { value, label }
+          const up = userProfileValue as { value?: string; label?: string };
           userProfileValue = up.value || up.label || "";
         }
         const userPayload: Partial<ApplicationUser> = {

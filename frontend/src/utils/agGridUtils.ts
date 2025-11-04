@@ -2,7 +2,7 @@
 // definitions are dynamically created from runtime data. Narrowing to the
 // exact `ColDef` shape is possible but caused brittle type errors; using
 // `any[]` is a pragmatic compromise for these helpers.
-export function getColDefFromResult(data: unknown): any[] {
+export function getColDefFromResult(data: unknown): unknown[] {
   if (!data) return [];
   const sample = Array.isArray(data) ? data[0] : data;
   if (!sample) return [];
@@ -27,7 +27,7 @@ export function getColDefFromResult(data: unknown): any[] {
   });
 }
 
-export function getRowDataFromData(data: unknown): any[] {
+export function getRowDataFromData(data: unknown): unknown[] {
   if (!data) return [];
   const arr = Array.isArray(data)
     ? data

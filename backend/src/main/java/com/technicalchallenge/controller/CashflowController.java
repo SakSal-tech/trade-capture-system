@@ -138,6 +138,17 @@ public class CashflowController {
             @ApiResponse(responseCode = "400", description = "Invalid input data for cashflow generation"),
             @ApiResponse(responseCode = "500", description = "Internal server error")
     })
+    // Refactored: Historically this endpoint only calculated payment amounts for
+    // Fixed
+    // legs and left Floating legs at zero. That produced many zero-valued
+    // cashflows when the frontend supplied an explicit numeric rate for a
+    // Floating leg (for testing or one-off pricing). To make the endpoint
+    // more useful during UI-driven testing and to keep behaviour consistent
+    // with calculateCashflowValue in TradeService, we now compute payments
+    // for Floating legs when the caller provides a concrete `rate` value.
+    // If no rate is provided for a Floating leg we preserve the old
+    // behaviour (paymentValue remains zero) so production behaviour that
+    // relies on external market-data is unchanged.
     public ResponseEntity<List<CashflowDTO>> generateCashflows(@RequestBody CashflowGenerationRequest request) {
         List<CashflowDTO> allCashflows = new ArrayList<>();
         if (request.getLegs() == null || request.getLegs().isEmpty()) {
@@ -175,8 +186,24 @@ public class CashflowController {
                                                                                                 // using HALF_UP
                                                                                                 // rounding.
 
+                } else if ("Floating".equalsIgnoreCase(leg.getLegType())) {
+                    // Compute floating-leg payment only when the request includes
+                    // an explicit numeric rate. This keeps the endpoint useful
+                    // for UI testing and aligns it with TradeService which
+                    // computes a floating payment when a rate is present.
+                    // If no rate is supplied we intentionally leave paymentValue
+                    // as zero so that callers relying on market fixings are
+                    // unaffected.
+                    if (leg.getRate() != null) {
+                        long days = java.time.temporal.ChronoUnit.DAYS.between(valueDate, nextValueDate);
+                        double rate = leg.getRate();
+                        paymentValue = leg.getNotional()
+                                .multiply(BigDecimal.valueOf(rate))
+                                .multiply(BigDecimal.valueOf(days))
+                                .divide(BigDecimal.valueOf(360), 2, java.math.RoundingMode.HALF_UP);
+                    }
                 }
-                // For floating, paymentValue remains 0
+                // For floating legs without an explicit rate, paymentValue remains 0
                 CashflowDTO cf = new CashflowDTO();
                 cf.setValueDate(nextValueDate);
                 cf.setPaymentValue(paymentValue);

@@ -84,12 +84,33 @@ export const formatTradeForBackend = (
   };
 };
 
+// DEMO / TEST FALLBACK RATE
+// A realistic demo rate used only for local testing and demos when a
+// floating leg is left without an explicit rate. This should be adjusted
+// or removed when a MarketData/RateProvider is integrated.
+export const DEFAULT_FALLBACK_FLOATING_RATE = 0.03; // 3% p.a. (demo-only)
+// DEMO / TEST FALLBACK RATE FOR FIXED LEGS
+// When a Fixed leg rate is left empty in the UI during demos/tests, use
+// this default so cashflow generation and save flows produce numeric values.
+// This is demo-only and should be removed or replaced by a proper
+// MarketData/RateProvider in production.
+export const DEFAULT_FALLBACK_FIXED_RATE = 0.03; // 3% p.a. (demo-only)
+
 /**
  * Validates a trade for completeness and required fields
  * @param trade - Trade to validate
  * @returns {string|null} Error message or null if valid
  */
 export const validateTrade = (trade: Trade): string | null => {
+  // Propagate top-level maturity into legs
+  // Rationale: backend validators require per-leg maturities. For convenience
+  // when the user sets the top-level maturity, copy it into any leg that
+  // lacks a maturity. If legs differ among themselves and the top-level
+  // maturity is present but doesn't match them, return a clear error so the
+  // caller can show a 400-like validation message.
+  const propagationError = propagateTopLevelMaturityToLegs(trade);
+  if (propagationError) return propagationError;
+
   // Backend-required fields (tradeStatus is NOT required)
   if (!trade.tradeDate) return "Trade date is required.";
   if (!trade.bookName) return "Book is required.";
@@ -124,6 +145,61 @@ export const validateTrade = (trade: Trade): string | null => {
 };
 
 /**
+ * If trade.maturityDate exists, copy it into any leg that lacks a
+ * `tradeMaturityDate`. If legs contain differing maturity dates and the
+ * top-level maturity is present but does not match them, return an error
+ * message describing the conflict. Otherwise return null. This keeps the
+ * front-end convenience behaviour local and predictable for validators.
+ */
+function propagateTopLevelMaturityToLegs(trade: Trade): string | null {
+  // `topLevelMaturity` is the trade-level maturity date. When present we
+  // use it as the source of truth to populate any per-leg `tradeMaturityDate`
+  // values that are missing. We keep per-leg values if they already exist.
+  const topLevelMaturity = trade.maturityDate;
+  if (!topLevelMaturity) {
+    // nothing to propagate
+    return null;
+  }
+  if (!trade.tradeLegs || trade.tradeLegs.length === 0) return null;
+
+  // collect non-null leg maturities
+  const nonNullLegDates: string[] = [];
+  for (const leg of trade.tradeLegs) {
+    const typedLeg = leg as import("./tradeTypes").TradeLeg & {
+      tradeMaturityDate?: string;
+    };
+    const legDate = typedLeg.tradeMaturityDate as string | undefined;
+    if (legDate) nonNullLegDates.push(legDate);
+  }
+
+  // If legs have differing maturities among themselves and top-level present
+  // but does not match them, treat as conflict and fail early.
+  const uniqueLegDates = Array.from(new Set(nonNullLegDates));
+  if (uniqueLegDates.length > 1) {
+    // legs differ — check if top matches all existing leg dates
+    const allMatchTop = uniqueLegDates.every((d) => d === topLevelMaturity);
+    if (!allMatchTop) {
+      return (
+        "Conflict: legs have different maturity dates and the top-level maturity " +
+        "does not match them. Please make leg maturities consistent or remove the top-level maturity."
+      );
+    }
+  }
+
+  // Propagate top-level maturity into any leg missing it (keep existing ones)
+  for (const leg of trade.tradeLegs) {
+    const typedLeg = leg as import("./tradeTypes").TradeLeg & {
+      tradeMaturityDate?: string;
+    };
+    if (!typedLeg.tradeMaturityDate) {
+      // Add per-leg maturity for backend DTO compatibility
+      typedLeg.tradeMaturityDate = topLevelMaturity;
+    }
+  }
+  return null;
+}
+
+/**
  * Recursively convert empty strings to null for numeric/date/enum fields
  * @param obj - Object to convert
  * @returns {Object} Converted object
@@ -144,8 +220,6 @@ export function convertEmptyStringsToNull(
         // CHANGED: This list was expanded to include a number of date/user
         // fields during the settlement integration work. Beware: this
         // conversion is broad and can convert required fields to `null` if
-        // the frontend leaves them as empty strings. If you see unexpected
-        // 400 validation errors, check this list and narrow it so required
         // fields (e.g. tradeDate, tradeLegs[].notional) are not nulled.
         // List of fields that should be null if empty string (including enums)
         // NOTE: include UTI, settlement and common user/id fields so the

@@ -1,13 +1,14 @@
 import React, { useState } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
 import Button from "./Button";
 
 const navItems = [
+  // Home quick actions (vertical nav on left for the Home page)
   {
-    label: "Trade Actions",
-    aria: "trade-actions",
-    parent: "trade",
-    param: "actions",
+    label: "Trade Dashboard",
+    aria: "home-dashboard",
+    parent: "home",
+    path: "/dashboard",
   },
   {
     label: "History",
@@ -22,12 +23,7 @@ const navItems = [
     param: "user-actions",
   },
   { label: "All Users", aria: "user-all", parent: "admin", param: "user-all" }, // Added for user history
-  {
-    label: "Trade Actions",
-    aria: "trade-actions",
-    parent: "middle-office",
-    param: "actions",
-  },
+  // Keep other admin / middle-office / support entries but avoid duplicating the "Trade Actions" label
   {
     label: "Static Data Management",
     aria: "static-actions",
@@ -36,7 +32,7 @@ const navItems = [
   },
   {
     label: "View Trade",
-    aria: "trade-actions",
+    aria: "view-trade",
     parent: "support",
     param: "actions",
   },
@@ -46,18 +42,50 @@ const navItems = [
 const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
-  const handleSideBarClick = (param: string) => {
-    setSearchParams({ view: param });
+  // Global buttons that appear in the vertical nav on every page.
+  // These provide the horizontal-like top-level navigation in the sidebar.
+  // Use explicit search params in the path for actions/history so clicking the global
+  // buttons lands on the correct subview of the /trade page.
+  const globalItems = [
+    { label: "Home", aria: "home", path: "/home" },
+    {
+      label: "Trade Actions",
+      aria: "home-trade-actions",
+      path: "/trade?view=actions",
+    },
+    {
+      label: "Trade Dashboard",
+      aria: "home-dashboard-global",
+      path: "/dashboard",
+    },
+    { label: "History", aria: "home-history", path: "/trade?view=history" },
+  ];
+
+  const handleSideBarClick = (item: { param?: string; path?: string }) => {
+    if (item.path) {
+      // direct route (dashboard, trade page, etc.)
+      navigate(item.path);
+    } else if (item.param) {
+      // change the current page view using search params
+      setSearchParams({ view: item.param });
+    }
   };
   const location = useLocation();
   const pathSegments = location.pathname.split("/").filter(Boolean);
   const parentRoot = pathSegments[0];
-  const filteredItems = navItems.filter((item) => item.parent === parentRoot);
+  // Exclude any nav items whose label is already provided in the globalItems list
+  // to avoid duplicate labels in the sidebar.
+  const filteredItems = navItems.filter(
+    (item) =>
+      item.parent === parentRoot &&
+      !globalItems.some((g) => g.label === item.label)
+  );
 
   return (
     <aside
-      className={`transition-all duration-300 h-screen bg-white shadow-lg mt-1 p-4 flex flex-col rounded-2xl ${
+      className={`transition-all duration-300 h-screen shadow-lg mt-1 p-4 flex flex-col rounded-2xl ubs-sidebar ${
         collapsed ? "w-16" : "w-64"
       }`}
     >
@@ -71,6 +99,25 @@ const Sidebar = () => {
         </span>
       </button>
       <ul className="space-y-2">
+        {/* Global top-level buttons visible on every page */}
+        {globalItems.map((item) => (
+          <li
+            key={item.aria}
+            className={`${collapsed ? "hidden" : "text-xl transition"}`}
+            aria-label={item.aria}
+          >
+            <Button
+              variant="primary"
+              size="md"
+              className="w-full text-left !text-black bg-transparent hover:bg-indigo-300  text-grey shadow-none rounded-lg cursor-pointer"
+              onClick={() => {
+                if (item.path) navigate(item.path);
+              }}
+            >
+              {item.label}
+            </Button>
+          </li>
+        ))}
         {filteredItems.map((item) => (
           <li
             key={item.aria}
@@ -81,7 +128,7 @@ const Sidebar = () => {
               variant="primary"
               size="md"
               className="w-full text-left !text-black bg-transparent hover:bg-indigo-300  text-grey shadow-none rounded-lg cursor-pointer"
-              onClick={() => handleSideBarClick(item.param)}
+              onClick={() => handleSideBarClick(item)}
             >
               {item.label}
             </Button>

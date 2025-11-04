@@ -35,7 +35,7 @@ function TradeDetails(props: TradeDetailsProps) {
   }
 
   // Define a variable holding the CSS class names used for all field labels
-  var labelClass =
+  const labelClass =
     "h-9 flex items-center font-semibold rounded shadow bg-violet-50 px-2 py-1 ml-1 min-w-[200px] text-sm";
 
   /**
@@ -53,37 +53,47 @@ function TradeDetails(props: TradeDetailsProps) {
         </Label>
 
         {/* Container that holds the editable input or dropdown */}
-        <div className="flex flex-row justify-end rounded px-2 py-1 h-fit w-full">
-          {/* Component that decides whether to show an input, dropdown, or date field */}
-          <FieldRenderer
-            field={
-              field as unknown as {
-                key: string;
-                label: string;
-                type: string;
-                options?:
-                  | string[]
-                  | (() => string[] | { value: string; label: string }[])
-                  | { value: string; label: string }[];
+        <div className="flex flex-col w-full">
+          {/* Special help text for the maturity field: clarify that this value
+              will be used as Leg 1 maturity and copied into Leg 2 if Leg 2 is empty */}
+          {field.key === "maturityDate" && (
+            <div className="text-xs text-gray-600 mb-1 ml-1">
+              This value is treated as Leg 1 maturity and will be copied to Leg
+              2 maturity if Leg 2 has no maturity date set.
+            </div>
+          )}
+          <div className="flex flex-row justify-end rounded px-2 py-1 h-fit w-full">
+            {/* Component that decides whether to show an input, dropdown, or date field */}
+            <FieldRenderer
+              field={
+                field as unknown as {
+                  key: string;
+                  label: string;
+                  type: string;
+                  options?:
+                    | string[]
+                    | (() => string[] | { value: string; label: string }[])
+                    | { value: string; label: string }[];
+                }
+              } // cast to satisfy FieldRenderer's expected shape
+              value={
+                props.trade![field.key] as string | number | null | undefined
+              } // assert trade exists and cast to allowed value types
+              // Field is disabled if the mode is not "edit" or if the field key is in the disabled list
+              disabled={
+                props.mode !== "edit" ||
+                DISABLED_FIELDS.includes(field.key as string)
               }
-            } // cast to satisfy FieldRenderer's expected shape
-            value={
-              props.trade![field.key] as string | number | null | undefined
-            } // assert trade exists and cast to allowed value types
-            // Field is disabled if the mode is not "edit" or if the field key is in the disabled list
-            disabled={
-              props.mode !== "edit" ||
-              DISABLED_FIELDS.includes(field.key as string)
-            }
-            // Function that runs when the user changes a field value
-            onChange={function (value) {
-              // Check that an onFieldChange function was actually provided
-              if (props.onFieldChange) {
-                // Call the parent’s change handler with the key and the new value
-                props.onFieldChange(field.key, value);
-              }
-            }}
-          />
+              // Function that runs when the user changes a field value
+              onChange={function (value) {
+                // Check that an onFieldChange function was actually provided
+                if (props.onFieldChange) {
+                  // Call the parent’s change handler with the key and the new value
+                  props.onFieldChange(field.key, value);
+                }
+              }}
+            />
+          </div>
         </div>
       </div>
     );

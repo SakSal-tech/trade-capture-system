@@ -79,7 +79,7 @@ public class DatabaseUserDetailsService implements UserDetailsService {
         }
 
         // Log basic debug info about the loaded user (mask the password for safety)
-        // NOTE: These debug logs were added to help diagnose 403 / AccessDenied
+        // These debug logs were added to help diagnose 403 / AccessDenied
         // problems during development. They show the stored (masked) password and
         // the resulting GrantedAuthority set created for the user. An empty
         // authority set or an unexpected stored value is a likely reason why
