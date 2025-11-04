@@ -119,7 +119,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                         // Also seed additional users and a second trade used by some tests.
                         var tradeStatus = tradeStatusRepository.findByTradeStatus("NEW").orElseThrow();
 
-                        // ✅ Create new application users for the tests (unique login IDs)
+                        // Create new application users for the tests (unique login IDs)
                         String[] extraUsers = {
                                         "testTrader", "supportUser", "viewerUser",
                                         "creatorUser", "editorUser", "deleterUser",
