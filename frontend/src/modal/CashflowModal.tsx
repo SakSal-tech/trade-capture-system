@@ -70,7 +70,7 @@ const CashflowModal: React.FC<CashflowModalProps> = ({
   // Detect whether any cashflows for a leg used the demo fallback rate.
   // We consider the fallback used when the paymentType is 'floating'
   // (case-insensitive) and the rate exactly equals the shared demo rate.
-  // Note: this heuristic is intentionally simple — if you integrate a
+  // Note: this heuristic is intentionally simple if you integrate a
   // proper RateProvider, remove this UI-only label logic.
   const usedFallback = (cfs: CashflowDTO[]) =>
     cfs.some(

@@ -1,4 +1,4 @@
-# Frontend change log — 29 OCtober
+# Frontend change log 29 OCtober
 
 ## Summary
 
@@ -30,8 +30,8 @@
    - Action: ensured linter is restricted to source files and added `.eslintignore` (to avoid scanning generated bundles). Fixed small lint items (unused imports/variables and improved axios error handling) so `pnpm run build` can run without ESLint failing.
 
 4. Documentation
-   - File: `docs/Errors-and-Fixes-Summary.md` — consolidated problem / root cause / solution / impact entries for the frontend fixes were added.
-   - File: `docs/log.md` (this file) — a short developer log entry summarising today's frontend work.
+   - File: `docs/Errors-and-Fixes-Summary.md` consolidated problem / root cause / solution / impact entries for the frontend fixes were added.
+   - File: `docs/log.md` (this file) a short developer log entry summarising today's frontend work.
 
 ## What I attempted but which changed afterwards
 
@@ -46,11 +46,11 @@
 
 ## Files changed in this session (high level)
 
-- frontend/src/modal/SettlementTextArea.tsx — controlled settlement editor + validation fix
-- frontend/src/modal/TradeActionsModal.tsx — fetch + save wiring, comments
-- frontend/.eslintignore and lint script change — restrict lint to source files
-- docs/Errors-and-Fixes-Summary.md — summary of errors and fixes
-- docs/log.md — this log entry
+- frontend/src/modal/SettlementTextArea.tsx controlled settlement editor + validation fix
+- frontend/src/modal/TradeActionsModal.tsx fetch + save wiring, comments
+- frontend/.eslintignore and lint script change restrict lint to source files
+- docs/Errors-and-Fixes-Summary.md summary of errors and fixes
+- docs/log.md this log entry
 
 ## How I verified
 
@@ -61,7 +61,7 @@
 1. Recreate and run the Vitest tests for `SettlementTextArea` and fix any test failures.
 2. Run `pnpm run build` and address the Vite chunk-size warnings (bundle visualiser + manualChunks).
 
-# Developer log — 30/10/2025 (detailed)
+# Developer log 30/10/2025 (detailed)
 
 This document records the work I completed on 30 October 2025. It explains what I changed, why I changed it, and how those changes map to business rules about users, trades and settlement instructions. I’ve included code snippets from the repository to make the reasoning concrete for the team.
 
@@ -154,7 +154,7 @@ Code excerpt:
 
 ### Challenges
 
-- Need to ensure every template control or dropdown has an accessible label — the earlier UX issue reported as "Adding Settlement drop down without a label" is corrected by adding `aria-label` or a visible `<label>`.
+- Need to ensure every template control or dropdown has an accessible label the earlier UX issue reported as "Adding Settlement drop down without a label" is corrected by adding `aria-label` or a visible `<label>`.
 
 ## Data mapping: Trader / Inputter IDs and UTI handling (avoid 400 errors)
 
@@ -214,9 +214,9 @@ export function createUser(user: User) {
 
 ### Overall next steps (priority)
 
-Add unit tests (medium) — Vitest + React Testing Library tests for `SettlementTextArea` covering template insertion, validation and Clear behaviour.
+Add unit tests (medium) Vitest + React Testing Library tests for `SettlementTextArea` covering template insertion, validation and Clear behaviour.
 
-# Developer log — 30/10/2025 (detailed)
+# Developer log 30/10/2025 (detailed)
 
 This document records the work I completed on 30 October 2025. It explains what I changed, why I changed it, and how those changes map to business rules about users, trades and settlement instructions. I’ve included code snippets from the repository to make the reasoning concrete for the team.
 
@@ -309,7 +309,7 @@ Code excerpt:
 
 ### Challenges
 
-- Need to ensure every template control or dropdown has an accessible label — the earlier UX issue reported as "Adding Settlement drop down without a label" is corrected by adding `aria-label` or a visible `<label>`.
+- Need to ensure every template control or dropdown has an accessible label the earlier UX issue reported as "Adding Settlement drop down without a label" is corrected by adding `aria-label` or a visible `<label>`.
 
 ### Placement / Visibility work
 
@@ -399,4 +399,4 @@ export function createUser(user: User) {
 
 ### Overall next steps (priority)
 
-To Add unit tests (medium) — Vitest + React Testing Library tests for `SettlementTextArea` covering template insertion, validation and Clea
+To Add unit tests (medium) Vitest + React Testing Library tests for `SettlementTextArea` covering template insertion, validation and Clea

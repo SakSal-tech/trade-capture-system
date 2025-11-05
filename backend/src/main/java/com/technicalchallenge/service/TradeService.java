@@ -959,7 +959,7 @@ public class TradeService {
                         RoundingMode.HALF_EVEN);
                 return result;
             }
-            // No explicit rate available for floating leg — return zero as before.
+            // No explicit rate available for floating leg return zero as before.
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_EVEN);
         }
         // Fallback for unknown leg types return 0,0

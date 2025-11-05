@@ -344,7 +344,7 @@ public class TradeDashboardService {
             // helper resolveCurrentUserRole method in use)
             logger.debug("Current role for user {}: {}", resolveCurrentTraderId(), resolveCurrentUserRole());
 
-            // Aggregation — trades by status: group by tradeStatus and count
+            // Aggregation trades by status: group by tradeStatus and count
             Map<String, Long> tradesByStatus = tradesForTrader.stream()
                     .map(TradeDTO::getTradeStatus)
                     .filter(status -> status != null && !status.isBlank())
@@ -353,7 +353,7 @@ public class TradeDashboardService {
             // ALSO set labeled all-time field for clarity in the UI
             summaryDTO.setAllTimeTradesByStatus(tradesByStatus);
 
-            // Aggregation — notional by currency: iterate all trade legs and sum
+            // Aggregation notional by currency: iterate all trade legs and sum
             // notionals per currency using BigDecimal to avoid floating-point errors.
             Map<String, BigDecimal> notionalByCurrency = new HashMap<>();
             for (TradeDTO tradeDto : tradesForTrader) {
@@ -374,7 +374,7 @@ public class TradeDashboardService {
             // ALSO set labeled all-time notional totals
             summaryDTO.setAllTimeNotionalByCurrency(notionalByCurrency);
 
-            // Aggregation — trades by type and counterparty: build a compact key
+            // Aggregation trades by type and counterparty: build a compact key
             // "tradeType:counterparty" and count occurrences.
             Map<String, Long> tradesByTypeAndCounterparty = tradesForTrader.stream()
                     .map(trade -> {

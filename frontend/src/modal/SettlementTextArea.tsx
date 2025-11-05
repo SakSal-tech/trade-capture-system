@@ -56,7 +56,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
 
   // A React state hook that creates a piece of component state named value and an updater function setValue. initialValue: the runtime initial value for that state (comes from props via destructuring).
   const [value, setValue] = useState<string>(initialValue);
-  //This is used only on first render — if the initialValue prop later changes, state won't update automatically unless I use a useEffect
+  //This is used only on first render if the initialValue prop later changes, state won't update automatically unless I use a useEffect
   const [touched, setTouched] = useState<boolean>(false); //Reset touched when deliberately replacing the content (e.g., switching trades, after successful save)
 
   useEffect(() => {
@@ -88,7 +88,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
   // Take a template (or any text) and insert it into  textarea at the current caret/selection position. ChangeEvent<HTMLTextAreaElement>, which gives the handler a correctly typed event.
   function insertAtCursor(text: string) {
     const txtArea = textareaRef.current;
-    //If null (the DOM node isn’t available — e.g., not mounted, ref not attached, or running on server
+    //If null (the DOM node isn’t available e.g., not mounted, ref not attached, or running on server
     if (!txtArea) {
       // Update internal state and inform parent when no DOM ref is available
       const newVal = (value || "") + text;
@@ -174,7 +174,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
     // Use the trimmed value for all validation checks so leading/trailing
     // whitespace can't be used to bypass the length check and so the
     // angle-bracket check is applied to the visible content.
-    // [<>] — matches either < or > which we forbid to reduce XSS risk.
+    // [<>] matches either < or > which we forbid to reduce XSS risk.
     // ADDED: validation rules enforced by the UI for settlement text.
     // These match server expectations where possible and provide
     // immediate feedback before attempting to persist:
@@ -248,7 +248,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
         </div>
 
         <p id="template-help" className="text-xs text-gray-600 mt-1">
-          Select a template to insert at the caret — editable after insertion.
+          Select a template to insert at the caret editable after insertion.
         </p>
       </div>
       {/* The editable multi-line input used for settlement instructions */}

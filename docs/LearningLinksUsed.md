@@ -139,7 +139,7 @@ https://www.youtube.com/watch?v=qpSasUow1XI
 - [Drools (Business Rules Management System)](https://www.drools.org/)
 - [Easy Rules – Lightweight Java Rules Engine](https://github.com/j-easy/easy-rules)
 
-# Learning Resources — Trade Dashboard Calculations & Concepts
+# Learning Resources Trade Dashboard Calculations & Concepts
 
 ## Trade Lifecycle, Blotter Aggregation & Status Counts
 
@@ -215,7 +215,7 @@ https://site.mockito.org/javadoc/current/org/mockito/ArgumentCaptor.html
 
 ### Spring Security and UserDetails resources
 
-Spring Security Reference — Authentication and UserDetailsService
+Spring Security Reference Authentication and UserDetailsService
 https://docs.spring.io/spring-security/reference/servlet/authentication/passwords/userdetailsservice.html
 (Official reference for the UserDetails and UserDetailsService contract and how DaoAuthenticationProvider uses them.)
 
@@ -223,11 +223,11 @@ DaoAuthenticationProvider (official reference)
 https://docs.spring.io/spring-security/reference/servlet/authentication/dao.html
 (Explains DaoAuthenticationProvider, how it uses a UserDetailsService and a PasswordEncoder, and the authentication flow.)
 
-Spring Security Reference — Testing support
+Spring Security Reference Testing support
 https://docs.spring.io/spring-security/reference/servlet/test/index.html
 (Official testing chapter covering @WithMockUser, @WithUserDetails and MockMvc helpers.)
 
-Spring Boot Reference — Security auto-configuration
+Spring Boot Reference Security auto-configuration
 https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/#boot-features-security
 (Explains how Spring Boot configures security by default and how to override the UserDetailsService and PasswordEncoder.)
 
@@ -235,15 +235,15 @@ Spring guide: Securing a web application
 https://spring.io/guides/gs/securing-web/
 (A short, practical walkthrough of how security pieces fit together in a simple app.)
 
-Baeldung — Custom UserDetailsService
+Baeldung Custom UserDetailsService
 https://www.baeldung.com/spring-security-userdetailsservice
 (Practical examples of loading users from a database and common pitfalls.)
 
-Baeldung — JDBC authentication / JdbcUserDetailsManager
+Baeldung JDBC authentication / JdbcUserDetailsManager
 https://www.baeldung.com/spring-security-jdbc-authentication
 (Shows an out-of-the-box JDBC approach if you prefer not to write a custom service.)
 
-Baeldung — Testing Spring Security (@WithMockUser vs @WithUserDetails)
+Baeldung Testing Spring Security (@WithMockUser vs @WithUserDetails)
 https://www.baeldung.com/spring-security-test-withmockuser-withuserdetails
 (Explains differences between mock users and loading actual UserDetails in integration tests.)
 
@@ -280,11 +280,11 @@ Log4j 2 manual (alternative implementation)
 https://logging.apache.org/log4j/2.x/manual/index.html
 (Advanced features and configuration for projects that prefer Log4j.)
 
-Baeldung — SLF4J and Logback introduction
+Baeldung SLF4J and Logback introduction
 https://www.baeldung.com/slf4j-logback
 (Examples of creating loggers, parameterised logging and configuration.)
 
-Baeldung — Logging best practices
+Baeldung Logging best practices
 https://www.baeldung.com/java-logging-best-practices
 (Avoid string concatenation, use parameterised logging, MDC, and configuration tips.)
 

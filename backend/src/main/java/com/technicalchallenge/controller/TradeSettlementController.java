@@ -80,7 +80,7 @@ public class TradeSettlementController {
      *
      * WHY:
      * - Improves performance (database handles search instead of Java loops)
-     * - Keeps controller "thin" — handles only request/response logic
+     * - Keeps controller "thin" handles only request/response logic
      * - Easier to test and reuse (search logic is now in AdditionalInfoService)
      *
      * Business Requirement:
@@ -300,7 +300,7 @@ public class TradeSettlementController {
 
     // Refactored ADDED:
     // Fetches settlement instructions for a single trade directly from DB.
-    // Supports business requirement — “Settlement instructions visible to all user
+    // Supports business requirement “Settlement instructions visible to all user
     // types.”
     public Optional<AdditionalInfoDTO> getTradeSettlementInstructions(Long tradeId) {
 

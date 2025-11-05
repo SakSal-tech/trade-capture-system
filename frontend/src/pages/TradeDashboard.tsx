@@ -35,11 +35,32 @@ function SummaryCard(props: { title: string; value: string }) {
   );
 }
 
+// Minimal types to avoid explicit `any` while keeping the page flexible.
+// Introduced to remove usages of `any` which trigger the
+// `@typescript-eslint/no-explicit-any` rule during the build. These
+// small local types provide enough structure for the dashboard UI without
+// importing full backend DTOs and help satisfy lint/type checks.
+type WeeklyComparison = { tradeCount?: number };
+type DashboardSummary = {
+  weeklyComparisons?: WeeklyComparison[];
+  notionalByCurrency?: Record<string, number | string>;
+  bookActivitySummaries?: Record<string, unknown>;
+  riskExposureSummary?: { delta?: number | string };
+  todaysTradeCount?: number;
+  tradesByTypeAndCounterparty?: Record<string, number | string>;
+};
+type DailySummary = {
+  todaysTradeCount?: number;
+  todaysNotionalByCurrency?: Record<string, number | string>;
+};
+
 function TradeDashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [summary, setSummary] = useState<any | null>(null);
-  const [myTrades, setMyTrades] = useState<any[] | null>(null);
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [myTrades, setMyTrades] = useState<Record<string, unknown>[] | null>(
+    null
+  );
   // UI state: which summary panel (if any) is currently open.
   // - 'weekly' = show the weekly summary using the already-fetched `summary` object
   // - 'daily' = show the daily summary (fetched on demand into `dailySummary`)
@@ -50,7 +71,7 @@ function TradeDashboard() {
   // Stores the payload returned by getDashboardDailySummary when the user
   // requests the Daily Summary. Kept separate from `summary` to avoid
   // overwriting the weekly aggregates already loaded on page mount.
-  const [dailySummary, setDailySummary] = useState<any | null>(null);
+  const [dailySummary, setDailySummary] = useState<DailySummary | null>(null);
 
   function goToTrades() {
     // The standalone /trade route was removed; send users to Home where
@@ -107,8 +128,8 @@ function TradeDashboard() {
                 users understand that the buttons will show a weekly or daily
                 summary when clicked. Kept short to avoid UI clutter. */}
             <div className="text-sm text-gray-600">
-              Click "Weekly Summary" to view weekly aggregates; click "Daily
-              Summary" to fetch today's summary.
+              Click &quot;Weekly Summary&quot; to view weekly aggregates; click
+              &quot;Daily Summary&quot; to fetch today&apos;s summary.
             </div>
 
             <div className="flex gap-2">
@@ -181,10 +202,22 @@ function TradeDashboard() {
                 <div>
                   <div className="text-sm text-gray-700 mb-2">
                     Total trades this week:{" "}
+                    {/* Use WeeklyComparison to avoid `any` in the reducer and
+                        make the reducer's intent explicit: each item may have
+                        an optional numeric `tradeCount`. */}
                     {summary?.weeklyComparisons?.reduce(
-                      (a: number, b: any) => a + (b.tradeCount || 0),
+                      (a: number, b: WeeklyComparison) =>
+                        a + (b.tradeCount || 0),
                       0
                     ) ?? "-"}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {/* Escaped quotes/apostrophes here to satisfy ESLint's
+                        react/no-unescaped-entities rule. Unescaped quotes in
+                        JSX text cause lint errors and block the build. */}
+                    Click &quot;Weekly Summary&quot; to view weekly aggregates;
+                    click &quot;Daily Summary&quot; to fetch today&apos;s
+                    summary.
                   </div>
                   <div className="text-sm text-gray-700">
                     Notional by currency:{" "}
@@ -200,13 +233,13 @@ function TradeDashboard() {
               ) : (
                 <div>
                   <div className="text-sm text-gray-700 mb-2">
-                    Today's trades:{" "}
+                    Today&apos;s trades:{" "}
                     {dailySummary?.todaysTradeCount ??
                       summary?.todaysTradeCount ??
                       "-"}
                   </div>
                   <div className="text-sm text-gray-700">
-                    Today's notional by currency:{" "}
+                    Today&apos;s notional by currency:{" "}
                     {dailySummary?.todaysNotionalByCurrency
                       ? Object.entries(dailySummary.todaysNotionalByCurrency)
                           .map(
@@ -236,7 +269,7 @@ function TradeDashboard() {
               summary && summary.notionalByCurrency
                 ? // sum notional values across currencies (best-effort parsing)
                   Object.values(summary.notionalByCurrency)
-                    .map((v: any) => Number(v ?? 0))
+                    .map((v: unknown) => Number((v as number) ?? 0))
                     .reduce((a: number, b: number) => a + b, 0)
                     .toLocaleString(undefined, {
                       style: "currency",
@@ -282,9 +315,12 @@ function TradeDashboard() {
                       ? // map weekly comparisons to {date, tradeCount}. We don't get dates from the API model,
                         // so build dates for the last N days (oldest -> newest).
                         summary.weeklyComparisons.map(
-                          (item: any, idx: number) => {
-                            const daysAgo =
-                              summary.weeklyComparisons.length - 1 - idx;
+                          (item: WeeklyComparison, idx: number, arr) => {
+                            // Use the mapped array `arr` to compute the index-based
+                            // label rather than referencing `summary.weeklyComparisons`
+                            // directly. This avoids a TypeScript 'possibly undefined'
+                            // error while preserving the original semantics.
+                            const daysAgo = arr.length - 1 - idx;
                             const d = new Date();
                             d.setDate(d.getDate() - daysAgo);
                             const label = d.toISOString().slice(0, 10);
@@ -339,7 +375,7 @@ function TradeDashboard() {
                     const counterpartyData =
                       summary && summary.tradesByTypeAndCounterparty
                         ? Object.entries(
-                            summary.tradesByTypeAndCounterparty
+                            summary.tradesByTypeAndCounterparty ?? {}
                           ).map(([k, v]) => ({ name: k, value: Number(v) }))
                         : [
                             { name: "Counterparty A", value: 45 },

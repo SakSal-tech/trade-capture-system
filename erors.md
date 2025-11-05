@@ -36,7 +36,7 @@ Source: development_error_log.md
 - Cause: Spring loaded `data.sql` and tests re-seeded the same records.
 - Fix: Reuse seeded rows via repository lookups (e.g., `bookRepository.findByBookName("FX-BOOK-1")`).
 
-## 6) TradeController Patch Logic (404) — ID mismatch
+## 6) TradeController Patch Logic (404) ID mismatch
 
 - Symptom: PATCH returned 404 due to ID mismatch.
 - Cause: Controller/test used internal DB id while `amendTrade()` expects business id.

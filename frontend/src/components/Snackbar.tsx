@@ -1,6 +1,6 @@
 import React from "react";
 
-// ADDED: Snackbar default behaviour changed — moved to top-left and
+// ADDED: Snackbar default behaviour changed moved to top-left and
 // increased default duration to 10s so messages (e.g., cashflow errors)
 // are visible and not obscured by modal dialogs. Callers can override
 // the `duration` prop per usage.

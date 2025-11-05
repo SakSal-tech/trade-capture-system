@@ -221,7 +221,7 @@ public class TradeController {
      * SUPPORT denied.
      *
      * I've changed this to return 204 (No Content) on success,
-     * and 404 if the trade doesn't exist — matching test expectations.
+     * and 404 if the trade doesn't exist matching test expectations.
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('TRADER')")

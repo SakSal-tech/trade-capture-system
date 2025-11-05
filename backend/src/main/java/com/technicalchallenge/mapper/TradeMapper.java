@@ -141,7 +141,7 @@ public class TradeMapper {
             trade.setCounterparty(cp);
         }
 
-        // Note: Do NOT set settlementInstructions here — they belong to AdditionalInfo
+        // Note: Do NOT set settlementInstructions here they belong to AdditionalInfo
         return trade;
     }
 

@@ -82,7 +82,7 @@ export const TradeActionsModal: React.FC = observer(() => {
         const current = resp?.data?.fieldValue ?? "";
         if (!cancelled) setSettlement(current);
       } catch (err) {
-        // 404 means no settlement saved yet — treat as empty; otherwise surface error via snackbar
+        // 404 means no settlement saved yet treat as empty; otherwise surface error via snackbar
         if (axios.isAxiosError(err) && err.response?.status === 404) {
           if (!cancelled) setSettlement("");
         } else {
@@ -322,11 +322,14 @@ export const TradeActionsModal: React.FC = observer(() => {
               <h2 className="text-2xl font-semibold mb-2">
                 How to add settlement details
               </h2>
+              {/* Escaped inner quotes to satisfy the react/no-unescaped-entities
+                  ESLint rule. Unescaped quotes/apostrophes in JSX text cause
+                  lint errors that block production builds. */}
               <p className="text-lg text-gray-700">
-                Open the trade and select "Edit" or "Add settlement". Fill in
-                the settlement date, currency and amount. The system will
-                validate required fields and notify you if anything is missing
-                or inconsistent.
+                Open the trade and select &quot;Edit&quot; or &quot;Add
+                settlement&quot;. Fill in the settlement date, currency and
+                amount. The system will validate required fields and notify you
+                if anything is missing or inconsistent.
               </p>
             </section>
 
@@ -346,27 +349,29 @@ export const TradeActionsModal: React.FC = observer(() => {
               <h2 className="text-2xl font-semibold mb-2">
                 How to book a new trade
               </h2>
+              {/* Escaped double quotes in the instruction paragraph to avoid
+                  react/no-unescaped-entities lint failures during build. */}
               <p className="text-lg text-gray-700 mb-3">
-                Click "Book New" above to create a trade. The form checks
-                important business rules before the trade is accepted — below is
-                a friendly list of the key checks.
+                Click &quot;Book New&quot; above to create a trade. The form
+                checks important business rules before the trade is accepted
+                below is a friendly list of the key checks.
               </p>
 
               <ul className="list-disc pl-6 space-y-2 text-lg text-gray-700">
                 <li>
-                  <strong>Both legs must have identical maturity dates</strong>—
+                  <strong>Both legs must have identical maturity dates</strong>:
                   each side of the trade should settle on the same date.
                 </li>
                 <li>
-                  <strong>Legs must have opposite pay/receive flags</strong> —
+                  <strong>Legs must have opposite pay/receive flags</strong>:
                   one side pays and the other receives.
                 </li>
                 <li>
-                  <strong>Floating legs must have an index specified</strong> —
+                  <strong>Floating legs must have an index specified</strong>:
                   enter the appropriate reference rate (e.g. LIBOR-like index).
                 </li>
                 <li>
-                  <strong>Fixed legs must have a valid rate</strong> — enter the
+                  <strong>Fixed legs must have a valid rate</strong> enter the
                   agreed fixed rate for the fixed leg.
                 </li>
               </ul>
@@ -376,12 +381,12 @@ export const TradeActionsModal: React.FC = observer(() => {
               </h3>
               <ul className="list-disc pl-6 space-y-2 text-lg text-gray-700">
                 <li>
-                  <strong>User, book, and counterparty must be active</strong>—
+                  <strong>User, book, and counterparty must be active</strong>:
                   trades can only be booked against active records in the
                   system.
                 </li>
                 <li>
-                  <strong>All reference data must exist and be valid</strong> —
+                  <strong>All reference data must exist and be valid</strong>:
                   currencies, indices, and other lookup values must be present.
                 </li>
               </ul>
