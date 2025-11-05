@@ -99,7 +99,10 @@ public class TradeLegValidator {
         // If the leg type is "FLOATING", then the code checks that both an index ID and
         // index name are provided and that the index name is not blank
         if (legType != null && legType.equalsIgnoreCase("FLOATING")) {
-            return leg.getIndexId() != null && leg.getIndexName() != null && !leg.getIndexName().isBlank();
+            // Accept either an index id or an index name (or both). The previous
+            // implementation required both which prevented valid requests that
+            // supplied the human-readable index name only (JSON property "index").
+            return (leg.getIndexId() != null) || (leg.getIndexName() != null && !leg.getIndexName().isBlank());
         }
         return true;
     }

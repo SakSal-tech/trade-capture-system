@@ -54,16 +54,11 @@ export const TRADE_FIELDS = [
   },
   { key: "tradeDate", label: "Trade Date", type: "date" },
   { key: "startDate", label: "Start Date", type: "date" },
-  { key: "maturityDate", label: "Maturity Date", type: "date" },
+  { key: "maturityDate", label: "Leg 1 Maturity", type: "date" },
   { key: "executionDate", label: "Execution Date", type: "date" },
   { key: "utiCode", label: "UTI Code", type: "input" },
   { key: "lastTouchTimestamp", label: "Last Touch Timestamp", type: "date" },
   { key: "validityStartDate", label: "Version Active Since", type: "date" },
-  {
-    key: "settlementInstructions",
-    label: "Settlement Instructions",
-    type: "textarea",
-  },
 ];
 
 /**

@@ -1,6 +1,7 @@
 package com.technicalchallenge.controller;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -14,9 +15,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.technicalchallenge.repository.AdditionalInfoAuditRepository;
 import com.technicalchallenge.model.AdditionalInfoAudit;
+
+// Added: imports for repositories and entities to support validator dependencies.
+// This ensures the test can create reference data only when needed, avoiding reliance on external SQL files.
+import com.technicalchallenge.repository.BookRepository;
+import com.technicalchallenge.repository.CounterpartyRepository;
+import com.technicalchallenge.repository.ApplicationUserRepository;
+import com.technicalchallenge.model.Book;
+import com.technicalchallenge.model.Counterparty;
+import com.technicalchallenge.model.ApplicationUser;
+
 import java.util.Map;
 import java.util.List;
 import java.util.Objects;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 // @SpringBootTest boots the full Spring context (controllers, services, repositories and DB)
@@ -39,6 +51,54 @@ public class AdditionalInfoIntegrationTest {
     // AdditionalInfoRepository here so it is intentionally omitted.
     @Autowired
     private AdditionalInfoAuditRepository auditRepository;
+
+    // Added: repositories needed to verify or insert minimal reference data
+    // without duplicating what data.sql already loads.
+    @Autowired
+    private BookRepository bookRepository;
+
+    @Autowired
+    private CounterpartyRepository counterpartyRepository;
+
+    @Autowired
+    private ApplicationUserRepository applicationUserRepository;
+
+    @BeforeEach
+    void setUp() {
+        // Changed: previous version inserted records unconditionally, causing
+        // DataIntegrityViolation when data.sql already contained the same entries.
+        // The new logic checks for existence before inserting, keeping the setup
+        // idempotent.
+
+        // Check if a book named "TestBook" exists before inserting to prevent
+        // duplicates
+        if (bookRepository.findByBookName("TestBook").isEmpty()) {
+            Book book = new Book();
+            book.setBookName("TestBook");
+            book.setActive(true);
+            bookRepository.saveAndFlush(book);
+        }
+
+        // Check if counterparty "BigBank" exists before inserting to avoid duplicate
+        // rows
+        if (counterpartyRepository.findByName("BigBank").isEmpty()) {
+            Counterparty counterparty = new Counterparty();
+            counterparty.setName("BigBank");
+            counterparty.setActive(true);
+            counterpartyRepository.saveAndFlush(counterparty);
+        }
+
+        // Check if user "simon" exists before inserting to prevent unique constraint
+        // violations
+        if (applicationUserRepository.findByLoginId("simon").isEmpty()) {
+            ApplicationUser trader = new ApplicationUser();
+            trader.setLoginId("simon");
+            trader.setFirstName("Simon");
+            trader.setLastName("Trader");
+            trader.setActive(true);
+            applicationUserRepository.saveAndFlush(trader);
+        }
+    }
 
     @Test
     @DisplayName("Controller -> Service -> Repository: settlement instruction audit records must store authenticated username")
@@ -85,11 +145,13 @@ public class AdditionalInfoIntegrationTest {
         // Retrieve audit records and locate the entry created by the
         // controller call. Defensive null-checks guard against any
         // unexpected null elements returned by the repository.
+
         List<AdditionalInfoAudit> audits = auditRepository.findAll();
         AdditionalInfoAudit audit = null;
         for (AdditionalInfoAudit a : audits) {
-            if (a == null)
+            if (a == null) {
                 continue; // skip null entries if present
+            }
             if ("simon".equals(a.getChangedBy()) && "SETTLEMENT_INSTRUCTIONS".equals(a.getFieldName())) {
                 audit = a;
                 break; // stop on first match

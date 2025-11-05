@@ -209,7 +209,7 @@ public class CashflowServiceTest {
                                                      // from the task:“$10M trade with 3.5% rate generating ~$875,000
                                                      // quarterly instead of ~$87,500”) using the string constructor to
                                                      // avoid double rounding issues. uses a String as Java parses the
-                                                     // digits exactly — no rounding at all
+                                                     // digits exactly no rounding at all
         leg.setRate(3.5);// as it is now the service class has this incorrectly as 3.5 instead of 0.035
                          // which produced too large. this line reproduces that bug
 

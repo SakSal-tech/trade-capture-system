@@ -23,6 +23,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.access.AccessDeniedException;
 import com.technicalchallenge.security.UserPrivilegeValidator;
+import com.technicalchallenge.validation.TradeValidationEngine;
+import com.technicalchallenge.validation.TradeValidationResult;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 @Service
 @Transactional
@@ -89,6 +93,9 @@ public class TradeService {
     // elsewhere (defence-in-depth) to avoid allowing remote clients to bypass
     // server-side checks.
     private UserPrivilegeValidator userPrivilegeValidator;
+
+    // Centralized validation engine (business rules + field validators)
+    private TradeValidationEngine tradeValidationEngine;
 
     public List<Trade> getAllTrades() {
         logger.info("Retrieving all trades");
@@ -223,8 +230,22 @@ public class TradeService {
             logger.info("Generated trade ID: {}", generatedTradeId);
         }
 
-        // Validate business rules
+        // Validate business rules (existing light checks)
         validateTradeCreation(tradeDTO);
+
+        // Run centralized validation engine when available. This consolidates
+        // business-rule checks and field-level validators (e.g. settlement
+        // instructions). In test contexts where the engine may not be provided,
+        // skip with a debug log to preserve existing unit-test behaviour.
+        if (tradeValidationEngine != null) {
+            TradeValidationResult validationResult = tradeValidationEngine.validateTradeBusinessRules(tradeDTO);
+            if (!validationResult.isValid()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Validation failed: " + String.join("; ", validationResult.getErrors()));
+            }
+        } else {
+            logger.debug("TradeValidationEngine not present - skipping centralized validation");
+        }
 
         // Create trade entity
         Trade trade = mapDTOToEntity(tradeDTO);
@@ -249,6 +270,16 @@ public class TradeService {
         // The UI sends settlementInstructions in the TradeDTO. Then persist it
         // into the additional_info table so it can be searched/edited later.
         if (tradeDTO.getSettlementInstructions() != null && !tradeDTO.getSettlementInstructions().trim().isEmpty()) {
+            // Validate settlement instructions via validation engine (if present)
+            if (tradeValidationEngine != null) {
+                TradeValidationResult settlementResult = tradeValidationEngine
+                        .validateSettlementInstructions(tradeDTO.getSettlementInstructions());
+                if (!settlementResult.isValid()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Settlement instructions invalid: " + String.join("; ", settlementResult.getErrors()));
+                }
+            }
+
             AdditionalInfo settlementInfo = new AdditionalInfo();
             settlementInfo.setEntityType("TRADE");
             settlementInfo.setEntityId(savedTrade.getTradeId());
@@ -425,6 +456,24 @@ public class TradeService {
         }
 
         Trade existingTrade = existingTradeOpt.get();
+
+        // Centralized validation (null-safe). Validate business rules and
+        // settlement instructions before creating the amended trade.
+        if (tradeValidationEngine != null) {
+            TradeValidationResult validationResult = tradeValidationEngine.validateTradeBusinessRules(tradeDTO);
+            if (!validationResult.isValid()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Validation failed: " + String.join("; ", validationResult.getErrors()));
+            }
+            TradeValidationResult settlementResult = tradeValidationEngine
+                    .validateSettlementInstructions(tradeDTO.getSettlementInstructions());
+            if (!settlementResult.isValid()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Settlement instructions invalid: " + String.join("; ", settlementResult.getErrors()));
+            }
+        } else {
+            logger.debug("TradeValidationEngine not present - skipping centralized validation for amendTrade");
+        }
 
         // Deactivate existing trade
         existingTrade.setActive(false);
@@ -751,6 +800,34 @@ public class TradeService {
             cashflow.setRate(leg.getRate());
 
             BigDecimal cashflowValue = calculateCashflowValue(leg, monthsInterval);
+
+            // Debug instrumentation: log leg inputs and computed value so we can
+            // diagnose why some cashflows are persisted with payment_value = 0.00
+            String legRateType = (leg.getLegRateType() != null) ? leg.getLegRateType().getType() : null;
+            Long tradeId = (leg.getTrade() != null) ? leg.getTrade().getId() : null;
+            logger.debug(
+                    "Cashflow inputs before save -> legId={}, tradeId={}, notional={}, rate={}, legRateType={}, payRec={}, paymentDate={}, monthsInterval={}",
+                    leg.getLegId(), tradeId, leg.getNotional(), leg.getRate(), legRateType, leg.getPayReceiveFlag(),
+                    paymentDate, monthsInterval);
+            logger.debug("Computed cashflowValue for leg {} on {} = {}", leg.getLegId(), paymentDate, cashflowValue);
+
+            // If the computed value is zero or key inputs are missing, also emit
+            // an INFO-level summary so operators can see the issue without
+            // changing logger levels to DEBUG.
+            try {
+                boolean isZero = cashflowValue == null || cashflowValue.compareTo(BigDecimal.ZERO) == 0;
+                boolean missingInputs = (leg.getLegRateType() == null) || (leg.getRate() == null)
+                        || (leg.getNotional() == null);
+                if (isZero || missingInputs) {
+                    logger.info(
+                            "Potential zero cashflow or missing inputs -> legId={}, tradeId={}, notional={}, rate={}, legRateType={}, paymentDate={}, computedValue={}",
+                            leg.getLegId(), tradeId, leg.getNotional(), leg.getRate(), legRateType, paymentDate,
+                            cashflowValue);
+                }
+            } catch (Exception ignore) {
+                // Best-effort logging - do not break cashflow generation if logging throws
+            }
+
             cashflow.setPaymentValue(cashflowValue);
 
             cashflow.setPayRec(leg.getPayReceiveFlag());
@@ -854,7 +931,35 @@ public class TradeService {
                     RoundingMode.HALF_EVEN);
 
             return result;
-        } else if ("Floating".equalsIgnoreCase(legType)) { // For "Floating" legs, the method currently returns zero.
+        } else if ("Floating".equalsIgnoreCase(legType)) {
+            // Refactor: when an explicit `rate` is present on the TradeLeg. Historically
+            // floating legs always returned zero here because the system expects
+            // index fixings from market data. To make UI-driven testing and
+            // one-off pricing easier we compute payments when the caller
+            // provides a concrete rate. If no rate is supplied we preserve the
+            // prior behaviour and return zero so production flows that rely on
+            // a RateProvider remain unchanged.
+            // If/when a MarketData service is added, this method should be
+            // updated to fetch index fixings and fall back to any explicit
+            // rate only when market data is unavailable.
+            // If a floating leg has an explicit rate (e.g. provided by the UI or
+            // pre-populated), use it to compute the cashflow value using the same
+            // accrual logic as a fixed leg. If no rate is available we keep the
+            // previous behaviour and return zero (this preserves current behaviour
+            // until a MarketData/RateProvider is implemented).
+            if (leg.getRate() != null) {
+                BigDecimal notional = (leg.getNotional() == null) ? BigDecimal.ZERO : leg.getNotional();
+                BigDecimal rawRate = BigDecimal.valueOf(leg.getRate());
+                BigDecimal rateDecimal = (rawRate.compareTo(BigDecimal.ONE) > 0)
+                        ? rawRate.divide(BigDecimal.valueOf(100))
+                        : rawRate;
+                BigDecimal yearFraction = BigDecimal.valueOf(monthsInterval).divide(BigDecimal.valueOf(12), 10,
+                        RoundingMode.HALF_EVEN);
+                BigDecimal result = notional.multiply(rateDecimal).multiply(yearFraction).setScale(2,
+                        RoundingMode.HALF_EVEN);
+                return result;
+            }
+            // No explicit rate available for floating leg return zero as before.
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_EVEN);
         }
         // Fallback for unknown leg types return 0,0
