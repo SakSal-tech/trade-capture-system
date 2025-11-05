@@ -22,7 +22,7 @@ public class AdditionalInfoMapper {
      * into a DTO to send to the frontend or API clients.
      *
      * BUSINESS REQUIREMENT:
-     * Supports data visibility — ensures UI can view structured
+     * Supports data visibility ensures UI can view structured
      * settlement instructions safely without exposing database internals.
      */
     public AdditionalInfoDTO toDto(AdditionalInfo entity) {
@@ -76,7 +76,7 @@ public class AdditionalInfoMapper {
      * Updates an existing AdditionalInfo entity with new data from a request DTO.
      *
      * BUSINESS REQUIREMENT:
-     * Supports trade amendment handling — updating existing settlement instructions
+     * Supports trade amendment handling updating existing settlement instructions
      * while maintaining version history and modification timestamps.
      */
     public void updateEntityFromRequest(AdditionalInfo entity, AdditionalInfoRequestDTO request) {

@@ -526,7 +526,7 @@ public class AdditionalInfoService {
     }
 
     // Refactored ADDED:
-    // Supports business requirement — “Search capability for finding trades with
+    // Supports business requirement “Search capability for finding trades with
     // specific settlement requirements.”
     public List<AdditionalInfoDTO> searchTradesBySettlementText(String keyword) {
 

@@ -1,4 +1,4 @@
-# Developer log — 03/11/2025
+# Developer log 03/11/2025
 
 Timeframe: work started 03/11/2025 at 10:00 (UK time) and carried through into 04/11/2025.
 
@@ -36,7 +36,7 @@ Today I focused on making validation more consistent and visible, tidying some i
 
 - Read and analysed the relevant DTOs and validators (`TradeDTO`, `TradeLegDTO`, `TradeLegValidator`, `TradeDateValidator`, `TradeValidationEngine`).
 - Confirmed the current business rule: trades must have two legs, and each leg must have a maturity date defined and the two leg maturities must match exactly.
-- Noted that cashflow generation still used the top-level trade maturity in some places — an inconsistency to address.
+- Noted that cashflow generation still used the top-level trade maturity in some places an inconsistency to address.
 - Updated `TradeValidationEngine`, `EntityStatusValidationEngine`, and `EntityStatusValidator` to centralise validation orchestration and to allow repository-backed checks where Spring DI is present.
 
 ### Learned
@@ -100,7 +100,7 @@ Today I focused on making validation more consistent and visible, tidying some i
 
 ### Challenges
 
-- Ensuring log entries are accurate without repeating large stack traces — I kept the log focused on cause and remedy; full traces can be attached if reviewers want them.
+- Ensuring log entries are accurate without repeating large stack traces I kept the log focused on cause and remedy; full traces can be attached if reviewers want them.
 
 ---
 
@@ -174,7 +174,7 @@ Below I add concrete examples from the codebase and the JSON payloads I used whi
 
 ### Example JSON payloads I used in tests (before/after fixes)
 
-- Problematic (previously used) payload — this used the wrong field names and omitted per-leg maturities. This produced 400s from DTO validation:
+- Problematic (previously used) payload this used the wrong field names and omitted per-leg maturities. This produced 400s from DTO validation:
 
   ```json
   {
@@ -295,7 +295,7 @@ Below I add concrete examples from the codebase and the JSON payloads I used whi
 
 1. Tightening validators and wiring repository-backed validators
 
-   - I introduced stricter repository-backed validation (`EntityStatusValidator`) and made `EntityStatusValidationEngine` a Spring `@Component`. That validator's constructor became strict (requiring repositories). Some older unit tests expected to instantiate a validator with no repositories or a no-arg engine — they failed because the stricter constructor now threw or required mocks.
+   - I introduced stricter repository-backed validation (`EntityStatusValidator`) and made `EntityStatusValidationEngine` a Spring `@Component`. That validator's constructor became strict (requiring repositories). Some older unit tests expected to instantiate a validator with no repositories or a no-arg engine they failed because the stricter constructor now threw or required mocks.
 
    - Fix: I kept a no-arg constructor path in `TradeValidationEngine` and made the `EntityStatusValidationEngine` optional (null-safe) when Spring DI is not present. I also updated unit tests to mock repositories and inject them where the strict validator was directly tested (see updated `EntityStatusValidatorTest`).
 
@@ -313,7 +313,7 @@ Below I add concrete examples from the codebase and the JSON payloads I used whi
 
 4. Transaction visibility between test code and MockMvc
 
-   - MockMvc executes within the application's web layer which may be in a different transaction than the test's. When test setup used the same test transaction without committing, the MockMvc request could not see the seeded rows — tests then failed in non-obvious ways.
+   - MockMvc executes within the application's web layer which may be in a different transaction than the test's. When test setup used the same test transaction without committing, the MockMvc request could not see the seeded rows tests then failed in non-obvious ways.
 
    - Fix: use `TransactionTemplate` to commit seed data, ensuring it is visible to MockMvc calls.
 
@@ -344,4 +344,4 @@ mvn -f backend/pom.xml -Dtest=UserPrivilegeIntegrationTest#testTradeEditRoleAllo
 ---
 
 ADDED: Propagation CLASS
-is a small Spring enum used by @Transactional to tell Spring how the annotated method should behave relative to any existing transaction. Each value controls whether the method should join the caller’s transaction (REQUIRED), always run in a new independent transaction (REQUIRES_NEW), run non‑transactionally and suspend any existing transaction (NOT_SUPPORTED), or one of several other semantics (e.g., SUPPORTS, MANDATORY, NEVER, NESTED). You “need” it whenever you care whether work should be atomic with the caller (default REQUIRED) or isolated/suspended; picking the right propagation avoids problems like the rollback-only UnexpectedRollbackException you saw (e.g., marking dashboard reads NOT_SUPPORTED prevents inner failures from marking a transaction to roll back). It’s safe to use — the enum is just configuration — but the choices have real consistency implications: REQUIRES_NEW can produce independently committed side‑effects, NOT_SUPPORTED removes transactional guarantees for that call, and NESTED requires a transaction manager that supports savepoints. In short, use propagation deliberately: annotate specific methods (not whole classes) with the propagation that matches the business consistency you need.
+is a small Spring enum used by @Transactional to tell Spring how the annotated method should behave relative to any existing transaction. Each value controls whether the method should join the caller’s transaction (REQUIRED), always run in a new independent transaction (REQUIRES_NEW), run non‑transactionally and suspend any existing transaction (NOT_SUPPORTED), or one of several other semantics (e.g., SUPPORTS, MANDATORY, NEVER, NESTED). You “need” it whenever you care whether work should be atomic with the caller (default REQUIRED) or isolated/suspended; picking the right propagation avoids problems like the rollback-only UnexpectedRollbackException you saw (e.g., marking dashboard reads NOT_SUPPORTED prevents inner failures from marking a transaction to roll back). It’s safe to use the enum is just configuration but the choices have real consistency implications: REQUIRES_NEW can produce independently committed side‑effects, NOT_SUPPORTED removes transactional guarantees for that call, and NESTED requires a transaction manager that supports savepoints. In short, use propagation deliberately: annotate specific methods (not whole classes) with the propagation that matches the business consistency you need.

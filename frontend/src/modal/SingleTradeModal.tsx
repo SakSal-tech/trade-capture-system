@@ -304,7 +304,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
     let tradeDto: Record<string, unknown> =
       formatTradeForBackend(editableTrade);
     tradeDto = convertEmptyStringsToNull(tradeDto) as Record<string, unknown>;
-    // Prepared DTO for saving — we do not inject additional derived
+    // Prepared DTO for saving we do not inject additional derived
     // fields here to avoid sending incorrectly-typed values (e.g. sending
     // a username where the backend expects a numeric traderUserId). The
     // backend's DTO expects `traderUserId` (Long) and `traderUserName`

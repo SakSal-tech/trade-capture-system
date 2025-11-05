@@ -427,7 +427,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                                 """;
 
                 // This test intentionally hits a trade id that does not belong to
-                // the caller (supportUser) — the controller/service should return 403.
+                // the caller (supportUser) the controller/service should return 403.
                 mockMvc.perform(patch("/api/trades/" + savedTradeBusinessId)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(validPatchJson)

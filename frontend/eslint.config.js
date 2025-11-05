@@ -8,6 +8,21 @@ import tseslint from '@typescript-eslint/eslint-plugin';
 const compat = new FlatCompat();
 
 export default [
+  // Migrate patterns previously stored in .eslintignore into the
+  // flat config `ignores` property. The old .eslintignore file triggers
+  // a runtime warning and is not supported by the new flat config loader.
+  // See: https://eslint.org/docs/latest/use/configure/migration-guide#ignoring-files
+  {
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      '.vite/**',
+      'coverage/**',
+      'playwright-report/**',
+      '*.log',
+      '*.tmp'
+    ]
+  },
   js.configs.recommended,
   ...compat.extends('plugin:react/recommended'),
   ...compat.extends('plugin:@typescript-eslint/recommended'),

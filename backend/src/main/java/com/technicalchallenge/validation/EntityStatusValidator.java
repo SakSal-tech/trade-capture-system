@@ -47,7 +47,7 @@ public class EntityStatusValidator {
     /**
      * Strict validation: All repository-backed checks are applied. This method
      * intentionally does not short-circuit or skip checks when repositories are
-     * missing — callers (tests) should supply mocks or real repositories.
+     * missing callers (tests) should supply mocks or real repositories.
      */
     public void validate(TradeDTO trade, TradeValidationResult result) {
         if (trade == null) {

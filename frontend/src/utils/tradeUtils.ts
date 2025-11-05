@@ -176,7 +176,7 @@ function propagateTopLevelMaturityToLegs(trade: Trade): string | null {
   // but does not match them, treat as conflict and fail early.
   const uniqueLegDates = Array.from(new Set(nonNullLegDates));
   if (uniqueLegDates.length > 1) {
-    // legs differ — check if top matches all existing leg dates
+    // legs differ check if top matches all existing leg dates
     const allMatchTop = uniqueLegDates.every((d) => d === topLevelMaturity);
     if (!allMatchTop) {
       return (
