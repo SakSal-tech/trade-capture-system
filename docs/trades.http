@@ -9,46 +9,46 @@ Accept: application/json
 
 Advanced Searches
 ### Search trades by all criteria (names)
-GET http://localhost:8080/api/trades/search?counterparty=BigBank&book=FX-BOOK-1&trader=Simon%King&status=LIVE&startDate=2024-06-01&endDate=2024-06-30
+GET http://localhost:8080/api/dashboard/search?counterparty=BigBank&bookId=1000&trader=Simon%King&status=LIVE&startDate=2024-06-01&endDate=2024-06-30
 Accept: application/json
 
 ### Search trades by counterparty only
-GET http://localhost:8080/api/trades/search?counterparty=BigBank
+GET http://localhost:8080/api/dashboard/search?counterparty=BigBank
 Accept: application/json
 
 ### Search trades by book only
-GET http://localhost:8080/api/trades/search?book=FX-BOOK-1
+GET http://localhost:8080/api/dashboard/search?bookId=1000
 Accept: application/json
 
 ### Search trades by trader only
-GET http://localhost:8080/api/trades/search?trader=Simon%King
+GET http://localhost:8080/api/dashboard/search?trader=Simon%King
 Accept: application/json
 
 ### Search trades by status only
-GET http://localhost:8080/api/trades/search?status=LIVE
+GET http://localhost:8080/api/dashboard/search?status=LIVE
 Accept: application/json
 
 ### Search trades by date range only
-GET http://localhost:8080/api/trades/search?startDate=2024-06-01&endDate=2024-06-30
+GET http://localhost:8080/api/dashboard/search?startDate=2024-06-01&endDate=2024-06-30
 Accept: application/json
 
 ### RSQL query Search by counterparty AND tradeStatus
-http://localhost:8080/api/trades/rsql?query=counterparty.name==BIGBANK;tradeStatus.tradeStatus==LIVE
+GET http://localhost:8080/api/dashboard/rsql?query=counterparty.name==BIGBANK;tradeStatus.tradeStatus==LIVE
 ### RSQl query Comparison
-http://localhost:8080/api/trades/rsql?query=counterparty.name==ABC
+GET http://localhost:8080/api/dashboard/rsql?query=counterparty.name==ABC
 
 ### More complex RSQl query
-http://localhost:8080/api/trades/rsql?query=tradeDate=ge=2024-06-01;tradeDate=le=2024-06-30
+GET http://localhost:8080/api/dashboard/rsql?query=tradeDate=ge=2024-06-01;tradeDate=le=2024-06-30
 
 ### RSQL Get all trades where the status is either LIVE or NEW.
-GET http://localhost:8080/api/trades/rsql?query=tradeStatus.tradeStatus=in=(LIVE,NEW)
+GET http://localhost:8080/api/dashboard/rsql?query=tradeStatus.tradeStatus=in=(LIVE,NEW)
 
 ### RSQL Get all trades that are not TERMINATED or CANCELLED
-GET http://localhost:8080/api/trades/rsql?query=tradeStatus.tradeStatus=out=(TERMINATED,CANCELLED)
+GET http://localhost:8080/api/dashboard/rsql?query=tradeStatus.tradeStatus=out=(TERMINATED,CANCELLED)
 
 ### returns all names containing “bank” (e.g., “BigBank”, “MegaBank”).
 
-GET http://localhost:8080/api/trades/rsql?query=counterparty.name=like=*bank*
+GET http://localhost:8080/api/dashboard/rsql?query=counterparty.name=like=*bank*
 
 
 

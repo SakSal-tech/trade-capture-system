@@ -1,4 +1,4 @@
-# Developer log — 30/10/2025 (detailed)
+# Developer log 30/10/2025 (detailed)
 
 ---
 
@@ -89,7 +89,7 @@ Code excerpt:
 
 ### Challenges
 
-- Need to ensure every template control or dropdown has an accessible label — the earlier UX issue reported as "Adding Settlement drop down without a label" is corrected by adding `aria-label` or a visible `<label>`.
+- Need to ensure every template control or dropdown has an accessible label the earlier UX issue reported as "Adding Settlement drop down without a label" is corrected by adding `aria-label` or a visible `<label>`.
 
 ### Placement / Visibility work
 
@@ -179,6 +179,6 @@ export function createUser(user: User) {
 
 ### Overall next steps (priority)
 
-1. Run end-to-end verification (high) — start backend and frontend locally and perform a create-trade + settlement save flow; capture request/response bodies and server logs.
-2. Confirm UTI strategy (medium) — inspect backend trade create controller and DTO; if server-generated, display returned UTI; if not, decide on client generation or input.
-3. Add unit tests (medium) — Vitest + React Testing Library tests for `SettlementTextArea` covering template insertion, validation and Clea
+1. Run end-to-end verification (high) start backend and frontend locally and perform a create-trade + settlement save flow; capture request/response bodies and server logs.
+2. Confirm UTI strategy (medium) inspect backend trade create controller and DTO; if server-generated, display returned UTI; if not, decide on client generation or input.
+3. Add unit tests (medium) Vitest + React Testing Library tests for `SettlementTextArea` covering template insertion, validation and Clea

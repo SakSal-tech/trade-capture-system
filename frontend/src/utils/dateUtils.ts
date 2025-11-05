@@ -55,7 +55,7 @@ export const formatDateForBackend = (
     const minutes = pad(d.getMinutes());
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   }
-  return null as any;
+  return null;
 };
 
 interface TradeData {
@@ -101,13 +101,11 @@ export const formatDatesFromBackend = (trade: TradeData): TradeData => {
   ) {
     trade.validityStartDate = (trade.validityStartDate as string).split("T")[0];
   }
-  if (
-    (trade as any).validityEndDate &&
-    (trade as any).validityEndDate.includes("T")
-  ) {
-    (trade as any).validityEndDate = (trade as any).validityEndDate.split(
-      "T"
-    )[0];
+  const endDate = (trade as TradeData & { validityEndDate?: string })
+    .validityEndDate;
+  if (endDate && endDate.includes("T")) {
+    (trade as TradeData & { validityEndDate?: string }).validityEndDate =
+      endDate.split("T")[0];
   }
   return trade;
 };

@@ -1,4 +1,4 @@
-# Developer Progress Log — October 2025
+# Developer Progress Log October 2025
 
 ## Saturday, Oct 11
 
@@ -89,7 +89,7 @@ Expanded test coverage and implemented multiple validation layers.
 - Using `ValidationResult` allows collecting multiple business rule errors without exceptions.
 - Separate validators (date, privilege, leg) keep validation logic modular and maintainable.
 - Learned difference between user roles and validation engine orchestration.
-- Reinforced understanding of TDD — writing tests first made implementation clearer and faster.
+- Reinforced understanding of TDD writing tests first made implementation clearer and faster.
 
 ### Next Steps
 
@@ -137,17 +137,17 @@ Expanded test coverage and implemented multiple validation layers.
 - Refactoring required careful coordination between engine and validator classes
 - Ensured all validation logic is covered by tests before committing
 
-### Tomorrow (Tuesday, Oct 14) — Plan
+### Tomorrow (Tuesday, Oct 14) Plan
 
 **Goal:** Start Enhancement 3: Trader Dashboard and Blotter System
 
 #### Tasks
 
 1. Design and implement REST endpoints for trader dashboard:
-   - `@GetMapping("/my-trades")` — Trader's personal trades
-   - `@GetMapping("/book/{id}/trades")` — Book-level trade aggregation
-   - `@GetMapping("/summary")` — Trade portfolio summaries
-   - `@GetMapping("/daily-summary")` — Daily trading statistics
+   - `@GetMapping("/my-trades")` Trader's personal trades
+   - `@GetMapping("/book/{id}/trades")` Book-level trade aggregation
+   - `@GetMapping("/summary")` Trade portfolio summaries
+   - `@GetMapping("/daily-summary")` Daily trading statistics
 2. Create new DTOs:
    - `TradeSummaryDTO` (trade status counts, notional by currency, breakdowns, risk summaries)
    - `DailySummaryDTO` (today's trade count, user metrics, book activity, historical comparison)
@@ -159,11 +159,11 @@ Expanded test coverage and implemented multiple validation layers.
 4. Write unit and integration tests for new endpoints and DTOs
 5. Document dashboard design and implementation approach
 
-# Developer Progress Log — October 2025
+# Developer Progress Log October 2025
 
 ## Tuesday, Oct 14, 2025
 
-**Focus:** Enhancement 3 — Trader Dashboard and Blotter System
+**Focus:** Enhancement 3 Trader Dashboard and Blotter System
 
 ### Completed
 
@@ -174,10 +174,10 @@ Expanded test coverage and implemented multiple validation layers.
 
 - Implemented **new REST endpoints** in `TradeDashboardService`:
 
-  - `GET /my-trades` — Returns authenticated trader’s personal trades using Spring Security context.
-  - `GET /book/{id}/trades` — Provides book-level trade aggregation with privilege validation.
-  - `GET /summary` — Generates real-time portfolio summaries (trades by status, notional by currency, and counterparty breakdowns).
-  - `GET /daily-summary` — Produces daily trade metrics with historical comparisons (today vs yesterday).
+  - `GET /my-trades` Returns authenticated trader’s personal trades using Spring Security context.
+  - `GET /book/{id}/trades` Provides book-level trade aggregation with privilege validation.
+  - `GET /summary` Generates real-time portfolio summaries (trades by status, notional by currency, and counterparty breakdowns).
+  - `GET /daily-summary` Produces daily trade metrics with historical comparisons (today vs yesterday).
 
 - Created **new DTOs** to structure API responses:
 
@@ -235,7 +235,7 @@ Expanded test coverage and implemented multiple validation layers.
 - Ensuring consistent results for today/yesterday comparisons in tests required dynamic date handling.
 - Test configuration for privilege simulation took longer than expected.
 
-### Tomorrow (Wednesday, Oct 15, 2025) — Plan
+### Tomorrow (Wednesday, Oct 15, 2025) Plan
 
 **Goal:** Integration Testing + Begin Step 4 (Bug Investigation and Fix)
 
@@ -274,51 +274,51 @@ Expanded test coverage and implemented multiple validation layers.
 All possible user privilege validation integration tests:
 adeController Endpoints:
 
-GET /api/trades — getAllTrades
-GET /api/trades/{id} — getTradeById
-POST /api/trades — createTrade
-PATCH /api/trades/{id} — updateTrade (partial)
-PUT /api/trades/{id} — updateTrade (full)
-DELETE /api/trades/{id} — deleteTrade
-POST /api/trades/{id}/terminate — terminateTrade
-POST /api/trades/{id}/cancel — cancelTrade
+GET /api/trades getAllTrades
+GET /api/trades/{id} getTradeById
+POST /api/trades createTrade
+PATCH /api/trades/{id} updateTrade (partial)
+PUT /api/trades/{id} updateTrade (full)
+DELETE /api/trades/{id} deleteTrade
+POST /api/trades/{id}/terminate terminateTrade
+POST /api/trades/{id}/cancel cancelTrade
 TradeDashboardController Endpoints:
 
-GET /api/dashboard/filter — filterTrades
-GET /api/dashboard/search — searchTrades
-GET /api/dashboard/rsql — searchTradesRsql
-GET /api/dashboard/my-trades — getMyTrades
-GET /api/dashboard/book/{bookId}/trades — getTradesByBook
-GET /api/dashboard/summary — getTradeSummary
-GET /api/dashboard/daily-summary — getDailySummary
+GET /api/dashboard/filter filterTrades
+GET /api/dashboard/search searchTrades
+GET /api/dashboard/rsql searchTradesRsql
+GET /api/dashboard/my-trades getMyTrades
+GET /api/dashboard/book/{bookId}/trades getTradesByBook
+GET /api/dashboard/summary getTradeSummary
+GET /api/dashboard/daily-summary getDailySummary
 Next step: I will recommend specific privilege validation integration tests for each endpoint, specifying expected roles and HTTP status codes.
 To fully resolve request, here is a privilege validation integration test plan for all endpoints:
 
 TradeController:
 
-GET /api/trades — Test: Only users with "TRADE_VIEW" or "ADMIN" role can access; others get 403.
-GET /api/trades/{id} — Test: Only "TRADE_VIEW" or "ADMIN" role; others get 403.
-POST /api/trades — Test: Only "TRADE_CREATE" or "ADMIN" role; others get 403.
-PATCH /api/trades/{id} — Test: Only "TRADE_EDIT" or "ADMIN" role; others get 403.
-PUT /api/trades/{id} — Test: Only "TRADE_EDIT" or "ADMIN" role; others get 403.
-DELETE /api/trades/{id} — Test: Only "TRADE_DELETE" or "ADMIN" role; others get 403.
-POST /api/trades/{id}/terminate — Test: Only "TRADE_TERMINATE" or "ADMIN" role; others get 403.
-POST /api/trades/{id}/cancel — Test: Only "TRADE_CANCEL" or "ADMIN" role; others get 403.
+GET /api/trades Test: Only users with "TRADE_VIEW" or "ADMIN" role can access; others get 403.
+GET /api/trades/{id} Test: Only "TRADE_VIEW" or "ADMIN" role; others get 403.
+POST /api/trades Test: Only "TRADE_CREATE" or "ADMIN" role; others get 403.
+PATCH /api/trades/{id} Test: Only "TRADE_EDIT" or "ADMIN" role; others get 403.
+PUT /api/trades/{id} Test: Only "TRADE_EDIT" or "ADMIN" role; others get 403.
+DELETE /api/trades/{id} Test: Only "TRADE_DELETE" or "ADMIN" role; others get 403.
+POST /api/trades/{id}/terminate Test: Only "TRADE_TERMINATE" or "ADMIN" role; others get 403.
+POST /api/trades/{id}/cancel Test: Only "TRADE_CANCEL" or "ADMIN" role; others get 403.
 TradeDashboardController:
 
-GET /api/dashboard/filter — Test: Only "TRADE_VIEW" or "ADMIN" role; others get 403.
-GET /api/dashboard/search — Test: Only "TRADE_VIEW" or "ADMIN" role; others get 403.
-GET /api/dashboard/rsql — Test: Only "TRADE_VIEW" or "ADMIN" role; others get 403.
-GET /api/dashboard/my-trades — Test: Only "TRADER" or "ADMIN" role; others get 403.
-GET /api/dashboard/book/{bookId}/trades — Test: Only "BOOK_VIEW" or "ADMIN" role; others get 403.
-GET /api/dashboard/summary — Test: Only "TRADER" or "ADMIN" role; others get 403.
-GET /api/dashboard/daily-summary — Test: Only "TRADER" or "ADMIN" role; others get 403.
+GET /api/dashboard/filter Test: Only "TRADE_VIEW" or "ADMIN" role; others get 403.
+GET /api/dashboard/search Test: Only "TRADE_VIEW" or "ADMIN" role; others get 403.
+GET /api/dashboard/rsql Test: Only "TRADE_VIEW" or "ADMIN" role; others get 403.
+GET /api/dashboard/my-trades Test: Only "TRADER" or "ADMIN" role; others get 403.
+GET /api/dashboard/book/{bookId}/trades Test: Only "BOOK_VIEW" or "ADMIN" role; others get 403.
+GET /api/dashboard/summary Test: Only "TRADER" or "ADMIN" role; others get 403.
+GET /api/dashboard/daily-summary Test: Only "TRADER" or "ADMIN" role; others get 403.
 For each endpoint, write integration tests using @WithMockUser for:
 
 Allowed roles (expect 200/204)
 Disallowed roles (expect 403)
 
-# Developer Progress Log — 18 to 24 October 2025
+# Developer Progress Log 18 to 24 October 2025
 
 These entries cover day by day work I did on security and privilege issues across the controllers, service layer and configuration. I write them in full sentences to capture my thinking, the technical changes I made, and the tests I added so I can revisit decisions later.
 
@@ -401,7 +401,7 @@ Focus: Security configuration and creating database-backed UserDetails
 
 ## Monday, Oct 27, 2025
 
-**Focus:** Safe startup remediation — stop runtime reseed of file-backed H2
+**Focus:** Safe startup remediation stop runtime reseed of file-backed H2
 
 ### Summary
 
@@ -419,7 +419,7 @@ Focus: Security configuration and creating database-backed UserDetails
 2. Consider adopting Flyway or Liquibase for schema and data migrations to get reliable, repeatable boots across environments.
 3. Add a small regression test that starts the app with an existing file-backed H2 DB and asserts startup succeeds (no SQL-init exceptions).
 
-Recorded by: developer automation — merged and logged after feature branch merge.
+Recorded by: developer automation merged and logged after feature branch merge.
 
 - Swagger and the API explorer were intermittently inaccessible during development because the tightened security configuration blocked the swagger UI and the OpenAPI endpoints. I solved this by explicitly permitting the swagger UI endpoints under the local/test profile and ensuring health and swagger paths are only open in non-production profiles.
 
@@ -513,11 +513,11 @@ Recorded by: developer automation — merged and logged after feature branch mer
 
 ### Files changed (high level)
 
-- `backend/src/main/java/com/technicalchallenge/service/AdditionalInfoService.java` — added ownership checks, upsert logic and audit write.
-- `backend/src/main/java/com/technicalchallenge/controller/TradeSettlementController.java` — delegated GET/PUT to service methods and clarified behaviour.
-- `backend/src/main/resources/application.properties` — left file-based H2 + `spring.sql.init.mode=always` (diagnosed as part of the root cause).
-- `backend/src/test/resources/application-test.properties` — switched to in-memory H2 and `create-drop` for tests.
-- `backend/src/test/java/com/technicalchallenge/controller/AdditionalInfoIntegrationTest.java` — added `@ActiveProfiles("test")` to ensure test runs against in-memory DB.
+- `backend/src/main/java/com/technicalchallenge/service/AdditionalInfoService.java` added ownership checks, upsert logic and audit write.
+- `backend/src/main/java/com/technicalchallenge/controller/TradeSettlementController.java` delegated GET/PUT to service methods and clarified behaviour.
+- `backend/src/main/resources/application.properties` left file-based H2 + `spring.sql.init.mode=always` (diagnosed as part of the root cause).
+- `backend/src/test/resources/application-test.properties` switched to in-memory H2 and `create-drop` for tests.
+- `backend/src/test/java/com/technicalchallenge/controller/AdditionalInfoIntegrationTest.java` added `@ActiveProfiles("test")` to ensure test runs against in-memory DB.
 
 ---
 
@@ -665,7 +665,7 @@ Key actions to carry forward
 ### Learned
 
 - Implementing SQL injection prevention properly for user-provided text fields was new to me. I learned how to validate and sanitise user input safely before it reaches the database.
-- I spent time reasoning through why and how to structure two separate DTOs — one for incoming API requests (`AdditionalInfoRequestDTO`) and another for backend use (`AdditionalInfoDTO`). At first, it felt redundant, but I understood that it keeps the API layer clean and avoids exposing unnecessary internal fields.
+- I spent time reasoning through why and how to structure two separate DTOs one for incoming API requests (`AdditionalInfoRequestDTO`) and another for backend use (`AdditionalInfoDTO`). At first, it felt redundant, but I understood that it keeps the API layer clean and avoids exposing unnecessary internal fields.
 - I had to think carefully about how settlement instruction data should be represented. Initially, I considered adding new fields to the Trade model, but decided it was more flexible to store them in the `AdditionalInfo` table as dynamic key-value pairs.
 - The process of validating an optional field was interesting. I implemented the logic so that settlement instructions can be omitted but still cleaned and validated when provided.
 - I gained a better understanding of how trimming, null-checking, and normalisation work together to maintain both clean data and flexibility in input handling.
@@ -679,7 +679,7 @@ Key actions to carry forward
 - Updating the service and repository to integrate the new logic took time, as I had to ensure that existing trade lookups still worked correctly.
 - Overall, today’s work felt like a good combination of design thinking, validation logic, and improving application safety.
 
-### Development Log — Settlement Instructions Integration (Steps 1–7)
+### Development Log Settlement Instructions Integration (Steps 1–7)
 
 Feature: Integration of Settlement Instructions into Trade Capture Workflow
 Objective: To enable traders to capture settlement instructions directly during trade booking, reducing operational delays and errors.
@@ -698,7 +698,7 @@ The key addition was:
        """)
 List<AdditionalInfo> searchTradeSettlementByKeyword(@Param("keyword") String keyword);`
 
-This supports case-insensitive, partial text searches on settlement instructions — an explicit business requirement for the operations team.
+This supports case-insensitive, partial text searches on settlement instructions an explicit business requirement for the operations team.
 I used the SQL LIKE wildcard (%keyword%) so users can search for phrases like “Euroclear” even if it appears mid-sentence.
 
 This is much more efficient than the previous findAll() and in-memory .filter() approach, which had a time complexity of O(n) on the application side.
@@ -767,7 +767,7 @@ additionalInfoService.upOrInsertTradeSettlementInstructions(id, text, changedBy)
 This “upInsert” (update-or-insert) approach simplifies handling of both new and amended settlement instructions.
 It aligns with business rules allowing traders to edit settlement instructions at any stage, while maintaining audit tracking automatically.
 
-This also improves maintainability — the controller is now focused solely on HTTP and role logic, not database operations.
+This also improves maintainability the controller is now focused solely on HTTP and role logic, not database operations.
 
 #### Mapper Sanity Check and Versioning
 
@@ -775,7 +775,7 @@ I revisited AdditionalInfoMapper to ensure that conversions between entities and
 
 I added a version field to the entity, annotated with:
 `@Version`
-This enables optimistic locking — preventing two users from overwriting each other’s changes to the same record.
+This enables optimistic locking preventing two users from overwriting each other’s changes to the same record.
 The first update succeeds and increments the version (starting at 1), while any concurrent update throws an OptimisticLockException.
 
 This is an essential part of data integrity in multi-user systems and meets audit and risk management expectations.
@@ -788,7 +788,7 @@ In TradeRepository, I confirmed the existence of:
 `List<Trade> findAllByTradeIdIn(List<Long> tradeIds);`
 This method allows retrieving all trades by a list of IDs, used by the searchBySettlementInstructions() controller.
 
-It is a derived query method generated automatically by Spring Data JPA — clean, type-safe, and efficient (translates to SQL WHERE trade_id IN (...)).
+It is a derived query method generated automatically by Spring Data JPA clean, type-safe, and efficient (translates to SQL WHERE trade_id IN (...)).
 
 I also ensured that all Optional imports were correctly included (for example, in findActiveOne()), so that the service layer can handle “record not found” scenarios safely, avoiding NullPointerException.
 
@@ -798,7 +798,7 @@ Alternative to AdditionalInfo Table Extension
 
 I could have added settlement_instructions directly into the Trade table (simpler schema).
 
-However, I chose to use the existing AdditionalInfo extensible architecture for long-term scalability — it allows storing future optional fields (like “Delivery Notes”) without schema changes.
+However, I chose to use the existing AdditionalInfo extensible architecture for long-term scalability it allows storing future optional fields (like “Delivery Notes”) without schema changes.
 
 #### Audit Trail Alternatives
 
@@ -822,9 +822,9 @@ Versioning Enabled optimistic locking Data integrity and concurrency safety
 
 Overall, these steps transformed the system from a procedural, controller-heavy design into a layered, maintainable architecture that meets all business, audit, and performance requirements.
 
-The settlement instruction feature is now searchable, editable, auditable, and efficient, with all logic cleanly separated across the repository, service, and controller layers — ready for front-end integration.
+The settlement instruction feature is now searchable, editable, auditable, and efficient, with all logic cleanly separated across the repository, service, and controller layers ready for front-end integration.
 
-### Sunday, 26 October 2025 — Settlement instructions validation refactor
+### Sunday, 26 October 2025 Settlement instructions validation refactor
 
 **Focus:** Settlement instructions validation refactor, audit wiring and service integration
 
@@ -854,16 +854,16 @@ The settlement instruction feature is now searchable, editable, auditable, and e
 
 - Business-driven rules implemented:
 
-  - Optional field — operations can omit instructions when unnecessary.
-  - Length bounds (10–500) — ensures instructions are informative but bounded for storage, display and index performance.
-  - Semicolon ban & SQL-token blacklist — mitigate common injection patterns before persistence.
-  - Escaped-quote enforcement — preserves user intent and avoids ambiguity while keeping stored text safe to display.
+  - Optional field operations can omit instructions when unnecessary.
+  - Length bounds (10–500) ensures instructions are informative but bounded for storage, display and index performance.
+  - Semicolon ban & SQL-token blacklist mitigate common injection patterns before persistence.
+  - Escaped-quote enforcement preserves user intent and avoids ambiguity while keeping stored text safe to display.
 
 - The engine adapter allows callers to access field-level validation from the same orchestration point used for trade-level rules, avoiding awkward caller-side wiring.
 
 ### Learned
 
-- Field-level validators are the right abstraction for free-text fields — they are small, focused and easy to unit test.
+- Field-level validators are the right abstraction for free-text fields they are small, focused and easy to unit test.
 - Providing a single engine entry point keeps validation discoverable and consistent across services.
 - Example-based error messages materially help inexperienced users correct input (the escape example was added for exactly this reason).
 
@@ -887,7 +887,7 @@ These changes make settlement instructions safer to store and simpler to validat
 
 ## Tests implemented (26 October 2025)
 
-Below I document the three tests I added: two unit tests and one integration test. For each I explain how it is implemented, why I wrote it that way, and what I learned — concentrating on the hardest parts that required iteration.
+Below I document the three tests I added: two unit tests and one integration test. For each I explain how it is implemented, why I wrote it that way, and what I learned concentrating on the hardest parts that required iteration.
 
 ### 1) Unit: `SettlementInstructionValidatorTest`
 
@@ -971,7 +971,7 @@ Hardest parts / what I learned
 - Fail-fast benefits: the integration test revealed configuration and bean errors that unit tests would not show. Running the integration test early in the iteration saved time.
 - Maintainability: I added comments in the tests describing why particular setup choices were made (for example why `trade_id=200001` must be used), to prevent future accidental regressions.
 
-## NEWlog — 27/10/2025
+## NEWlog 27/10/2025
 
 ### Settlement instructions persisted in AdditionalInfo (Option B)
 
@@ -1213,7 +1213,7 @@ Hardest parts / what I learned
 - Seed data and test authentication identities must be synchronised for reliable tests.
 - Defensive test design (provide realistic non-null mock returns) improves diagnostic value.
 
-## Monday, 27 October 2025 — Post previous log: settlement & audit persistence incident
+## Monday, 27 October 2025 Post previous log: settlement & audit persistence incident
 
 ### Context
 

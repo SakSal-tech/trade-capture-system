@@ -1,4 +1,4 @@
-## NEWlog — 27/10/2025
+## NEWlog 27/10/2025
 
 ### Settlement instructions persisted in AdditionalInfo (Option B)
 

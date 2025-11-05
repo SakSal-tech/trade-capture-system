@@ -15,7 +15,7 @@ I kept the settlement instruction field optional but ensured that when it is pro
 **Database Queries** Moved from `findAll().stream().filter(...)` to focused SQL queries using `@Query` in the repository Avoids loading entire tables into memory; allows the database to filter results efficiently using indexes. Reduces time complexity from O(n) to approximately O(log n).
 **Indexes** Added a compound index on `(entity_type, field_name, entity_id)` and a single index on `field_value` Enables the database to locate relevant rows quickly without scanning the entire table. Particularly improves keyword-based searches in settlement instructions.
 
-### Production index guidance — functional lower() index (detailed)
+### Production index guidance functional lower() index (detailed)
 
 Context:
 
@@ -29,7 +29,7 @@ Recommendation:
 
 Why a functional `lower()` index helps:
 
-- When repository queries use `LOWER(a.fieldValue) LIKE LOWER(CONCAT('%', :keyword, '%'))`, databases that support functional indexes can map the `LOWER(field_value)` expression to a stored index. This avoids computing LOWER(...) across the entire table for matching and can use the index when the pattern does not start with a wildcard. For leading-wildcard searches (`%term%`), functional `lower()` alone will not help — use trigram.
+- When repository queries use `LOWER(a.fieldValue) LIKE LOWER(CONCAT('%', :keyword, '%'))`, databases that support functional indexes can map the `LOWER(field_value)` expression to a stored index. This avoids computing LOWER(...) across the entire table for matching and can use the index when the pattern does not start with a wildcard. For leading-wildcard searches (`%term%`), functional `lower()` alone will not help use trigram.
 
 SQL to create the functional index (Postgres):
 

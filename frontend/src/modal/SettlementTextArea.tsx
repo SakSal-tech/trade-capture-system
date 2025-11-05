@@ -56,7 +56,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
 
   // A React state hook that creates a piece of component state named value and an updater function setValue. initialValue: the runtime initial value for that state (comes from props via destructuring).
   const [value, setValue] = useState<string>(initialValue);
-  //This is used only on first render — if the initialValue prop later changes, state won't update automatically unless I use a useEffect
+  //This is used only on first render if the initialValue prop later changes, state won't update automatically unless I use a useEffect
   const [touched, setTouched] = useState<boolean>(false); //Reset touched when deliberately replacing the content (e.g., switching trades, after successful save)
 
   useEffect(() => {
@@ -88,7 +88,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
   // Take a template (or any text) and insert it into  textarea at the current caret/selection position. ChangeEvent<HTMLTextAreaElement>, which gives the handler a correctly typed event.
   function insertAtCursor(text: string) {
     const txtArea = textareaRef.current;
-    //If null (the DOM node isn’t available — e.g., not mounted, ref not attached, or running on server
+    //If null (the DOM node isn’t available e.g., not mounted, ref not attached, or running on server
     if (!txtArea) {
       // Update internal state and inform parent when no DOM ref is available
       const newVal = (value || "") + text;
@@ -136,16 +136,17 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
   }
 
   // The array exists to speed and standardise trader input if UBS prefers traders always type from scratch, I can remove it or replace it with an empty.
+
   const defaultTemplates = [
     {
       value:
-        "BENEFICIARY: UBS AG, Zurich / SWIFT: UBSWCHZH80A / IBAN: CHxx xxxx xxxx xxxx xxxx x",
-      label: "UBS AG - Beneficiary (IBAN placeholder)",
+        "Settle via JPM New York, Account: 123456789, Further Credit: ABC Corp Trading Account",
+      label: "UBS JPM - Beneficiary (IBAN placeholder)",
     },
     {
       value:
-        "OUR BANK: UBS AG, Zurich / SWIFT: UBSWCHZH80A / Account: 123-456789.0 (local format)",
-      label: "UBS AG - Our account (local)",
+        "DVP settlement through Euroclear, ISIN confirmation required before settlement",
+      label: "UBS DVP - Our account (local)",
     },
     {
       value:
@@ -154,13 +155,13 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
     },
     {
       value:
-        "INTERMEDIARY: UBS AG NY / SWIFT: BKTRUS33 / FOR CREDIT TO: UBS AG Zurich / IBAN: CHxx xxxx xxxx xxxx xxxx x",
-      label: "UBS - Intermediary + credit instruction",
+        "Cash settlement only, wire instructions: Federal Reserve Bank routing 123456789",
+      label: "UBS - FRB + credit instruction",
     },
     {
       value:
-        "UBS PAYMENT INSTRUCTIONS: Please pay via UBS AG (SWIFT UBSWCHZH80A). Beneficiary: (NAME). Account/IBAN: (IBAN). Reference: (TRADE ID).",
-      label: "UBS - Short payment instruction (templated)",
+        "Physical delivery to warehouse facility, contact operations team for coordination",
+      label: "UBS - Short delivery instructio",
     },
   ];
   //Picks which template list the component should use. If the parent passes a non-empty list of templates (e.g., desk- or user-specific templates from the server), traders will see those choices.If no templates were provided (or the provided array is empty), the UI falls back to defaultTemplates so traders still have useful quick-insert options
@@ -173,7 +174,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
     // Use the trimmed value for all validation checks so leading/trailing
     // whitespace can't be used to bypass the length check and so the
     // angle-bracket check is applied to the visible content.
-    // [<>] — matches either < or > which we forbid to reduce XSS risk.
+    // [<>] matches either < or > which we forbid to reduce XSS risk.
     // ADDED: validation rules enforced by the UI for settlement text.
     // These match server expectations where possible and provide
     // immediate feedback before attempting to persist:
@@ -247,7 +248,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
         </div>
 
         <p id="template-help" className="text-xs text-gray-600 mt-1">
-          Select a template to insert at the caret — editable after insertion.
+          Select a template to insert at the caret editable after insertion.
         </p>
       </div>
       {/* The editable multi-line input used for settlement instructions */}
@@ -261,6 +262,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
         value={value}
         onChange={handleChange}
         onBlur={() => setTouched(true)}
+        className="w-full min-h-[140px] border border-gray-300 rounded p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
       />
       {/*Shows current trimmed char count and the 500-char limit.
 Turns red when the count exceeds 500, giving immediate visual feedback before Save is wired.
@@ -289,8 +291,8 @@ Turns red when the count exceeds 500, giving immediate visual feedback before Sa
           transaction. */}
       <div className="flex flex-col gap-2 mt-2">
         <div className="text-sm text-gray-600">
-          Settlement is saved when you click "Save Trade". Use the Clear button
-          to reset the settlement textarea locally.
+          Settlement is saved when you click &quot;Save Trade&quot;. Use the
+          Clear button to reset the settlement textarea locally.
         </div>
         <div className="flex gap-2">
           <Button

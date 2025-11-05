@@ -13,10 +13,17 @@ import {
   formatTradeForBackend,
   convertEmptyStringsToNull,
 } from "../utils/tradeUtils";
-import { formatDatesFromBackend } from "../utils/dateUtils";
+import {
+  formatDatesFromBackend,
+  formatDateForBackend,
+} from "../utils/dateUtils";
 import LoadingSpinner from "../components/LoadingSpinner";
 import userStore from "../stores/userStore";
 import staticStore from "../stores/staticStore";
+import {
+  DEFAULT_FALLBACK_FLOATING_RATE,
+  DEFAULT_FALLBACK_FIXED_RATE,
+} from "../utils/tradeUtils";
 // REFACTOR SUMMARY:
 // This file was updated to integrate settlement instructions into the
 // main trade save flow. Key reasons for the edits:
@@ -109,7 +116,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
       if (anyErr && anyErr.response && anyErr.response.data) {
         try {
           detail = JSON.stringify(anyErr.response.data);
-        } catch (e) {
+        } catch {
           detail = String(anyErr.response.data);
         }
       }
@@ -144,27 +151,50 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
     setLoading(true);
     if (!editableTrade) return;
     try {
-      const legsDto = editableTrade.tradeLegs.map((leg) => ({
-        legType: leg.legType,
-        notional:
-          typeof leg.notional === "string"
-            ? parseFloat(leg.notional)
-            : leg.notional,
-        rate: leg.rate
-          ? typeof leg.rate === "string"
-            ? parseFloat(leg.rate)
-            : leg.rate
-          : undefined,
-        index: leg.index,
-        calculationPeriodSchedule: leg.calculationPeriodSchedule,
-        paymentBusinessDayConvention: leg.paymentBusinessDayConvention,
-        payReceiveFlag: leg.payReceiveFlag,
-      }));
+      // Helper: sanitize numeric strings by removing commas/whitespace
+      const sanitizeNumber = (v: number | string | undefined) => {
+        if (v === undefined || v === null) return undefined;
+        if (typeof v === "number") return v;
+        const cleaned = String(v).replace(/[,\s]/g, "");
+        const parsed = parseFloat(cleaned);
+        return Number.isNaN(parsed) ? undefined : parsed;
+      };
+
+      const legsDto = editableTrade.tradeLegs.map((leg) => {
+        // Sanitize incoming rate values. If the leg is Floating and no
+        // explicit rate is provided by the UI (common when using index
+        // fixings externally), inject a demo fallback so the backend
+        // produces numeric cashflows for demo/test purposes.
+        const sanitizedRate = sanitizeNumber(leg.rate) as number | undefined;
+        let rateForDto: number | undefined;
+        if (sanitizedRate !== undefined && sanitizedRate !== null) {
+          rateForDto = sanitizedRate;
+        } else {
+          const lt = (leg.legType || "").toLowerCase();
+          if (lt === "floating") rateForDto = DEFAULT_FALLBACK_FLOATING_RATE;
+          else if (lt === "fixed") rateForDto = DEFAULT_FALLBACK_FIXED_RATE;
+          else rateForDto = undefined;
+        }
+
+        return {
+          legType: leg.legType,
+          notional: sanitizeNumber(leg.notional) as number,
+          rate: rateForDto as number | undefined,
+          index: leg.index,
+          calculationPeriodSchedule: leg.calculationPeriodSchedule,
+          paymentBusinessDayConvention: leg.paymentBusinessDayConvention,
+          payReceiveFlag: leg.payReceiveFlag,
+        };
+      });
 
       const response = await api.post("/cashflows/generate", {
         legs: legsDto,
-        tradeStartDate: editableTrade.startDate,
-        tradeMaturityDate: editableTrade.maturityDate,
+        // Use normalized backend date format so generation logic receives
+        // consistent date-times (YYYY-MM-DDTHH:MM). This avoids timezone
+        // or format interpretation differences that can shift schedule
+        // dates on the server.
+        tradeStartDate: formatDateForBackend(editableTrade.startDate),
+        tradeMaturityDate: formatDateForBackend(editableTrade.maturityDate),
       });
 
       const allCashflows: CashflowDTO[] = response.data;
@@ -184,7 +214,8 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
       );
       setGeneratedCashflows(allCashflows);
       setCashflowModalOpen(true);
-    } catch {
+    } catch (err) {
+      console.error("Cashflow generation failed", err);
       setSnackbarMsg("Failed to generate cashflows");
       setSnackbarType("error");
       setSnackbarOpen(true);
@@ -232,7 +263,32 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
         prev ? { ...prev, utiCode: generatedUti } : prev
       );
     }
-    const validationError = validateTrade(editableTrade);
+    // Inject demo default fixed rates into the editable trade before
+    // validation so the save flow and backend validators receive a
+    // populated Fixed rate. This mutation is intentionally local and
+    // only applied when the UI left the Fixed rate empty. The default
+    // is demo/test-only and should be removed once a MarketData/RateProvider
+    // is available.
+    const tradeWithDefaults: Trade = {
+      ...(editableTrade as Trade),
+      tradeLegs: (editableTrade.tradeLegs || []).map((leg) => {
+        const legType = (leg.legType || "").toLowerCase();
+        // If Fixed leg lacks a rate, set the demo fixed fallback as a string
+        // to keep the UI representation consistent with existing defaults.
+        if (
+          legType === "fixed" &&
+          (leg.rate === undefined || leg.rate === null || leg.rate === "")
+        ) {
+          return { ...leg, rate: String(DEFAULT_FALLBACK_FIXED_RATE) };
+        }
+        return { ...leg };
+      }),
+    };
+    // Persist the injected defaults into UI state so the user sees them
+    // before we validate/save.
+    setEditableTrade(tradeWithDefaults);
+
+    const validationError = validateTrade(tradeWithDefaults);
     if (validationError) {
       setSnackbarMsg(validationError);
       setSnackbarType("error");
@@ -248,7 +304,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
     let tradeDto: Record<string, unknown> =
       formatTradeForBackend(editableTrade);
     tradeDto = convertEmptyStringsToNull(tradeDto) as Record<string, unknown>;
-    // Prepared DTO for saving — we do not inject additional derived
+    // Prepared DTO for saving we do not inject additional derived
     // fields here to avoid sending incorrectly-typed values (e.g. sending
     // a username where the backend expects a numeric traderUserId). The
     // backend's DTO expects `traderUserId` (Long) and `traderUserName`
@@ -261,8 +317,8 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
     // DEV: Defensive DTO coercion and UTI handling. Use safe numeric parsing
     // and explicit null fallbacks to avoid sending NaN or unexpected types
     // to the backend which can cause ownership checks to fail.
-    const editable: any = editableTrade as any;
-    const dto: any = tradeDto as any;
+    const editable: Trade = editableTrade as Trade;
+    const dto: Record<string, unknown> = tradeDto as Record<string, unknown>;
 
     const toNumberOrNull = (v: unknown) => {
       if (v === undefined || v === null || v === "") return null;
@@ -413,7 +469,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
     const validateSettlementText = (text?: string) => {
       if (!text) return true; // nothing to validate
       const trimmedText = String(text).trim();
-      const invalidChars = /[;'\"<>]/; // ADDED: illegal-character guard used by validation
+      const invalidChars = /[;'"<>]/; // ADDED: illegal-character guard used by validation
       // Validate length: settlement text must be between 10 and 500 characters
       if (trimmedText.length < 10 || trimmedText.length > 500) {
         setSnackbarMsg(

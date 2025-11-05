@@ -1,32 +1,30 @@
 package com.technicalchallenge.validation;
 
+import org.springframework.stereotype.Component;
+
 import com.technicalchallenge.dto.TradeDTO;
-import com.technicalchallenge.model.ApplicationUser;
-import com.technicalchallenge.model.Book;
-import com.technicalchallenge.model.Counterparty;
 
 /**
- * Engine for validating entity status and references for trades.
- * Keeps entity validation separate from business rule validation.
+ * Adapter/engine that delegates to the repository-backed
+ * {@link EntityStatusValidator}. This class expects the validator to be a
+ * Spring-managed bean and therefore relies on constructor injection.
  */
+@Component
 public class EntityStatusValidationEngine {
 
-    private final EntityStatusValidator entityValidator = new EntityStatusValidator();
+    private final EntityStatusValidator entityValidator;
 
-    /**
-     * Validates that user, book, and counterparty are active.
-     */
-    public boolean validateEntityStatus(ApplicationUser user, Book book, Counterparty counterparty,
-            TradeValidationResult result) {
-        return entityValidator.validateEntityStatus(user, book, counterparty, result);
+    public EntityStatusValidationEngine(EntityStatusValidator entityValidator) {
+        this.entityValidator = entityValidator;
     }
 
     /**
-     * Validates that trade references (book, counterparty) exist and are valid.
+     * Validate a TradeDTO's entity references and return the validation result.
      */
-    public boolean validateEntityReferences(TradeDTO trade, TradeValidationResult result) {
-        return entityValidator.validateEntityReferences(trade, result);
+    public TradeValidationResult validate(TradeDTO trade) {
+        TradeValidationResult result = new TradeValidationResult();
+        entityValidator.validate(trade, result);
+        return result;
     }
-    // Adding this line to force commit
 
 }
