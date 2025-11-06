@@ -53,10 +53,18 @@ public class UserPrivilegeValidator {
             return false;
         String currentUser = (auth != null && auth.getName() != null) ? auth.getName() : "__UNKNOWN__";
 
+        // Consider Middle Office and Admin as elevated editors as well. The
+        // service layer and controller expect ROLE_MIDDLE_OFFICE and ROLE_ADMIN
+        // to be able to modify or delete trade-linked additional info in
+        // operational workflows. Keep ROLE_SALES, ROLE_SUPERUSER and TRADE_EDIT_ALL
+        // as previous elevated editor authorities.
         boolean canEditOthers = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
                 .anyMatch(a -> {
                     String ga = a.getAuthority();
-                    return "ROLE_SALES".equalsIgnoreCase(ga) || "ROLE_SUPERUSER".equalsIgnoreCase(ga)
+                    return "ROLE_SALES".equalsIgnoreCase(ga)
+                            || "ROLE_SUPERUSER".equalsIgnoreCase(ga)
+                            || "ROLE_MIDDLE_OFFICE".equalsIgnoreCase(ga)
+                            || "ROLE_ADMIN".equalsIgnoreCase(ga)
                             || "TRADE_EDIT_ALL".equalsIgnoreCase(ga);
                 });
 

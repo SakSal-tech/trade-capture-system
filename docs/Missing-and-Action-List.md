@@ -98,10 +98,10 @@ But redhaven’t tied this into any trade validation flow (for example, the proc
 
 A full workflow would integrate settlement validation checks before a trade moves to “READY_TO_SETTLE” status.
 
-🧠 Summary
+Summary
 Integration Area Status Explanation
-Settlement visible after booking ✅ Done Immediate persistence to DB
-Search by settlement text ✅ Done Indexed LIKE query
+Settlement visible after booking = Done Immediate persistence to DB
+Search by settlement text = Done Indexed LIKE query
 Export for settlement systems Missing Needs file or API export feature
 Real-time notifications Missing No WebSocket/email/Kafka integration
 Risk visibility Partial Data accessible, not integrated

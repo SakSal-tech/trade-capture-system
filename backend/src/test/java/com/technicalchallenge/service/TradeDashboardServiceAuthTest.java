@@ -6,13 +6,16 @@ import static org.mockito.Mockito.*;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
+
 import org.junit.jupiter.api.Test;
+
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.technicalchallenge.model.UserPrivilege;
+import com.technicalchallenge.repository.AdditionalInfoRepository;
 import com.technicalchallenge.mapper.TradeMapper;
 import com.technicalchallenge.repository.TradeRepository;
 import com.technicalchallenge.validation.UserPrivilegeValidationEngine;
@@ -20,7 +23,7 @@ import com.technicalchallenge.validation.UserPrivilegeValidationEngine;
 /*
  * Focused authentication/authorization unit tests for TradeDashboardService.
  *
- * - This test class isolates the privilege-checking behaviour (the
+ * - This test class isolates the privilege-checking behavior (the
  *   service-level `hasPrivilege(...)` logic) so can validate short-circuit
  *   rules (SecurityContext authorities) and the DB-backed privilege fallback.
  * - The service now uses a deny-by-default approach and requires a
@@ -28,6 +31,7 @@ import com.technicalchallenge.validation.UserPrivilegeValidationEngine;
  *   explicitly provide the privilege service behavior instead of relying on
  *   any permissive null-service shortcuts.
  */
+@SuppressWarnings("SpellCheckingInspection")
 public class TradeDashboardServiceAuthTest {
 
     private TradeDashboardService dashboardService;
@@ -44,19 +48,17 @@ public class TradeDashboardServiceAuthTest {
     @Mock
     private UserPrivilegeValidationEngine privilegeValidationEngine;
 
+    @Mock
+    private AdditionalInfoRepository additionalInfoRepository;
+
     @BeforeEach
     void setup() {
         MockitoAnnotations.openMocks(this);
         // default: inject mocks into service
-        dashboardService = new TradeDashboardService(tradeRepository, tradeMapper, userPrivilegeService,
-                privilege_validation_engine());
+        dashboardService = new TradeDashboardService(tradeRepository, tradeMapper, additionalInfoRepository,
+                userPrivilegeService, privilegeValidationEngine);
         // clear security context before each test
         SecurityContextHolder.clearContext();
-    }
-
-    // helper to satisfy constructor when want a null engine (useful for test)
-    private UserPrivilegeValidationEngine privilege_validation_engine() {
-        return privilegeValidationEngine;
     }
 
     @Test

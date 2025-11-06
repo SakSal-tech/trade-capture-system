@@ -17,8 +17,8 @@ import java.util.stream.Collectors;
 
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Propagation;
 
 import com.technicalchallenge.dto.DailySummaryDTO;
 import com.technicalchallenge.dto.SearchCriteriaDTO;
@@ -30,6 +30,8 @@ import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.repository.TradeRepository;
 
 import com.technicalchallenge.validation.UserPrivilegeValidationEngine;
+import com.technicalchallenge.repository.AdditionalInfoRepository;
+import com.technicalchallenge.model.AdditionalInfo;
 import com.technicalchallenge.model.UserPrivilege;
 
 import cz.jirutka.rsql.parser.RSQLParser;
@@ -107,16 +109,22 @@ public class TradeDashboardService {
             TradeDTO tradeDto = tradeMapper.toDto(tradeEntity);
             tradeDtos.add(tradeDto);
         }
-        return new PageImpl<>(tradeDtos, pageable, tradePage.getTotalElements());
+        // Batch-enrich DTOs with settlement instructions (avoids N+1)
+        enrichSettlementInstructionsForTrades(tradePage.getContent(), tradeDtos);
+
+        return new PageImpl<>(tradeDtos, pageable, tradePage.getTotalElements()); // return paged DTOs
     }
 
     private final TradeMapper tradeMapper;
     private final TradeRepository tradeRepository;
+    private final AdditionalInfoRepository additionalInfoRepository;
     private final UserPrivilegeService userPrivilegeService;
     @SuppressWarnings("unused")
     private final UserPrivilegeValidationEngine privilegeValidationEngine;
 
+    @Autowired
     public TradeDashboardService(TradeRepository tradeRepository, TradeMapper tradeMapper,
+            AdditionalInfoRepository additionalInfoRepository,
             UserPrivilegeService userPrivilegeService,
             UserPrivilegeValidationEngine privilegeValidationEngine) {/*
                                                                        * enforces a security check to ensure that the
@@ -132,8 +140,20 @@ public class TradeDashboardService {
                                                                        */
         this.tradeRepository = tradeRepository;
         this.tradeMapper = tradeMapper;
+        this.additionalInfoRepository = additionalInfoRepository;
         this.userPrivilegeService = userPrivilegeService; // ADDED: wire DB privilege service
         this.privilegeValidationEngine = privilegeValidationEngine;
+    }
+
+    /**
+     * Backwards-compatible constructor used by older tests that don't supply
+     * an AdditionalInfoRepository. Delegates to the full constructor with a
+     * null AdditionalInfoRepository.
+     */
+    public TradeDashboardService(TradeRepository tradeRepository, TradeMapper tradeMapper,
+            UserPrivilegeService userPrivilegeService,
+            UserPrivilegeValidationEngine privilegeValidationEngine) {
+        this(tradeRepository, tradeMapper, null, userPrivilegeService, privilegeValidationEngine);
     }
 
     /**
@@ -534,7 +554,71 @@ public class TradeDashboardService {
             System.out.println("DBG: Error while logging fetched trades: " + e.getMessage());
         }
 
-        return tradeEntities.stream().map(tradeMapper::toDto).toList();
+        // Map entities to DTOs
+        List<TradeDTO> dtos = tradeEntities.stream().map(tradeMapper::toDto).toList();
+
+        // Batch-enrich DTOs with settlement instructions (avoids N+1)
+        enrichSettlementInstructionsForTrades(tradeEntities, dtos);
+
+        return dtos;
+    }
+
+    /**
+     * Refactored helper: enrich a list of TradeDTOs with settlement instructions.
+     *
+     * Responsibilities:
+     * - Deduplicate tradeIds (preserve order) using a LinkedHashSet
+     * - Batch-fetch AdditionalInfo rows for field "SETTLEMENT_INSTRUCTIONS"
+     * - Build an in-memory map tradeId -> settlement text (keep-first semantics)
+     * - Attach settlement text to matching TradeDTOs
+     *
+     * This method is defensive: it returns early when inputs are empty and
+     * catches exceptions so enrichment failures do not break callers.
+     */
+    private void enrichSettlementInstructionsForTrades(List<Trade> tradeEntities, List<TradeDTO> dtos) {
+        if (tradeEntities == null || tradeEntities.isEmpty() || dtos == null || dtos.isEmpty()) {
+            return; // nothing to do
+        }
+        try {
+            java.util.Set<Long> idSet = new java.util.LinkedHashSet<>();
+            for (Trade tradeItem : tradeEntities) {
+                if (tradeItem == null)
+                    continue;
+                Long tid = tradeItem.getTradeId();
+                if (tid != null) {
+                    idSet.add(tid);
+                }
+            }
+
+            if (idSet.isEmpty()) {
+                return;
+            }
+
+            java.util.List<Long> idList = new java.util.ArrayList<>(idSet);
+            List<AdditionalInfo> infos = additionalInfoRepository
+                    .findByEntityTypeAndEntityIdInAndFieldName("TRADE", idList, "SETTLEMENT_INSTRUCTIONS");
+
+            java.util.Map<Long, String> settlementByTrade = new java.util.HashMap<>();
+            for (AdditionalInfo infoItem : infos) {
+                if (infoItem == null)
+                    continue;
+                Long entityId = infoItem.getEntityId();
+                String value = infoItem.getFieldValue();
+                if (entityId == null)
+                    continue;
+                if (!settlementByTrade.containsKey(entityId)) { // keep-first
+                    settlementByTrade.put(entityId, value);
+                }
+            }
+
+            for (TradeDTO dto : dtos) {
+                if (dto == null || dto.getTradeId() == null)
+                    continue;
+                dto.setSettlementInstructions(settlementByTrade.get(dto.getTradeId()));
+            }
+        } catch (Exception e) {
+            logger.debug("enrichSettlementInstructionsForTrades failed: {}", e.getMessage());
+        }
     }
 
     public TradeSummaryDTO getTradeSummary() {

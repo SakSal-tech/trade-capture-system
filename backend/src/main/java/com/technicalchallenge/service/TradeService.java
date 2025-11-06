@@ -25,6 +25,7 @@ import org.springframework.security.access.AccessDeniedException;
 import com.technicalchallenge.security.UserPrivilegeValidator;
 import com.technicalchallenge.validation.TradeValidationEngine;
 import com.technicalchallenge.validation.TradeValidationResult;
+import com.technicalchallenge.mapper.TradeMapper;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
@@ -84,6 +85,10 @@ public class TradeService {
 
     private PayRecRepository payRecRepository;
     private AdditionalInfoRepository additionalInfoRepository;
+
+    // Mapper used to convert between Trade entities and TradeDTOs. Kept in the
+    // service so DTO construction and enrichment can be centralised here.
+    private TradeMapper tradeMapper;
 
     // Security validator used to check ownership/edit privileges at the service
     // layer.
@@ -197,6 +202,33 @@ public class TradeService {
         }
 
         return opt;
+    }
+
+    /** Build and return an enriched TradeDTO (includes settlement instructions). */
+    public java.util.Optional<com.technicalchallenge.dto.TradeDTO> getTradeDtoById(Long tradeId) {
+        java.util.Optional<Trade> tradeOpt = getTradeById(tradeId);
+        if (tradeOpt.isEmpty()) {
+            return java.util.Optional.empty();
+        }
+        Trade trade = tradeOpt.get();
+        // Map entity -> DTO
+        TradeDTO tradeDto = tradeMapper.toDto(trade);
+
+        // Attach active settlement instructions if present; errors are logged but
+        // ignored
+        try {
+            java.util.Optional<AdditionalInfo> ai = additionalInfoRepository.findActiveOne("TRADE",
+                    trade.getTradeId(), "SETTLEMENT_INSTRUCTIONS");
+            // If an active AdditionalInfo row was found, copy its text into the DTO
+            ai.ifPresent(a -> tradeDto.setSettlementInstructions(a.getFieldValue()));
+        } catch (Exception e) {
+            // Do not fail the overall request for enrichment errors; log for
+            // diagnostics at debug level so production logs are not noisy.
+            logger.debug("Failed to enrich settlement instructions for trade {}: {}", tradeId, e.getMessage());
+        }
+
+        // Return DTO
+        return java.util.Optional.of(tradeDto);
     }
 
     // Refactored and changed the above method to fetch multiple trades by a list of

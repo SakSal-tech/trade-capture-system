@@ -107,7 +107,9 @@ public class TradeControllerTest extends BaseIntegrationTest {
     @Test
     void testGetTradeById() throws Exception {
         // Given
-        when(tradeService.getTradeById(1001L)).thenReturn(Optional.of(trade));
+        // controller now delegates to getTradeDtoById which returns an
+        // Optional<TradeDTO>
+        when(tradeService.getTradeDtoById(1001L)).thenReturn(Optional.of(tradeDTO));
 
         // When/Then
         mockMvc.perform(get("/api/trades/1001")
@@ -117,20 +119,20 @@ public class TradeControllerTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.bookName", is("TestBook")))
                 .andExpect(jsonPath("$.counterpartyName", is("TestCounterparty")));
 
-        verify(tradeService).getTradeById(1001L);
+        verify(tradeService).getTradeDtoById(1001L);
     }
 
     @Test
     void testGetTradeByIdNotFound() throws Exception {
         // Given
-        when(tradeService.getTradeById(9999L)).thenReturn(Optional.empty());
+        when(tradeService.getTradeDtoById(9999L)).thenReturn(Optional.empty());
 
         // When/Then
         mockMvc.perform(get("/api/trades/9999")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound());
 
-        verify(tradeService).getTradeById(9999L);
+        verify(tradeService).getTradeDtoById(9999L);
     }
 
     @Test

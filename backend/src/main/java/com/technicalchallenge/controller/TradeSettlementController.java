@@ -246,9 +246,9 @@ public class TradeSettlementController {
      * - Audit Trail: Every change is automatically recorded by the service layer.
      */
     @PutMapping("/{id}/settlement-instructions")
-    @PreAuthorize("hasAnyRole('TRADER','SALES')")
-    // OpenAPI: Describe this mutation endpoint. @Parameter documents the path
-    // parameter 'id' in the generated API docs; @Operation provides summary.
+    @PreAuthorize("hasAnyRole('TRADER','SALES','MIDDLE_OFFICE','ADMIN')")
+    // Refactored. Sales aand middle office and now allowed to create/update
+    // settlements. Before it was traders only.
     @Operation(summary = "Create or update settlement instructions", description = "Creates or updates the settlement instructions for a trade and records an audit entry.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Settlement instructions created/updated"),
@@ -310,6 +310,89 @@ public class TradeSettlementController {
             return ResponseEntity.ok().header("X-NonStandard-Keyword", keyword).body(resp);
         }
         return ResponseEntity.ok(resp);
+    }
+
+    /**
+     * Soft-delete settlement instructions for a trade (marks as inactive).
+     * Only users with edit privileges may delete. A deletion is recorded in the
+     * audit trail.
+     */
+    @DeleteMapping("/{id}/settlement-instructions")
+    @PreAuthorize("hasAnyRole('TRADER','SALES','MIDDLE_OFFICE','ADMIN')")
+    @Operation(summary = "Delete settlement instructions", description = "Soft-delete settlement instructions for a trade and record an audit entry.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Settlement instructions deleted (soft-delete)"),
+            @ApiResponse(responseCode = "404", description = "Trade or settlement instructions not found"),
+            @ApiResponse(responseCode = "403", description = "Insufficient privileges to delete")
+    })
+    public ResponseEntity<?> deleteSettlementInstructions(@PathVariable Long id) {
+
+        // Confirm trade exists
+        Optional<Trade> tradeOpt = tradeService.getTradeById(id);
+        if (tradeOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Trade not found with ID: " + id);
+        }
+
+        try {
+            boolean deleted = additionalInfoService.deleteSettlementInstructions(id);
+            if (!deleted) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("No settlement instructions found for trade ID: " + id);
+            }
+            // No content on successful soft-delete
+            // Success: the settlement instruction row was deactivated. Returns
+            // 204 No Content to match REST conventions for delete-like operations.
+            return ResponseEntity.noContent().build();
+        } catch (org.springframework.security.access.AccessDeniedException ade) {
+            // Authorization failed: the caller is not the trade owner and does
+            // not have an elevated edit role. The global exception handler may
+            // also convert this to a JSON 403 body; here I return a clear text
+            // message for backwards compatibility with older clients.
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Insufficient privileges to delete settlement instructions for trade " + id);
+        }
+    }
+
+    /**
+     * Delete a specific AdditionalInfo row by its primary key.
+     * Useful for operators to remove duplicate rows discovered in the
+     * additional_info table. This endpoint performs the same security checks
+     * as other settlement operations: trade-owned records require edit rights
+     * on the trade; non-trade records require admin/superuser authority.
+     *
+     * Example: DELETE /api/additional-info/123
+     */
+    @DeleteMapping("/additional-info/{additionalInfoId}")
+    @PreAuthorize("hasAnyRole('TRADER','SALES','MIDDLE_OFFICE','ADMIN')")
+    @Operation(summary = "Delete AdditionalInfo row by id", description = "Soft-delete a specific AdditionalInfo row (deactivate) and write an audit record.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "AdditionalInfo deactivated"),
+            @ApiResponse(responseCode = "404", description = "AdditionalInfo not found"),
+            @ApiResponse(responseCode = "403", description = "Insufficient privileges")
+    })
+    public ResponseEntity<?> deleteAdditionalInfoById(@PathVariable Long additionalInfoId) {
+        try {
+            boolean deleted = additionalInfoService.deleteAdditionalInfoById(additionalInfoId);
+            if (!deleted) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("AdditionalInfo not found with ID: " + additionalInfoId);
+            }
+            // Success: the AdditionalInfo row was deactivated. This endpoint is
+            // typically used by operators to remove duplicate rows discovered in
+            // the `additional_info` table. It is purposely precise (accepts the
+            // PK) to avoid accidental removal of the wrong record when
+            // duplicates exist.
+            return ResponseEntity.noContent().build();
+        } catch (org.springframework.security.access.AccessDeniedException ade) {
+            // Authorization failed: the caller lacks the required privileges to
+            // remove this row. For trade-linked rows the caller must be the
+            // trade owner or an elevated editor (ROLE_SUPERUSER/ROLE_ADMIN/
+            // ROLE_MIDDLE_OFFICE depending on configuration). For non-trade
+            // rows an admin/superuser is required.
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Insufficient privileges to delete AdditionalInfo ID: " + additionalInfoId);
+        }
     }
 
     //// Added this endpoint to extend the "Audit Trail" business requirement.

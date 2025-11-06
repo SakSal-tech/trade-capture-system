@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 // import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import com.technicalchallenge.repository.AdditionalInfoRepository;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -30,6 +31,9 @@ public class BookControllerTest extends BaseIntegrationTest {
 
     @MockBean
     private BookMapper bookMapper;
+
+    @MockBean
+    private AdditionalInfoRepository additionalInfoRepository;
 
     @BeforeEach
     public void setup() {

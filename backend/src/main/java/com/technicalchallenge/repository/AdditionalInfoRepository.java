@@ -150,4 +150,24 @@ public interface AdditionalInfoRepository extends JpaRepository<AdditionalInfo, 
       """)
   List<AdditionalInfo> searchTradeSettlementByKeyword(@Param("keyword") String keyword);
 
+  /*
+   * it returns all settlement rows where entityType = 'TRADE' and entityId is in
+   * the provided list and fieldName = 'SETTLEMENT_INSTRUCTIONS'. Its purpose is
+   * exactly to avoid the N+1: call this once for the list of tradeIds, build a
+   * Map<tradeId, fieldValue> in memory, then populate each
+   * TradeDTO.setSettlementInstructions() from that map. Practical notes: guard
+   * against an empty tradeIds list (return empty result early to avoid SQL IN ()
+   * issues), ensure appropriate DB indexes (entity_type, field_name, entity_id)
+   * exist for performance, and keep this logic in the service layer (not the
+   * mapper) so you preserve mapper purity and authorisation checks
+   */
+  @Query("SELECT a FROM AdditionalInfo a WHERE a.entityType = :entityType AND a.entityId IN :entityIds AND a.fieldName = :fieldName AND a.active = true")
+  List<AdditionalInfo> findByEntityTypeAndEntityIdInAndFieldName(@Param("entityType") String entityType,
+      @Param("entityIds") List<Long> entityIds, @Param("fieldName") String fieldName);
+  // single DB query to fetch settlement rows for many trades (avoids N+1 which
+  // means when code issues one query to fetch N parent rows(1), then for each
+  // parent issues another query(N) producing N +1, which is inefficient
+  // Complexity wise O(N) extra queries which causes high latency and DB load for
+  // large lists).
+
 }

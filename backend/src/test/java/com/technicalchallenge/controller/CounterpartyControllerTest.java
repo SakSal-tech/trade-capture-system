@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 // import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import com.technicalchallenge.repository.AdditionalInfoRepository;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,6 +35,9 @@ public class CounterpartyControllerTest extends BaseIntegrationTest {
 
     @MockBean
     private CounterpartyMapper counterpartyMapper;
+
+    @MockBean
+    private AdditionalInfoRepository additionalInfoRepository;
 
     @BeforeEach
     public void setup() {

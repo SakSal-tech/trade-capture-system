@@ -22,13 +22,35 @@ import com.technicalchallenge.validation.TradeValidationEngine;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.context.ApplicationEventPublisher;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Map;
 import com.technicalchallenge.repository.TradeRepository;
 import com.technicalchallenge.security.UserPrivilegeValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * This service is responsible for validating, saving, updating,
- * and searching for additional information records.
+ * Service layer for managing AdditionalInfo records (free-form fields tied to
+ * domain entities such as trades).
+ *
+ * Responsibilities:
+ * - Validate incoming AdditionalInfo payloads (special handling for
+ * settlement instructions).
+ * - Create, update and soft-delete AdditionalInfo rows.
+ * - Provide targeted queries used by the operations UI (search and lookup by
+ * trade id).
+ * - Maintain a separate audit trail for changes to settlement instructions.
+ *
+ * Behaviour and error modes:
+ * - Methods validate inputs and throw IllegalArgumentException for bad input.
+ * - Authorization is enforced server-side (AccessDeniedException) where
+ * required; the class prefers a central UserPrivilegeValidator when
+ * available and falls back to inline checks to preserve testability.
+ *
+ * Note: this class performs soft-deletes (preserves historical rows) and
+ * writes explicit audit records whenever settlement instructions are
+ * changed or deactivated.
  */
 @Service
 @Transactional
@@ -42,6 +64,7 @@ public class AdditionalInfoService {
     // central validation engine (refactor: prefer single entry point for
     // validations)
     private final TradeValidationEngine tradeValidationEngine;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     // Optional: validator injected by Spring at runtime. Tests that construct the
     // service directly without Spring will observe a null validator reference; in
@@ -50,23 +73,48 @@ public class AdditionalInfoService {
     @Autowired(required = false)
     private UserPrivilegeValidator userPrivilegeValidator;
 
+    /**
+     * Refactor after tests failed, I added extra parameter
+     * ApplicationEventPublisher — t later after
+     * tests writing. Backwards-compatible constructor used by older tests
+     * and callers that do
+     * not provide an ApplicationEventPublisher. Delegates to the full
+     * constructor with a null publisher.
+     */
     public AdditionalInfoService(AdditionalInfoRepository additionalInfoRepository,
             AdditionalInfoMapper additionalInfoMapper,
             AdditionalInfoAuditRepository additionalInfoAuditRepository,
             TradeValidationEngine tradeValidationEngine,
             TradeRepository tradeRepository) {
+        this(additionalInfoRepository, additionalInfoMapper, additionalInfoAuditRepository, tradeValidationEngine,
+                tradeRepository, null);
+    }
+
+    @Autowired
+    // Added a new arg so Spring Application Events so other components can react to
+    // settlement changes without tight coupling
+    public AdditionalInfoService(AdditionalInfoRepository additionalInfoRepository,
+            AdditionalInfoMapper additionalInfoMapper,
+            AdditionalInfoAuditRepository additionalInfoAuditRepository,
+            TradeValidationEngine tradeValidationEngine,
+            TradeRepository tradeRepository,
+            ApplicationEventPublisher applicationEventPublisher) {
         this.additionalInfoRepository = additionalInfoRepository;
         this.additionalInfoMapper = additionalInfoMapper;
         this.additionalInfoAuditRepository = additionalInfoAuditRepository;
         this.tradeValidationEngine = tradeValidationEngine;
         this.tradeRepository = tradeRepository;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     /**
      * Creates a new AdditionalInfo record.
      *
-     * This method validates the incoming data before saving.
-     * It ensures optional fields, content rules, and safety checks are met.
+     * Validates the provided DTO and persists a new AdditionalInfo entity.
+     *
+     * Inputs: an AdditionalInfoRequestDTO
+     * Returns: the saved AdditionalInfoDTO
+     * Errors: throws IllegalArgumentException for invalid input.
      */
     public AdditionalInfoDTO createAdditionalInfo(AdditionalInfoRequestDTO additionalInfoRequestDTO) {
         if (additionalInfoRequestDTO == null) {
@@ -146,7 +194,12 @@ public class AdditionalInfoService {
 
     /**
      * Updates an existing AdditionalInfo record.
-     * Similar to create, but first checks if the record exists in the database.
+     * Validates the new content and updates the entity identified by id.
+     *
+     * Inputs: id of the AdditionalInfo record and an AdditionalInfoRequestDTO
+     * Returns: the updated AdditionalInfoDTO
+     * Errors: IllegalArgumentException if the id is not found or the new
+     * content is invalid.
      */
     public AdditionalInfoDTO updateAdditionalInfo(Long id, AdditionalInfoRequestDTO requestDTO) {
 
@@ -272,12 +325,12 @@ public class AdditionalInfoService {
     // logic.
 
     /**
-     * ADDED:
-     * Retrieves settlement instructions for a specific trade.
-     * Business Requirement:
-     * - Supports “Operations Team Workflow” by making settlement info immediately
-     * accessible.
-     * - Required to display instructions on trade detail views and audit records.
+     * Retrieve the active settlement instructions for a trade.
+     *
+     * Security: performs ownership/privilege checks and will throw
+     * AccessDeniedException if the caller is not allowed to view the trade.
+     *
+     * Returns: AdditionalInfoDTO or null when no settlement instructions exist.
      */
     public AdditionalInfoDTO getSettlementInstructionsByTradeId(Long tradeId) {
         // Use targeted repository query for efficient lookup (avoids loading all data)
@@ -346,12 +399,11 @@ public class AdditionalInfoService {
     }
 
     /**
-     * ADDED:
-     * Searches trades whose settlement instructions contain a given keyword.
-     * Business Requirement:
-     * - Supports “Operations Team Workflow” for quick text-based search.
-     * - Enables partial, case-insensitive matching for flexible operational
-     * queries.
+     * Search for trades where the settlement instructions contain the
+     * supplied keyword (case-insensitive, partial match).
+     *
+     * Inputs: search keyword
+     * Returns: list of AdditionalInfoDTO (possibly empty)
      */
     public List<AdditionalInfoDTO> searchTradesBySettlementKeyword(String keyword) {
         if (keyword == null || keyword.trim().isEmpty()) {
@@ -371,12 +423,12 @@ public class AdditionalInfoService {
     }
 
     /**
-     * ADDED:
-     * Creates or updates settlement instructions for a specific trade.
-     * Business Requirement:
-     * - Handles both creation and amendment of settlement details.
-     * - Ensures there is only one active record per trade.
-     * - Supports real-time updates visible to the operations team.
+     * Create or update settlement instructions for a trade.
+     *
+     * Behaviour: if an active record exists it is updated, otherwise a new
+     * record is created. Validation and authorization are performed.
+     *
+     * Returns: saved AdditionalInfoDTO
      */
     public AdditionalInfoDTO saveOrUpdateSettlementInstructions(Long tradeId, String instructions) {
         // Retrieve any existing active record for this trade
@@ -403,16 +455,14 @@ public class AdditionalInfoService {
     }
 
     /**
-     * Refactored ADDED:
-     * Handles creation or update (upOrinsert) of settlement instructions for a
-     * trade.
-     * To centralise business rules from the controller into the service layer.
-     * - Supports both creation (insert) and modification (update) in one place.
-     * - Ensures SQL injection validation, structured text, and audit trail logging.
-     * BUSINESS REQUIREMENTS COVERED:
-     * - Optional field (may be blank or omitted)
-     * - Editable during trade amendments
-     * - Full audit trail of all changes
+     * Upsert (create or update) settlement instructions with explicit
+     * authorization and audit trail.
+     *
+     * Inputs: tradeId, settlementText and changedBy (informational only;
+     * actual actor is derived from the SecurityContext)
+     * Returns: saved AdditionalInfoDTO
+     * Errors: AccessDeniedException when the caller is not allowed to edit the
+     * target trade; IllegalArgumentException for invalid content.
      */
     @Transactional
     public AdditionalInfoDTO upOrInsertTradeSettlementInstructions(Long tradeId, String settlementText,
@@ -465,6 +515,7 @@ public class AdditionalInfoService {
                     .anyMatch(a -> {
                         String ga = a.getAuthority();
                         return "ROLE_SALES".equalsIgnoreCase(ga) || "ROLE_SUPERUSER".equalsIgnoreCase(ga)
+                                || "ROLE_MIDDLE_OFFICE".equalsIgnoreCase(ga) || "ROLE_ADMIN".equalsIgnoreCase(ga)
                                 || "TRADE_EDIT_ALL".equalsIgnoreCase(ga);
                     });
 
@@ -520,6 +571,32 @@ public class AdditionalInfoService {
         audit.setChangedAt(java.time.LocalDateTime.now());
         // Save audit trail record separately
         additionalInfoAuditRepository.save(audit);
+
+        // Publish a domain event so listeners (notifications, SSE, metrics)
+        // can react to the settlement instructions change. The event payload is
+        // intentionally lightweight and contains the old/new values for
+        // convenience.
+        try { // there is no tradeid 0
+            long longTradeId = (tradeId != null) ? tradeId.longValue() : 0L;
+            applicationEventPublisher.publishEvent(
+                    new com.technicalchallenge.Events.SettlementInstructionsUpdatedEvent(
+                            String.valueOf(tradeId), // trade id as string for UI listeners
+                            longTradeId,
+                            authUser, // username taken from SecurityContext
+                            Instant.now().truncatedTo(ChronoUnit.MILLIS), // event timestamp (truncated to ms)
+                            Map.of("oldValue", oldValue, "newValue", settlementText))); // map with previous and new.
+                                                                                        // Gives listeners a quick diff:
+                                                                                        // they can show "changed from X
+                                                                                        // to Y"
+                                                                                        // settlement text
+        } catch (Exception ex) {
+            // Ensure publishing failures do not break the primary DB transaction.Publishing
+            // should happen synchronously in this method and occurs after the DB save/audit
+            // Log and continue (listeners should be resilient).
+            // Using System.err here to avoid adding a logger to this large service
+            // class; in future I can use a dedicated logger or metrics.
+            System.err.println("Failed to publish SettlementInstructionsUpdatedEvent: " + ex.getMessage());
+        }
 
         // Convert to DTO and return
         return additionalInfoMapper.toDto(target);
@@ -589,5 +666,234 @@ public class AdditionalInfoService {
         return null;
 
     }
+
+    /**
+     * Soft-delete (deactivate) settlement instructions for a trade.
+     *
+     * Behavior: marks the active settlement AdditionalInfo row as inactive and
+     * writes an audit record containing the previous value and the actor.
+     *
+     * Returns: true when a record was found and deactivated; false when no
+     * active record existed.
+     *
+     * Authorization: only the trade owner or users with elevated edit roles
+     * are permitted; AccessDeniedException is thrown otherwise.
+     *
+     * Note: this method assumes at most one active settlement row per trade.
+     * Use deleteAdditionalInfoById for operator-precise cleanup of duplicates.
+     */
+    @Transactional
+    public boolean deleteSettlementInstructions(Long tradeId) {
+        if (tradeId == null || tradeId <= 0)
+            throw new IllegalArgumentException("Trade ID must be valid.");
+
+        // Find active settlement record for the trade
+        AdditionalInfo existing = additionalInfoRepository.findActiveByEntityTypeAndEntityIdAndFieldName(
+                "TRADE", tradeId, "SETTLEMENT_INSTRUCTIONS");
+
+        // Nothing to delete
+        if (existing == null) {
+            return false;
+        }
+
+        // Authorization: reuse the same ownership checks as for updates
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        com.technicalchallenge.model.Trade trade = tradeRepository.findLatestActiveVersionByTradeId(tradeId)
+                .orElse(null);
+        String authUser = (auth != null && auth.getName() != null && !auth.getName().isBlank())
+                ? auth.getName()
+                : "SYSTEM";
+
+        if (userPrivilegeValidator != null) {
+            if (!userPrivilegeValidator.canEditTrade(trade, auth)) {
+                throw new AccessDeniedException(
+                        "Insufficient privileges to delete settlement instructions for trade " + tradeId);
+            }
+        } else {
+            // NOTE: align fallback edit authority with other service paths
+            // (e.g., upOrInsertTradeSettlementInstructions and deleteAdditionalInfoById)
+            // The controller already allows MIDDLE_OFFICE; the service must also
+            // recognise ROLE_MIDDLE_OFFICE and ROLE_ADMIN as elevated editors.
+            boolean canEditOthers = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
+                    .anyMatch(a -> {
+                        String ga = a.getAuthority();
+                        return "ROLE_SALES".equalsIgnoreCase(ga)
+                                || "ROLE_SUPERUSER".equalsIgnoreCase(ga)
+                                || "ROLE_MIDDLE_OFFICE".equalsIgnoreCase(ga)
+                                || "ROLE_ADMIN".equalsIgnoreCase(ga)
+                                || "TRADE_EDIT_ALL".equalsIgnoreCase(ga);
+                    });
+
+            String ownerLogin = (trade != null && trade.getTraderUser() != null
+                    && trade.getTraderUser().getLoginId() != null)
+                            ? trade.getTraderUser().getLoginId()
+                            : null;
+
+            if (ownerLogin != null && !ownerLogin.equalsIgnoreCase(authUser) && !canEditOthers) {
+                throw new AccessDeniedException(
+                        "Insufficient privileges to delete settlement instructions for trade " + tradeId);
+            }
+        }
+
+        // Perform soft-delete
+        existing.setActive(false);
+        existing.setDeactivatedDate(java.time.LocalDateTime.now());
+        additionalInfoRepository.save(existing);
+
+        // Audit the deletion
+        AdditionalInfoAudit audit = new AdditionalInfoAudit();
+        audit.setTradeId(tradeId);
+        audit.setFieldName("SETTLEMENT_INSTRUCTIONS");
+        audit.setOldValue(existing.getFieldValue());
+        audit.setNewValue(null);
+        audit.setChangedBy(authUser);
+        audit.setChangedAt(java.time.LocalDateTime.now());
+        additionalInfoAuditRepository.save(audit);
+
+        // Publish an event for listeners to react to the deletion.
+        try {
+            long longTradeId;
+            if (tradeId != null) {
+                longTradeId = tradeId.longValue();
+            }
+            longTradeId = 0L;
+
+            applicationEventPublisher.publishEvent(
+                    new com.technicalchallenge.Events.SettlementInstructionsUpdatedEvent(
+                            String.valueOf(tradeId),
+                            longTradeId,
+                            authUser,
+                            Instant.now().truncatedTo(ChronoUnit.MILLIS),
+                            Map.of("oldValue", existing.getFieldValue(), "newValue", null)));
+        } catch (Exception ex) {
+            System.err.println("Failed to publish SettlementInstructionsUpdatedEvent (delete): " + ex.getMessage());// Publish
+                                                                                                                    // a
+                                                                                                                    // event
+                                                                                                                    // SettlementInstructionsUpdatedEvent
+                                                                                                                    // so
+                                                                                                                    // other
+                                                                                                                    // components
+                                                                                                                    // (notifications,
+                                                                                                                    // metrics,
+                                                                                                                    // SSE,
+                                                                                                                    // etc.)
+                                                                                                                    // can
+                                                                                                                    // react
+                                                                                                                    // to
+                                                                                                                    // settlement
+                                                                                                                    // instruction
+                                                                                                                    // changes.
+        }
+
+        return true;
+    }
+
+    /**
+     * Soft-delete (deactivate) a single AdditionalInfo record by its primary
+     * key. Intended for operator use to remove duplicates or incorrect rows.
+     *
+     * Authorization: for records linked to trades the caller must be allowed
+     * to edit the trade (owner or elevated role). For non-trade records the
+     * caller must have admin/superuser/middle-office authority.
+     *
+     * Returns: true when a change was made, false when the record did not
+     * exist or was already inactive.
+     */
+    @Transactional
+    public boolean deleteAdditionalInfoById(Long additionalInfoId) {
+        if (additionalInfoId == null || additionalInfoId <= 0)
+            throw new IllegalArgumentException("AdditionalInfo ID must be valid.");
+
+        AdditionalInfo record = additionalInfoRepository.findById(additionalInfoId).orElse(null);
+        if (record == null) {
+            return false;
+        }
+
+        // If already inactive, nothing to do
+        if (record.getActive() != null && !record.getActive()) {
+            return false;
+        }
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String authUser = (auth != null && auth.getName() != null && !auth.getName().isBlank())
+                ? auth.getName()
+                : "SYSTEM";
+
+        String entityType = record.getEntityType();
+
+        if ("TRADE".equalsIgnoreCase(entityType)) {
+            Long tradeId = record.getEntityId();
+            com.technicalchallenge.model.Trade trade = tradeRepository.findLatestActiveVersionByTradeId(tradeId)
+                    .orElse(null);
+
+            if (userPrivilegeValidator != null) {
+                if (!userPrivilegeValidator.canEditTrade(trade, auth)) {
+                    throw new AccessDeniedException(
+                            "Insufficient privileges to delete this additional info record: " + additionalInfoId);
+                }
+            } else {
+                boolean canEditOthers = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
+                        .anyMatch(a -> {
+                            String ga = a.getAuthority();
+                            return "ROLE_SALES".equalsIgnoreCase(ga) || "ROLE_SUPERUSER".equalsIgnoreCase(ga)
+                                    || "ROLE_MIDDLE_OFFICE".equalsIgnoreCase(ga) || "ROLE_ADMIN".equalsIgnoreCase(ga)
+                                    || "TRADE_EDIT_ALL".equalsIgnoreCase(ga);
+                        });
+
+                String ownerLogin = (trade != null && trade.getTraderUser() != null
+                        && trade.getTraderUser().getLoginId() != null)
+                                ? trade.getTraderUser().getLoginId()
+                                : null;
+
+                if (ownerLogin != null && !ownerLogin.equalsIgnoreCase(authUser) && !canEditOthers) {
+                    throw new AccessDeniedException(
+                            "Insufficient privileges to delete this additional info record: " + additionalInfoId);
+                }
+            }
+        } else {
+            // For non-trade entityTypes require elevated authority
+            boolean hasAdmin = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
+                    .anyMatch(a -> {
+                        String ga = a.getAuthority();
+                        return "ROLE_SUPERUSER".equalsIgnoreCase(ga) || "ROLE_ADMIN".equalsIgnoreCase(ga)
+                                || "ROLE_MIDDLE_OFFICE".equalsIgnoreCase(ga);
+                    });
+            if (!hasAdmin) {
+                throw new AccessDeniedException("Insufficient privileges to delete this additional info record: "
+                        + additionalInfoId);
+            }
+        }
+
+        // Soft-delete. it does not delete from the database but marks it as cancelled
+        record.setActive(false);
+        record.setDeactivatedDate(java.time.LocalDateTime.now());
+        additionalInfoRepository.save(record);
+
+        // Audit
+        AdditionalInfoAudit audit = new AdditionalInfoAudit();
+        audit.setTradeId(record.getEntityId());
+        audit.setFieldName(record.getFieldName());
+        audit.setOldValue(record.getFieldValue());
+        audit.setNewValue(null);
+        audit.setChangedBy(authUser);
+        audit.setChangedAt(java.time.LocalDateTime.now());
+        additionalInfoAuditRepository.save(audit);
+
+        return true;
+    }
+
+    /*
+     * Notes about deleteAdditionalInfoById:
+     * - Purpose: provides a precise operator-facing way to deactivate a single
+     * AdditionalInfo row by its primary key. This is the recommended approach
+     * when cleaning up duplicate rows because it avoids ambiguity about which
+     * row will be removed.
+     * - Authorization: For records linked to trades the same ownership/edit
+     * checks apply (owner or elevated edit roles). For non-trade records the
+     * method requires admin/superuser (or middle-office where appropriate).
+     * - Audit: the method always writes an audit record with the old value and
+     * the actor who performed the deletion. This keeps the audit trail intact
+     * and allows recovery/analysis after cleanup.
+     */
 
 }
