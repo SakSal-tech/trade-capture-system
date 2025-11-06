@@ -389,7 +389,7 @@ public class AdditionalInfoService {
         request.setEntityId(tradeId); // Links record to the correct trade
         request.setFieldName("SETTLEMENT_INSTRUCTIONS");
         request.setFieldValue(instructions); // The new or updated instruction text
-        // Note: we do NOT set fieldType on the DTO (request object) because
+        // Note: do NOT set fieldType on the DTO (request object) because
         // AdditionalInfoRequestDTO does not include that property. The mapper
         // and the entity-level defensive check in createAdditionalInfo will
         // ensure fieldType is populated before persistence to avoid 500 errors.
@@ -555,6 +555,39 @@ public class AdditionalInfoService {
         return additionalInfoRepository
                 .findActiveOne("TRADE", tradeId, "SETTLEMENT_INSTRUCTIONS")
                 .map(additionalInfoMapper::toDto);
+    }
+
+    // Adding a simple rule-based alert so the system can automatically flag
+    // trades whose settlement instructions look "non-standard" (words like
+    // "manual", "offshore", "warehouse", etc.). This helps operations and risk find
+    // problematic trades quickly and is the first
+
+    public String alertNonStandardSettlementKeyword(Long tradeId) {
+        // validate the tradeId, and We fetch the active AdditionalInfo record for
+        // settlement instructions for that trade
+        if (tradeId == null || tradeId <= 0)
+            throw new IllegalArgumentException("Trade ID must be valid.");
+        AdditionalInfo record = additionalInfoRepository.findActiveByEntityTypeAndEntityIdAndFieldName("TRADE", tradeId,
+                "SETTLEMENT_INSTRUCTIONS");// existing query
+
+        // If there are no settlement instructions, return null (nothing non-standard to
+        // detect)
+        if (record == null || record.getFieldValue() == null)
+            return null;
+        // Convert the stored text to lowercase so matching is case-insensitive
+        String text = record.getFieldValue().toLowerCase();
+        // DVP = Delivery-Versus=Payment: securities are delivered only if payment is
+        // made
+        String[] nonStandardS = new String[] { "manual", "non-dvp", "non dvp", "offshore", "physical", "warehouse" };
+
+        for (int i = 0; i < nonStandardS.length; i++) {
+            if (text.contains(nonStandardS[i]))
+                return nonStandardS[i];
+        }
+
+        // If nonStandardS is found, return null to indicate "no match".
+        return null;
+
     }
 
 }

@@ -32,7 +32,7 @@ public class EntityStatusValidator {
     public EntityStatusValidator(BookRepository bookRepository, CounterpartyRepository counterpartyRepository,
             ApplicationUserRepository applicationUserRepository) {
         // Repositories are required for strict validation. Fail fast if a
-        // repository is missing because we want validation to run in all
+        // repository is missing because I want validation to run in all
         // environments (unit tests that need to avoid DB access should mock
         // the validator or provide repository-backed test fixtures).
         if (bookRepository == null || counterpartyRepository == null || applicationUserRepository == null) {

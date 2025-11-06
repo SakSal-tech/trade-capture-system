@@ -89,7 +89,7 @@ function TradeDashboard() {
     // things in parallel using Promise.all:
     // - getDashboardSummary: weekly aggregates and per-currency totals
     // - getDashboardMyTrades: recent trades for the user's blotter
-    // The function is defensive: if the fetch fails we log and keep sample data.
+    // The function is defensive: if the fetch fails log and keep sample data.
     const loginId = userStore.user?.loginId;
     if (!loginId) return; // nothing to do until user is signed in
 
@@ -145,7 +145,7 @@ function TradeDashboard() {
                 Weekly Summary
               </button>
 
-              {/* Daily Summary button: when clicked we fetch a small daily
+              {/* Daily Summary button: when clicked fetch a small daily
                   summary payload (todaysTradeCount, todaysNotionalByCurrency).
                   We fetch on-demand to avoid extra requests during page load. */}
               <button
@@ -306,7 +306,7 @@ function TradeDashboard() {
                     of objects containing `tradeCount` for the last N days.
                   - The code maps those values to {date, tradeCount} labels
                     by constructing ISO date labels for the last N days.
-                  - If `summary` is unavailable we fall back to sample data
+                  - If `summary` is unavailable fall back to sample data
                     so the chart still renders during development. */}
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart
@@ -363,14 +363,11 @@ function TradeDashboard() {
                   Implementation notes:
                   - We derive `counterpartyData` from `summary.tradesByTypeAndCounterparty`.
                   - A fixed small colour palette (`COUNTERPARTY_COLORS`) is used
-                    to ensure visually distinct slices. If you want stable
-                    colours across sessions, map counterparty name -> colour
-                    with a deterministic hash instead of index-based colours.
-                  - A Legend and Tooltip are included for clarity.
+                    to ensure visually distinct slices. 
               */}
               <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
-                  {/* Build data once so we can map colours to cells */}
+                  {/* Build data once so can map colours to cells */}
                   {(() => {
                     const counterpartyData =
                       summary && summary.tradesByTypeAndCounterparty

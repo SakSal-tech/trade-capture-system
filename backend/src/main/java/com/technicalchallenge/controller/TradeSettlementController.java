@@ -22,6 +22,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
 
 // Added: Swagger imports to ensure developers, auditors, or testers can open /swagger-ui.html and use endpoints
 import io.swagger.v3.oas.annotations.Operation;
@@ -56,6 +58,10 @@ public class TradeSettlementController {
 
     // Short: logger for diagnostic traces (principal and authorities)
     private static final Logger logger = LoggerFactory.getLogger(TradeSettlementController.class);
+
+    // Developer note: settlement instructions are stored in AdditionalInfo;
+    // keep controller thin and delegate business logic/audit to
+    // AdditionalInfoService.
 
     @Autowired
     private TradeService tradeService;
@@ -194,7 +200,29 @@ public class TradeSettlementController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body("No settlement instructions found for trade ID: " + id);
             }
-            return ResponseEntity.ok(dto);
+
+            // ADDED: run server-side non-standard detection and include result in response
+            // (keeps UX consistent in Swagger and enables clients to show the message)
+            String keyword = additionalInfoService.alertNonStandardSettlementKeyword(id);
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("additionalInfo", dto);
+            // keep top-level compatibility with existing clients that expect
+            // the DTO fields at the root of the response (e.g., fieldValue)
+            resp.put("fieldValue", dto.getFieldValue());
+            resp.put("nonStandardKeyword", keyword);
+            String msg = (keyword != null) ? "Trade contains non-standard settlement instruction: " + keyword
+                    : "No non-standard settlement instruction detected.";
+            resp.put("message", msg);
+
+            // If a non-standard settlement keyword was found return an
+            // additional response header and a message so UIs (or Swagger)
+            // can highlight the response (e.g., show in red). Red signals
+            // attention: such settlement instructions often require manual
+            // handling by operations or risk teams.
+            if (keyword != null) {
+                return ResponseEntity.ok().header("X-NonStandard-Keyword", keyword).body(resp);
+            }
+            return ResponseEntity.ok(resp);
         } catch (org.springframework.security.access.AccessDeniedException ade) {
             // Let the global exception handler map this to a 403 with a clear
             // message, but return here for clarity in the controller flow.
@@ -263,7 +291,25 @@ public class TradeSettlementController {
         // Delegate logic to service layer (handles both create & update)
         AdditionalInfoDTO result = additionalInfoService.upOrInsertTradeSettlementInstructions(id, text, changedBy);
 
-        return ResponseEntity.ok(result);
+        // ADDED: Run server-side non-standard detection after save and include a
+        // short message in the response (keeps clients able to show detection results)
+        String keyword = additionalInfoService.alertNonStandardSettlementKeyword(id);
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("additionalInfo", result);
+        // preserve compatibility: include the saved fieldValue at top-level
+        resp.put("fieldValue", result.getFieldValue());
+        resp.put("nonStandardKeyword", keyword);
+        String msg = (keyword != null) ? "Trade contains non-standard settlement instruction: " + keyword
+                : "No non-standard settlement instruction detected.";
+        resp.put("message", msg);
+
+        // After creating/updating, include a header/message when non-standard
+        // text is detected. Clients can use this to emphasise the response in
+        // red because non-standard settlement notes are high-risk/manual.
+        if (keyword != null) {
+            return ResponseEntity.ok().header("X-NonStandard-Keyword", keyword).body(resp);
+        }
+        return ResponseEntity.ok(resp);
     }
 
     //// Added this endpoint to extend the "Audit Trail" business requirement.
@@ -311,6 +357,29 @@ public class TradeSettlementController {
         // Delegate to the service layer which returns Optional<AdditionalInfoDTO>,
         // avoiding direct repository Optional references in this class.
         return additionalInfoService.getTradeSettlementInstructions(tradeId);
+    }
+
+    @GetMapping("/{id}/settlement-instructions/identify-nonstandard")
+    @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')")
+    public ResponseEntity<?> identifyNonStandard(@PathVariable Long id) {
+
+        // call service method to detect nonstandard keyword in the settlement
+        String keyword = additionalInfoService.alertNonStandardSettlementKeyword(id);
+        // Create a response map to return small JSON. Spring (via Jackson) will
+        // automatically convert a Java Map into a small JSON object without you having
+        // to create a new DTO class
+        Map<String, Object> resp = new HashMap<>();
+
+        // add the trade id into the response so the caller can collect result
+        resp.put("tradeId", id);
+        // stores the detected keyword (or null)
+        resp.put("nonStandardKeyword", keyword);
+        // User message to alert nonstandard settlements
+        String msg = (keyword != null) ? "Trade contains non-standard settlement instruction: " + keyword
+                : "No non-standard settlement instruction detected.";
+        resp.put("message", msg);// Add message to the response map under key "message".
+
+        return ResponseEntity.ok(resp);
     }
 
 }

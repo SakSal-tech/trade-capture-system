@@ -1,7 +1,7 @@
 import { FC, useState, useRef, useEffect, ChangeEvent } from "react"; // React: JSX runtime
 // FC: Functional Component type for typing the component
 // useState: controlled value storage for the textarea
-// useRef: hold a reference to the <textarea> so we can insert at cursor
+// useRef: hold a reference to the <textarea> so can insert at cursor
 // useEffect: small lifecycle needs (e.g., focus or syncing initial value)
 // ChangeEvent: Type for the textarea onChange handler (keeps TS happy)
 // ChangeEvent: Type for the textarea onChange handler (keeps TS happy)
@@ -69,6 +69,45 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
   // to reset programmatically and simpler to write deterministic tests. Leave empty string
   // as the placeholder value so the first visible option is the prompt.
   const [templateSelectValue, setTemplateSelectValue] = useState<string>("");
+  //state to hold the matched keyword (or null)
+  const [nonStandardKeyword, setNonStandardKeyword] = useState<string | null>(
+    null
+  );
+  //start of an array of indicator phrases (UBS to extend as business rule)
+  const nonStandardIndicators = [
+    // Keep only the intentionally non-standard markers here. The JPM "Further Credit" template
+    // is considered standard for our flows, so do NOT include "further credit".
+    // This array can be extended later via config or a server-side ruleset.
+    "manual",
+    "non-dvp",
+    "non dvp",
+  ];
+  // detects nonstandard settlement as extra layer client side validation security. showing a yellow banner while the user types avoids waiting for network latency and makes booking safer and faster
+  function runNonStandardDetection(settlementText: string): string | null {
+    // convert the whole settlement text to lowercase so comparisons are case-insensitive
+    const lower = settlementText.toLowerCase();
+
+    for (let i = 0; i < nonStandardIndicators.length; i++) {
+      // search the string for the substring nonStandardIndicators[i]
+      if (lower.indexOf(nonStandardIndicators[i]) !== -1) {
+        // set the state to the matched phrase (e.g., "manual") and return it
+        setNonStandardKeyword(nonStandardIndicators[i]);
+        return nonStandardIndicators[i];
+      }
+    }
+
+    // no indicators matched — clear previous match and return null
+    setNonStandardKeyword(null);
+    return null;
+  }
+
+  // Ensure detection runs whenever the textarea value changes (covers parent-driven
+  // updates, template inserts and programmatic clears). This keeps the banner
+  // visibility consistent with the current content.
+  useEffect(() => {
+    runNonStandardDetection(value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
 
   //Reads the string from the textarea event and calls setValue(...) to update component state so the textarea can be used as a controlled component.
   function handleChange(evt: ChangeEvent<HTMLTextAreaElement>) {
@@ -78,6 +117,8 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
     // (keeps UX responsive rather than waiting for blur).
     setTouched(true);
     onChange?.(newValue); // To inform parent every time the text changes
+    // run client-side detector for immediate feedback
+    runNonStandardDetection(newValue);
   }
 
   // Note: the component remains UI-only and delegates persistence to the parent.
@@ -104,14 +145,36 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
 
     //
     // Insert the template at the caret/selection using a functional state updater
-    // so we never clobber concurrent updates. We calculate the new caret position
+    // so never clobber concurrent updates. We calculate the new caret position
     // (start + text.length) now and restore it after React updates the DOM below.
-    // Compute the new value deterministically from the textarea DOM so we can
+    // Compute the new value deterministically from the textarea DOM so can
     // synchronously inform the parent via onChange with the exact new content.
+    // Prevent accidental concatenation when inserting templates next to existing
+    // text (e.g. "...team for" + "Settle via JPM..."). If the character
+    // before the insertion point is not whitespace and the template doesn't
+    // start with whitespace, add a single separating space. Likewise, if the
+    // character after the selection is not whitespace and the template doesn't
+    // end with whitespace, append a separating space.
+    const beforeChar = start > 0 ? txtArea.value.charAt(start - 1) : null;
+    const afterChar =
+      end < txtArea.value.length ? txtArea.value.charAt(end) : null;
+
+    let adjustedText = text;
+    if (beforeChar && !/\s/.test(beforeChar) && !/^\s/.test(adjustedText)) {
+      adjustedText = " " + adjustedText;
+    }
+    if (afterChar && !/\s/.test(afterChar) && !/\s$/.test(adjustedText)) {
+      adjustedText = adjustedText + " ";
+    }
+
     const newValue =
-      txtArea.value.slice(0, start) + text + txtArea.value.slice(end);
+      txtArea.value.slice(0, start) + adjustedText + txtArea.value.slice(end);
     setValue(newValue);
     onChange?.(newValue);
+
+    // Run client-side detection after inserting a template so the warning
+    // appears immediately when a template contains non-standard phrases.
+    runNonStandardDetection(newValue);
 
     // 1) Mark the field as "touched" because template insertion is explicit user input.
     //    This ensures inline validation and "Save" enablement behave consistently.
@@ -119,8 +182,8 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
 
     // 2) Restore focus and move the caret to the end of the inserted text.
     //    We use requestAnimationFrame so the browser has applied the DOM value change
-    //    before we set selection; this produces reliable caret placement across browsers.
-    const newCaretPos = start + text.length;
+    //    before set selection; this produces reliable caret placement across browsers.
+    const newCaretPos = start + adjustedText.length;
     requestAnimationFrame(() => {
       if (!txtArea) return; // defensive check; txtArea was captured above
       try {
@@ -131,7 +194,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
         // because the insertion itself is still correct and editable.
       }
     });
-    // Note: we already used requestAnimationFrame above to focus and set selection.
+    // Note: already used requestAnimationFrame above to focus and set selection.
     // The duplicate call was removed to avoid running the focus/selection twice.
   }
 
@@ -144,13 +207,15 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
       label: "UBS JPM - Beneficiary (IBAN placeholder)",
     },
     {
+      // added explicit 'manual' phrase so client-side detector flags this template
       value:
-        "DVP settlement through Euroclear, ISIN confirmation required before settlement",
+        "DVP settlement through Euroclear, ISIN confirmation required before settlement, manual processing required",
       label: "UBS DVP - Our account (local)",
     },
     {
+      // added explicit 'non-dvp' marker to make this template intentionally non-standard
       value:
-        "PAYMENT: UBS AG / UBS ADDRESS: Bahnhofstrasse 45, CH-8001 Zurich / SWIFT: UBSWCHZH80A / CHARGES: OUR",
+        "PAYMENT: UBS AG / UBS ADDRESS: Bahnhofstrasse 45, CH-8001 Zurich / SWIFT: UBSWCHZH80A / CHARGES: OUR (note: non-dvp routing)",
       label: "UBS - Payment block (OUR charges)",
     },
     {
@@ -161,7 +226,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
     {
       value:
         "Physical delivery to warehouse facility, contact operations team for coordination",
-      label: "UBS - Short delivery instructio",
+      label: "UBS - Short delivery instruction",
     },
   ];
   //Picks which template list the component should use. If the parent passes a non-empty list of templates (e.g., desk- or user-specific templates from the server), traders will see those choices.If no templates were provided (or the provided array is empty), the UI falls back to defaultTemplates so traders still have useful quick-insert options
@@ -174,7 +239,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
     // Use the trimmed value for all validation checks so leading/trailing
     // whitespace can't be used to bypass the length check and so the
     // angle-bracket check is applied to the visible content.
-    // [<>] matches either < or > which we forbid to reduce XSS risk.
+    // [<>] matches either < or > which forbid to reduce XSS risk.
     // ADDED: validation rules enforced by the UI for settlement text.
     // These match server expectations where possible and provide
     // immediate feedback before attempting to persist:
@@ -191,7 +256,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
       {/* Wrapper for the label, templates dropdown, textarea and any messages */}
       {/* Label is linked to the textarea by id/htmlFor so screen readers announce the field */}
       {/* Templates picker: a simple select of approved settlement text.
-    - When the user picks a template we insert it at the caret or replace the selection.
+    - When the user picks a template insert it at the caret or replace the selection.
     - Mark the field as edited so validation and Save behave correctly.
     - Reset the select to the placeholder so the user can pick another template.
     This gives traders a quick, editable way to insert standard settlement instructions. */}
@@ -284,6 +349,21 @@ Turns red when the count exceeds 500, giving immediate visual feedback before Sa
           Must be 10-500 chars and may not contain &lt; or &gt;.
         </div>
       )}
+
+      {/*if nonStandardIndicators exist then apply darker yellow text and  visually a warning info banner in this position and margins*/}
+      {nonStandardKeyword && (
+        // Red banner: indicates attention required. Non-standard settlement
+        // instructions often need manual intervention by operations or
+        // risk; use a red background so the issue is visible immediately.
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="mt-2 p-2 bg-red-600 text-white text-sm rounded"
+        >
+          Non-standard settlement detected: {nonStandardKeyword}
+        </div>
+      )}
       {/* Actions: Clear remains available. The small per-field Save button
           was removed in favour of saving settlement together with the trade
           (user clicks 'Save Trade'). This avoids duplicate save buttons and
@@ -291,17 +371,22 @@ Turns red when the count exceeds 500, giving immediate visual feedback before Sa
           transaction. */}
       <div className="flex flex-col gap-2 mt-2">
         <div className="text-sm text-gray-600">
-          Settlement is saved when you click &quot;Save Trade&quot;. Use the
-          Clear button to reset the settlement textarea locally.
+          Settlement is saved when you click &quot;Save Trade&quot;.
         </div>
-        <div className="flex gap-2">
+
+        {/* Local Clear button: clears the textarea, informs the parent via onChange,
+            clears the non-standard banner and restores focus to the textarea. */}
+        <div className="flex items-center gap-2">
           <Button
+            variant={"secondary"}
             type="button"
-            variant="secondary"
             onClick={() => {
               setValue("");
-              setTouched(false);
-              textareaRef.current?.focus();
+              onChange?.("");
+              setTouched(true);
+              setNonStandardKeyword(null);
+              // focus the textarea after clearing so the user can start typing
+              requestAnimationFrame(() => textareaRef.current?.focus());
             }}
           >
             Clear

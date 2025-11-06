@@ -144,9 +144,9 @@ public class CashflowController {
     // cashflows when the frontend supplied an explicit numeric rate for a
     // Floating leg (for testing or one-off pricing). To make the endpoint
     // more useful during UI-driven testing and to keep behaviour consistent
-    // with calculateCashflowValue in TradeService, we now compute payments
+    // with calculateCashflowValue in TradeService, now compute payments
     // for Floating legs when the caller provides a concrete `rate` value.
-    // If no rate is provided for a Floating leg we preserve the old
+    // If no rate is provided for a Floating leg preserve the old
     // behaviour (paymentValue remains zero) so production behaviour that
     // relies on external market-data is unchanged.
     public ResponseEntity<List<CashflowDTO>> generateCashflows(@RequestBody CashflowGenerationRequest request) {
@@ -191,7 +191,7 @@ public class CashflowController {
                     // an explicit numeric rate. This keeps the endpoint useful
                     // for UI testing and aligns it with TradeService which
                     // computes a floating payment when a rate is present.
-                    // If no rate is supplied we intentionally leave paymentValue
+                    // If no rate is supplied intentionally leave paymentValue
                     // as zero so that callers relying on market fixings are
                     // unaffected.
                     if (leg.getRate() != null) {

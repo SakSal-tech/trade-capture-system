@@ -39,7 +39,7 @@ export const TradeActionsModal: React.FC = observer(() => {
   // Previously the settlement editor performed its own HTTP request and
   // persistence. To improve maintainability and ensure a single source of
   // truth for settlements (so Save Trade and the settlement UI behave
-  // identically), we refactored persistence into a single parent-level
+  // identically), refactored persistence into a single parent-level
   // handler `saveSettlement`. This lets the parent decide when and how to
   // persist (for example, save settlement after a trade create/update)
   // and keeps `SettlementTextArea` focused on UI concerns only (insert
@@ -47,7 +47,7 @@ export const TradeActionsModal: React.FC = observer(() => {
   // network logic and makes error-handling / UX messaging consistent.
   const [settlement, setSettlement] = useState<string>("");
   // `touched` state was previously added but is not used in this parent.
-  // If we later need to show saving state, reintroduce submitting state.
+  // If later need to show saving state, reintroduce submitting state.
 
   const { isSuccess, error } = useQuery({
     queryKey: ["staticValues"],
@@ -448,13 +448,8 @@ export const TradeActionsModal: React.FC = observer(() => {
                   >
                     Save
                   </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setSettlement("")}
-                  >
-                    Clear
-                  </Button>
+                  {/* Parent Clear removed to avoid duplicate Clear controls; the local Clear
+                      inside `SettlementTextArea` handles clearing and notifies the parent. */}
                 </div>
               </div>
             </div>

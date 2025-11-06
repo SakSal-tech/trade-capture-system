@@ -235,7 +235,7 @@ WHERE trade_id = (
 ### Next steps (recommended)
 
 1. Remove the remaining non-blocking warnings (optional): unused `loading` and nav helpers in `TradeDashboard.tsx`. This is low-risk and will make the build output clean.
-2. Add a compatibility mapping `/api/trades/search` that forwards to `TradeDashboardController.searchTrades(...)` if you want to preserve old client endpoints. Example pattern:
+2. Add a compatibility mapping `/api/trades/search` that forwards to `TradeDashboardController.searchTrades(...)` if I want to preserve old client endpoints. Example pattern:
 
 ```java
 @GetMapping("/search")

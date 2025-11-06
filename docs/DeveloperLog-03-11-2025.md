@@ -17,7 +17,7 @@ Today I focused on making validation more consistent and visible, tidying some i
 ### Completed
 
 - Created and then annotated `GlobalExceptionHandler` to return a consistent minimal JSON payload: `{ timestamp, status, message }` for errors.
-- Added developer comments and guidance in the handler explaining why we mustn't change the response shape without coordinating with the front-end team.
+- Added developer comments and guidance in the handler explaining why mustn't change the response shape without coordinating with the front-end team.
 
 ### Learned
 
@@ -114,8 +114,8 @@ Today I focused on making validation more consistent and visible, tidying some i
 
 ## Next steps (what I'd do next morning)
 
-1. With your permission, I will paste the server log lines around the rollback exception and identify the first "Caused by" stack trace so we can fix the root cause. This is the fastest way to find the actual bug.
-2. Decide and implement the maturity propagation rule (we currently have two options: propagate top-level maturity into legs on the server, or require the front end to always supply per-leg maturities). We have a todo item tracking this.
+1. With your permission, I will paste the server log lines around the rollback exception and identify the first "Caused by" stack trace so can fix the root cause. This is the fastest way to find the actual bug.
+2. Decide and implement the maturity propagation rule (currently have two options: propagate top-level maturity into legs on the server, or require the front end to always supply per-leg maturities). We have a todo item tracking this.
 3. Add more specific exception handlers to `GlobalExceptionHandler` (e.g. `MethodArgumentNotValidException`) so field-level errors return an `errors` array for the front end.
 4. Update the front end to surface returned `message` / `errors` to users and ensure Swagger payloads include both leg maturities (or the server populates them prior to validation) depending on the chosen strategy.
 
