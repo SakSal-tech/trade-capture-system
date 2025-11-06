@@ -11,7 +11,7 @@ Decision & high‑level approach
 
 - Business decision: do not record zero cashflows silently for floating legs that lack a valid rate either compute a valid rate (via a RateProvider/market data lookup or a tested fallback) or fail validation at trade creation/amendment so the issue is addressed by the trader or the downstream marketplace process.
 - Chosen implementation (conservative, safe):
-  - Add a `RateProvider` interface so we have a testable, replaceable abstraction for fetching floating rates.
+  - Add a `RateProvider` interface so have a testable, replaceable abstraction for fetching floating rates.
   - Change cashflow calculation code in `TradeService` to request a rate from `RateProvider` when a leg is floating. If no rate is returned, the validation engine will mark the trade as invalid and the booking request will fail with a clear 400 + message rather than silently generating a 0.00 payment.
   - Use `BigDecimal` consistently for monetary arithmetic, set scale and rounding mode when required, and avoid double arithmetic.
 
@@ -33,14 +33,14 @@ Programming techniques used and why (concrete explanation)
 1. Abstraction for external data (RateProvider interface)
 
 - What: I introduced a small `RateProvider` interface rather than hard‑coding rate lookups into `TradeService` or a util class.
-- Why: This isolates external dependency (market data) so we can mock it in unit tests, replace with a real adapter later (to a market data microservice or cache) and avoid mixing concern of cashflow logic with data retrieval.
+- Why: This isolates external dependency (market data) so can mock it in unit tests, replace with a real adapter later (to a market data microservice or cache) and avoid mixing concern of cashflow logic with data retrieval.
 - How: define interface:
 
   public interface RateProvider {
   Optional<BigDecimal> getRate(String indexName, LocalDate asOfDate);
   }
 
-  In production we wire an implementation. In tests we inject a `StaticRateProvider` or a Mockito mock.
+  In production wire an implementation. In tests inject a `StaticRateProvider` or a Mockito mock.
 
 2. Fail fast & clear validation (TradeValidationEngine)
 
@@ -56,7 +56,7 @@ Programming techniques used and why (concrete explanation)
 4. Monetary arithmetic discipline: BigDecimal, scale & rounding
 
 - What: All sums and per‑leg amount computations use `BigDecimal` with an agreed scale and `RoundingMode.HALF_EVEN` where necessary.
-- Why: Floating point (double) arithmetic loses precision; for financial calculations we use `BigDecimal` to avoid rounding errors and ensure consistent stored values.
+- Why: Floating point (double) arithmetic loses precision; for financial calculations use `BigDecimal` to avoid rounding errors and ensure consistent stored values.
 
 Tests I added (unit + integration) detail and rationale
 
@@ -117,7 +117,7 @@ mvn -DskipTests=false -Dtest=*IntegrationTest* test
 Notes on deployment & next steps
 
 - When moving to an environment with production market data, swap the test `RateProvider` implementation for a production adapter that calls the market data microservice or a time-series DB. Keep the same `RateProvider` interface so the service code remains unchanged.
-- If the business prefers a non-blocking booking flow (accept trade but mark cashflows pending until a rate arrives), we can adapt the validation to accept a trade but set a cashflow status field (PENDING) and enqueue a background job to populate cashflows and notify users when completed. I did not choose that approach because the business success criteria required preventing invalid trades from entering the system.
+- If the business prefers a non-blocking booking flow (accept trade but mark cashflows pending until a rate arrives), can adapt the validation to accept a trade but set a cashflow status field (PENDING) and enqueue a background job to populate cashflows and notify users when completed. I did not choose that approach because the business success criteria required preventing invalid trades from entering the system.
 
 Files created by this work
 

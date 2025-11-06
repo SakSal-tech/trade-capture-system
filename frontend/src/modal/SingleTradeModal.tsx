@@ -94,7 +94,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
   const saveSettlementAsync = async (tradeId: string, text: string) => {
     // Check whether the parent provided a saveSettlement function on props
     if (!props.saveSettlement) return;
-    // Log for debugging so we can confirm the async save was initiated
+    // Log for debugging so can confirm the async save was initiated
     console.debug("Initiating async settlement save", { tradeId, text });
     try {
       await props.saveSettlement(tradeId, text); //Calls the parent-provided saveSettlement function with the trade id and tex
@@ -285,7 +285,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
       }),
     };
     // Persist the injected defaults into UI state so the user sees them
-    // before we validate/save.
+    // before validate/save.
     setEditableTrade(tradeWithDefaults);
 
     const validationError = validateTrade(tradeWithDefaults);
@@ -304,7 +304,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
     let tradeDto: Record<string, unknown> =
       formatTradeForBackend(editableTrade);
     tradeDto = convertEmptyStringsToNull(tradeDto) as Record<string, unknown>;
-    // Prepared DTO for saving we do not inject additional derived
+    // Prepared DTO for saving do not inject additional derived
     // fields here to avoid sending incorrectly-typed values (e.g. sending
     // a username where the backend expects a numeric traderUserId). The
     // backend's DTO expects `traderUserId` (Long) and `traderUserName`
@@ -444,18 +444,18 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
       console.warn("Could not auto-assign current user ids", ex);
     }
 
-    // Debug: print the final DTO we are about to send to the backend
+    // Debug: print the final DTO are about to send to the backend
     console.debug("Sending trade DTO to backend", dto);
 
     // Ensure the settlementInstructions key is present in the DTO so the
     // backend sees the field during create/update requests. The UI keeps
     // settlement text in the parent (`props.settlement`) so prefer that
-    // when available. If there is no settlement text we still add the
+    // when available. If there is no settlement text still add the
     // key as an empty string so swagger-like payloads and programmatic
     // consumers behave consistently.
     // NOTE: tradeUtils.convertEmptyStringsToNull will later convert an
     // explicit empty string to null for fields listed there when called
-    // earlier; we intentionally include the key here to ensure the
+    // earlier; intentionally include the key here to ensure the
     // backend mapping receives the field in the JSON payload.
     dto.settlementInstructions = props.settlement ?? dto.settlement ?? "";
 
@@ -501,7 +501,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
         // trade update using the parent-provided handler. This keeps the
         // save semantics atomic from the user's perspective: clicking
         // "Save Trade" results in both the trade and its settlement being
-        // stored. Note we intentionally do not fail the whole operation if
+        // stored. Note intentionally do not fail the whole operation if
         // settlement persistence fails; the trade update succeeded and we
         // surface the settlement failure in the UI.
         if (props.saveSettlement && props.settlement) {
@@ -511,7 +511,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
               editableTrade.tradeId
             );
             // Validate settlement text before attempting async save. If
-            // validation fails we skip saving settlement but do not roll
+            // validation fails skip saving settlement but do not roll
             // back the trade update.
             if (validateSettlementText(props.settlement)) {
               void saveSettlementAsync(
@@ -526,7 +526,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
 
         const response = await api.get(`/trades/${editableTrade.tradeId}`);
         // formatDatesFromBackend may return an untyped object; cast to Trade
-        // as we expect the backend to return a complete trade entity here.
+        // as expect the backend to return a complete trade entity here.
         const updatedTrade = formatDatesFromBackend(response.data) as Trade;
         setEditableTrade(updatedTrade);
       } else {
@@ -544,7 +544,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
         }
         // NOTE: The createTrade controller already persists settlement when
         // `settlementInstructions` is present in the POST payload. To avoid
-        // duplicate records we do NOT call the separate settlement PUT here
+        // duplicate records do NOT call the separate settlement PUT here
         // for new trades. The parent `saveSettlement` handler is still used
         // for explicit updates (see update branch above) where the controller
         // does not persist settlement on PUT.

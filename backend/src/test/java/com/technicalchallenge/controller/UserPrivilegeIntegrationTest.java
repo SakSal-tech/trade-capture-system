@@ -375,7 +375,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                                 "}";
 
                 /*
-                 * REFACTORED: PATCH the trade we just created and verify 200 OK.
+                 * REFACTORED: PATCH the trade just created and verify 200 OK.
                  * WHY: The createdTradeId now references an existing, active trade,
                  * so the service's findByTradeIdAndActiveTrue() will succeed, eliminating the
                  * 404.

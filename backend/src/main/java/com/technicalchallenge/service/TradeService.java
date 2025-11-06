@@ -134,7 +134,7 @@ public class TradeService {
     // Fetch a single trade
     public Optional<Trade> getTradeById(Long tradeId) {
         logger.debug("Retrieving trade by id: {}", tradeId);
-        // Debug: also query all trades with the business tradeId so we can see if
+        // Debug: also query all trades with the business tradeId so can see if
         // rows exist but are not active. This helps diagnose integration-test
         // visibility issues where a trade may be present but flagged inactive.
         try {
@@ -149,7 +149,7 @@ public class TradeService {
             logger.warn("Error while debugging trade lookup: {}", e.getMessage());
         }
 
-        // Try to pick an active trade from the list we already fetched. This
+        // Try to pick an active trade from the list already fetched. This
         // works around cases where the derived query with a boolean predicate
         // may not match due to subtle dialect/nullable-boolean handling in
         // the test environment.
@@ -432,7 +432,7 @@ public class TradeService {
     public void deleteTrade(Long tradeId) {
         // CHANGE: Use business tradeId lookup to find the trade (not DB PK).
         // Previously this delegated directly to cancelTrade but that method
-        // performed additional ownership logic; here we make the intent
+        // performed additional ownership logic; here make the intent
         // explicit: find the trade by its business id and then cancel it.
         logger.info("Deleting (cancelling) trade with business ID: {}", tradeId);
         // Lookup by business id (tradeId) rather than DB primary key (id).
@@ -801,7 +801,7 @@ public class TradeService {
 
             BigDecimal cashflowValue = calculateCashflowValue(leg, monthsInterval);
 
-            // Debug instrumentation: log leg inputs and computed value so we can
+            // Debug instrumentation: log leg inputs and computed value so can
             // diagnose why some cashflows are persisted with payment_value = 0.00
             String legRateType = (leg.getLegRateType() != null) ? leg.getLegRateType().getType() : null;
             Long tradeId = (leg.getTrade() != null) ? leg.getTrade().getId() : null;
@@ -935,8 +935,8 @@ public class TradeService {
             // Refactor: when an explicit `rate` is present on the TradeLeg. Historically
             // floating legs always returned zero here because the system expects
             // index fixings from market data. To make UI-driven testing and
-            // one-off pricing easier we compute payments when the caller
-            // provides a concrete rate. If no rate is supplied we preserve the
+            // one-off pricing easier compute payments when the caller
+            // provides a concrete rate. If no rate is supplied preserve the
             // prior behaviour and return zero so production flows that rely on
             // a RateProvider remain unchanged.
             // If/when a MarketData service is added, this method should be
@@ -944,7 +944,7 @@ public class TradeService {
             // rate only when market data is unavailable.
             // If a floating leg has an explicit rate (e.g. provided by the UI or
             // pre-populated), use it to compute the cashflow value using the same
-            // accrual logic as a fixed leg. If no rate is available we keep the
+            // accrual logic as a fixed leg. If no rate is available keep the
             // previous behaviour and return zero (this preserves current behaviour
             // until a MarketData/RateProvider is implemented).
             if (leg.getRate() != null) {

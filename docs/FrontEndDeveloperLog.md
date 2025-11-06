@@ -57,7 +57,7 @@ Why it helps:
 - The cursor or selection start index inside the settlement-instructions textarea.
   Trade example: a trader clicks into the instructions after “Reference: ” (cursor at position 45). start becomes 45 so an inserted template (e.g., “BENEFICIARY: …”) goes exactly after the Reference text.
 - Why the fallback: if the browser can’t report selectionStart (rare), the code uses txtArea.value.length (append to the end). That prevents losing the template e.g., when the textarea isn’t fully mounted I still add the template at the end of the current settlement text.
-- UX reason for ?? : preserves 0 (cursor at document start). If the cursor is at index 0 we must treat 0 as valid ?? does that; || would mistakenly treat 0 as “missing” and append instead.
+- UX reason for ?? : preserves 0 (cursor at document start). If the cursor is at index 0 must treat 0 as valid ?? does that; || would mistakenly treat 0 as “missing” and append instead.
 
 `const end = txtArea.selectionEnd ?? start;`
 
@@ -66,7 +66,7 @@ Why it helps:
   Requirement fit:
 - Insert-at-cursor: puts templates exactly where the trader wants (improves speed and accuracy for settlement info).
 - Replace selection: lets trader select an old beneficiary block and replace it in one action (prevents duplicate/contradictory instructions).
-- Safe fallback: if selection info is unavailable, we still append the template instead of throwing avoids lost user action during edge cases (fast workflow, mounting timing).
+- Safe fallback: if selection info is unavailable, still append the template instead of throwing avoids lost user action during edge cases (fast workflow, mounting timing).
 
 `setValue((prevValue) => prevValue.slice(0, start) + text + prevValue.slice(end));`
 
@@ -97,7 +97,7 @@ const defaultTemplates = [ ... ]
 A hard-coded array of objects: { value: string, label: string }.
 Each entry is a ready-made instruction block (value) plus a short label for the UI.
 Later: const templatesToUse = templates && templates.length ? templates : defaultTemplates;
-If the parent passed templates props, we use those; otherwise we fall back to defaultTemplates.
+If the parent passed templates props, use those; otherwise fall back to defaultTemplates.
 Important: falling back to this array only makes template options available in the UI it does not change the trade unless the user inserts one.
 Why have templates (benefits for trade settlement)
 

@@ -36,7 +36,7 @@ public class GlobalExceptionHandler {
      * - message: exception message (ex.getMessage())
      *
      * Important: This is intentionally broad; consider replacing with more specific
-     * handlers (e.g. ResponseStatusException) so we don't accidentally mask server
+     * handlers (e.g. ResponseStatusException) so don't accidentally mask server
      * errors
      * as client errors.
      */

@@ -49,7 +49,7 @@ Alternatives considered (and why I deferred them)
 - Directly publishing to an external broker (Kafka/RabbitMQ) from the service.
   - Pros: Durable, scalable, decouples producers and consumers.
   - Cons: Requires infra, extra config, security hardening. For a first incremental rollout this is heavy and increases operational burden.
-  - Decision: Defer to a follow‑up step after we validate UX and volume.
+  - Decision: Defer to a follow‑up step after validate UX and volume.
 - Using Spring ApplicationEventPublisher to fire an application event and then a listener sends to a broker.
   - Pros: decouples publisher/listener responsibilities and simplifies unit testing.
   - Cons: still requires a downstream transport implementation and slightly more moving parts.
@@ -93,7 +93,7 @@ Alternatives considered and why I deferred them
 - WebSocket server (Spring WebSocket + STOMP)
   - Pros: bidirectional, better for interactive editors or chatty UIs.
   - Cons: more complex server and load‑balancer setup; requires session affinity or a broker for multi‑instance scaling. Not strictly necessary for read‑only, event‑streaming for operations.
-  - Decision: keep WebSocket as a later enhancement only if we need bidirectional or very low latency updates.
+  - Decision: keep WebSocket as a later enhancement only if need bidirectional or very low latency updates.
 - Broker + fan‑out service
   - Pros: durable and horizontally scalable; consumer decoupling.
   - Cons: external infra required and more work for on‑boarding.
@@ -144,7 +144,7 @@ Why I did it this way full justification
 
 - Correctness and compliance: audit-first emission ensures subscribers see only persisted and auditable changes this was non-negotiable for operations and compliance.
 - Low friction rollout: SSE requires no additional infra and is easy to test and demo to stakeholders. It buys immediate operational value while keeping the long‑term design open to durable options.
-- Future‑proof: by publishing from the service layer (not the controller) and keeping event publication abstract (via a manager or an event publisher), we made the implementation easy to refactor to a brokered, durable architecture later.
+- Future‑proof: by publishing from the service layer (not the controller) and keeping event publication abstract (via a manager or an event publisher), made the implementation easy to refactor to a brokered, durable architecture later.
 
 Known limitations and recommendations
 

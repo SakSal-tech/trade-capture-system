@@ -294,14 +294,6 @@ If `rate_source` = 'demo' the UI now highlights the cell and does not silently u
 
 ---
 
-If you want, I can now:
-
-1. Remove the remaining frontend warnings (unused-vars and the react-hooks deps hint) and re-run `pnpm build` to produce a fully clean lint output.
-2. Add a compatibility controller mapping for `/api/trades/search` that forwards to `/api/dashboard/search`.
-3. Run the full backend test suite (`mvn -T1C test`) and create a CI-style report.
-
-Please tell me which follow-up you'd like me to perform next and I'll proceed.
-
 - Used a `Set` (specifically a `HashSet`to ensure each operator is unique and to provide fast lookup and insertion. This is important for operator registration, so user does not accidentally register the same operator multiple times and the parser can efficiently check available operators.
 - Created a new `RSQLParser` instance with the updated set of operators so it recognizes the new `=like=` operator.
 - Updated the RSQL visitor logic to handle the `=like=` operator and perform SQL `LIKE` queries using wildcards.
@@ -1635,7 +1627,7 @@ Below is a consolidated log of the errors, test failures and functional issues I
     - Re-ran `pnpm --prefix frontend build` (lint + build). After the edits the production build completed successfully (Vite produced the dist bundle) with only non-blocking warnings remaining (unused-vars & react-hooks/exhaustive-deps warnings). The previous blocking errors were removed.
 
 - General code hygiene and documentation
-  - Added inline developer comments explaining the reasons for changes (why we escaped JSX quotes, why `any` was replaced etc.) so future contributors understand the rationale.
+  - Added inline developer comments explaining the reasons for changes (why escaped JSX quotes, why `any` was replaced etc.) so future contributors understand the rationale.
 
 Summary of verification steps executed during the session
 
@@ -1645,11 +1637,8 @@ Summary of verification steps executed during the session
 
 Notes and recommended next steps
 
-- Backwards compatibility: If external clients still call `/api/trades/search` we can add a compatibility mapping under `TradeController` for `/search` that forwards to the dashboard search method (low-risk change). I didn't add this automatically to avoid changing controller APIs without your confirmation.
-- Tidy remaining warnings: There are a few non-blocking warnings left in `TradeDashboard.tsx` (unused `loading`, `goToTrades`, `goToBooks` and a `react-hooks/exhaustive-deps` hint). I can remove or use those variables to clear the warnings if you want.
-- Tests: run a full backend test suite and CI pipeline if you want these changes validated across all tests and environments.
-
-If you want, I can now 1) remove the remaining frontend warnings, 2) add a compatibility route for `/api/trades/search`, and 3) run the full test suite and produce a CI-style report. Tell me which of the three (or all) you'd like me to do next.
+- Backwards compatibility: If external clients still call `/api/trades/search` can add a compatibility mapping under `TradeController` for `/search` that forwards to the dashboard search method (low-risk change). I didn't add this automatically to avoid changing controller APIs without your confirmation.
+- Tidy remaining warnings: There are a few non-blocking warnings left in `TradeDashboard.tsx` (unused `loading`, `goToTrades`, `goToBooks` and a `react-hooks/exhaustive-deps` hint).
 ```
 
 ### Problem
@@ -4823,7 +4812,7 @@ Caused by: org.hibernate.exception.ConstraintViolationException:
   - backend/src/main/java/com/technicalchallenge/mapper/AdditionalInfoMapper.java -> toEntity(...) sets fieldType default in some code paths but not all
   - backend/src/main/java/com/technicalchallenge/service/AdditionalInfoService.java -> createAdditionalInfo(), upOrInsertTradeSettlementInstructions()
 - Fix applied (defensive backend fix):
-  - Ensure the entity has a safe default `fieldType = "STRING"` before saving. Changes made in `AdditionalInfoService.createAdditionalInfo()` and in the upsert creation branch to set `entity.setFieldType("STRING")` when missing. Comments added explaining the 500 and why we set a default.
+  - Ensure the entity has a safe default `fieldType = "STRING"` before saving. Changes made in `AdditionalInfoService.createAdditionalInfo()` and in the upsert creation branch to set `entity.setFieldType("STRING")` when missing. Comments added explaining the 500 and why set a default.
   - Rationale: Making the service tolerant avoids 500s from clients that omit the optional `fieldType`. (Alternative: add `fieldType` to DTO and require clients to send it this is a breaking contract change. The service-level default is safer.)
 
 ### 5) tradeId remained null on the frontend after create

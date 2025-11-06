@@ -69,7 +69,7 @@ This document records the work I completed on 30 October 2025. It explains what 
 
 ### CONTEXT (short)
 
-- Business domain: trades have a business identifier (`trade_id`), metadata (trader, inputter, UTI), and optionally zero-or-more pieces of additional information (we store settlement instructions in `additional_info`).
+- Business domain: trades have a business identifier (`trade_id`), metadata (trader, inputter, UTI), and optionally zero-or-more pieces of additional information (store settlement instructions in `additional_info`).
 - Key rules I followed while implementing changes today:
   - Settlement instructions belong to a trade and must be persisted against the trade's business `trade_id` (AdditionalInfo.entity_id = trade.trade_id).
   - User references in trade payloads are numeric ids (backend expects Long), not usernames.
@@ -224,7 +224,7 @@ This document records the work I completed on 30 October 2025. It explains what 
 
 ### CONTEXT (short)
 
-- Business domain: trades have a business identifier (`trade_id`), metadata (trader, inputter, UTI), and optionally zero-or-more pieces of additional information (we store settlement instructions in `additional_info`).
+- Business domain: trades have a business identifier (`trade_id`), metadata (trader, inputter, UTI), and optionally zero-or-more pieces of additional information (store settlement instructions in `additional_info`).
 - Key rules I followed while implementing changes today:
   - Settlement instructions belong to a trade and must be persisted against the trade's business `trade_id` (AdditionalInfo.entity_id = trade.trade_id).
   - User references in trade payloads are numeric ids (backend expects Long), not usernames.
