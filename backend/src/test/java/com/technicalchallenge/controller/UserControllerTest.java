@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 // import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import com.technicalchallenge.repository.AdditionalInfoRepository;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -33,6 +34,9 @@ public class UserControllerTest extends BaseIntegrationTest {
     private ApplicationUserMapper applicationUserMapper;
     @MockBean
     private UserProfileService userProfileService;
+
+    @MockBean
+    private AdditionalInfoRepository additionalInfoRepository;
 
     @BeforeEach
     public void setup() {

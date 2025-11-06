@@ -21,7 +21,6 @@ import static org.hamcrest.Matchers.is;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import org.junit.jupiter.api.BeforeEach;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.model.Book;
 import com.technicalchallenge.model.Counterparty;

@@ -305,3 +305,35 @@ https://www.youtube.com/watch?v=SFyjnuyYj4I
 ### React TypeScript Loading Spinner
 
 https://www.youtube.com/watch?v=jUwMb0zF2H4
+
+YouTube: “How-to Create Bar / Pie / Radar / Line Chart using React Chart JS-2”.
+YouTube
+
+Medium article: “How to Create a Simple Pie Chart with Chart.js on React”.
+Medium
+
+### Snackbar & Navigation (React)
+
+Material UI Snackbar docs: https://mui.com/components/snackbars/
+
+React Router docs: https://reactrouter.com/
+
+### React Charts
+
+https://www.youtube.com/watch?v=6q5d3Z1-5kQ
+https://rainerregan.medium.com/how-to-create-a-simple-pie-chart-with-chart-js-on-react-1e5a16f364a3
+
+### How to download csv file from react
+
+https://www.baeldung.com/spring-events
+https://www.youtube.com/watch?v=IPEqb_AJbAQ
+
+### Handling Application Events with Spring Boot
+
+https://www.youtube.com/watch?v=d31EfLV1iJo
+
+https://www.baeldung.com/spring-events
+
+### Web Socket SSE
+
+https://www.baeldung.com/spring-server-sent-events

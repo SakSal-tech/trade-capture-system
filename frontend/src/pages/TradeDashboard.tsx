@@ -23,6 +23,7 @@ import {
   Legend,
   Cell,
 } from "recharts";
+import DownloadSettlementsButton from "../components/DownloadSettlementsButton";
 
 function SummaryCard(props: { title: string; value: string }) {
   // Small reusable card used in the dashboard summary row. Keeps styling
@@ -35,6 +36,16 @@ function SummaryCard(props: { title: string; value: string }) {
   );
 }
 
+// Format a numeric or string value as USD currency where possible.
+// If the backend provides a non-numeric delta (e.g. a string message) we
+// display it as-is. If the value is missing I show a dash to avoid
+// presenting a hardcoded placeholder number in the UI.
+function formatCurrency(value?: number | string | null) {
+  if (value === undefined || value === null) return "-";
+  const n = Number(value as any);
+  if (Number.isNaN(n)) return String(value);
+  return n.toLocaleString(undefined, { style: "currency", currency: "USD" });
+}
 // Minimal types to avoid explicit `any` while keeping the page flexible.
 // Introduced to remove usages of `any` which trigger the
 // `@typescript-eslint/no-explicit-any` rule during the build. These
@@ -172,6 +183,8 @@ function TradeDashboard() {
                 Daily Summary
               </button>
             </div>
+            {/* Add the export button here so users can quickly download settlements CSV */}
+            <DownloadSettlementsButton />
           </div>
         </div>
 
@@ -287,12 +300,8 @@ function TradeDashboard() {
             }
           />
           <SummaryCard
-            title="Net Exposure"
-            value={
-              summary?.riskExposureSummary?.delta
-                ? String(summary.riskExposureSummary.delta)
-                : "$1,234,000"
-            }
+            title="Risk Net Exposure"
+            value={formatCurrency(summary?.riskExposureSummary?.delta)}
           />
         </div>
 
