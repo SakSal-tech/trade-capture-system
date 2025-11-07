@@ -151,7 +151,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
     setLoading(true);
     if (!editableTrade) return;
     try {
-      // Helper: sanitize numeric strings by removing commas/whitespace
+      // Helper: sanitise numeric strings by removing commas/whitespace
       const sanitizeNumber = (v: number | string | undefined) => {
         if (v === undefined || v === null) return undefined;
         if (typeof v === "number") return v;
@@ -161,7 +161,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
       };
 
       const legsDto = editableTrade.tradeLegs.map((leg) => {
-        // Sanitize incoming rate values. If the leg is Floating and no
+        // Sanitise incoming rate values. If the leg is Floating and no
         // explicit rate is provided by the UI (common when using index
         // fixings externally), inject a demo fallback so the backend
         // produces numeric cashflows for demo/test purposes.
@@ -453,7 +453,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
     // when available. If there is no settlement text still add the
     // key as an empty string so swagger-like payloads and programmatic
     // consumers behave consistently.
-    // NOTE: tradeUtils.convertEmptyStringsToNull will later convert an
+    // tradeUtils.convertEmptyStringsToNull will later convert an
     // explicit empty string to null for fields listed there when called
     // earlier; intentionally include the key here to ensure the
     // backend mapping receives the field in the JSON payload.
@@ -542,7 +542,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
             prev ? { ...prev, tradeId: newTradeId } : prev
           );
         }
-        // NOTE: The createTrade controller already persists settlement when
+        // The createTrade controller already persists settlement when
         // `settlementInstructions` is present in the POST payload. To avoid
         // duplicate records do NOT call the separate settlement PUT here
         // for new trades. The parent `saveSettlement` handler is still used

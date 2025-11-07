@@ -1,0 +1,11 @@
+# Frontend dockerignore: exclude host node_modules and built assets from build context
+node_modules
+dist
+build
+.vscode
+.idea
+.DS_Store
+npm-debug.log
+.env
+.pnpm-store
+.pnpm

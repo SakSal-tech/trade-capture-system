@@ -13,6 +13,5 @@ public class BookDTO {
     private boolean active;
     private int version;
     private String costCenterName;
-    // Adding this line to force commit
 
 }

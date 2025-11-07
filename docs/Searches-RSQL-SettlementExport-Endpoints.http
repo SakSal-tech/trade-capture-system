@@ -51,7 +51,7 @@ GET http://localhost:8080/api/dashboard/rsql?query=tradeStatus.tradeStatus=out=(
 GET http://localhost:8080/api/dashboard/rsql?query=counterparty.name=like=*bank*
 
 
-EXPORTING NONSTANDARD SETTLEMENTS
+### EXPORTING NONSTANDARD SETTLEMENTS
 Full CSV (same as before):
 GET http://localhost:8080/api/trades/exports/settlements
 Non-standard-only CSV:

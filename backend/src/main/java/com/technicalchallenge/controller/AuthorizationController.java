@@ -28,7 +28,7 @@ public class AuthorizationController {
      * allows subsequent requests from the same session/client to be treated
      * as authenticated by Spring Security (session cookie).
      *
-     * Note: This endpoint still returns 403 when authentication fails.
+     * This endpoint still returns 403 when authentication fails.
      */
     @PostMapping("/{userName}")
     public ResponseEntity<?> login(@PathVariable(name = "userName") String userName,

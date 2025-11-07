@@ -12,7 +12,7 @@ import java.util.Map;
 // I was getting the default BasicErrorController is showing the full stack trace.
 // This class is to override it using a @ControllerAdvice to catch exceptions globally and return only the meaningful validation message.
 //
-// NOTE: Do not change the handlers' return shapes without coordinating with the frontend team.
+// Do not change the handlers' return shapes without coordinating with the frontend team.
 // The frontend expects a JSON object containing at least the following keys:
 // - timestamp: when the error occurred (LocalDateTime string)
 // - status: HTTP status code
@@ -58,10 +58,6 @@ public class GlobalExceptionHandler {
      *
      * Behaviour: returns HTTP 500 with a generic message to avoid leaking internal
      * details.
-     * If you need to expose more context for debugging in non-production
-     * environments,
-     * add an environment check and include additional fields (traceId, exception
-     * class).
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {

@@ -37,6 +37,5 @@ public class HolidayCalendarService {
         logger.warn("Deleting holiday calendar with id: {}", id);
         holidayCalendarRepository.deleteById(id);
     }
-    // Adding this line to force commit
 
 }

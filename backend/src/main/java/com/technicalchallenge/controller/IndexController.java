@@ -76,6 +76,5 @@ public class IndexController {
                 .map(Index::getIndex)
                 .toList();
     }
-    // Adding this line to force commit
 
 }

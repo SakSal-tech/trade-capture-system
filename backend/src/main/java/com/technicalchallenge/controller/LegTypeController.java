@@ -76,6 +76,5 @@ public class LegTypeController {
                 .map(LegType::getType)
                 .toList();
     }
-    // Adding this line to force commit
 
 }

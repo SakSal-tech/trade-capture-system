@@ -1,4 +1,4 @@
-# Step 3 Implement Missing Functionality (Enhancements 1–3)
+# Step 3 Functionality (Enhancements 1–3)
 
 ---
 
@@ -162,10 +162,10 @@ Programming techniques used and why
   - Technique: fetch domain `TradeDTO`s for the trader (via `fetchTradesForTraderWithoutPrivilegeCheck`) then perform in‑memory aggregations using Java streams and `BigDecimal` for numeric accuracy.
   - Why: Aggregations are domain-specific and easier to express in Java when datasets per trader are modest. `BigDecimal` avoids rounding errors when summing notionals.
 - Defensive authorization and short-circuits
-  - Technique: capture `Authentication` at the start of `getTradeSummary` and compute `canViewOthers` to prevent accidental leaks; enforce privilege checks early to avoid expensive aggregations for unauthorised callers.
+  - Technique: capture `Authentication` at the start of `getTradeSummary` and calculate `canViewOthers` to prevent accidental leaks; enforce privilege checks early to avoid expensive aggregations for unauthorised callers.
   - Why: Performance and security deny early prevents wasted work and prevents accidental data exposure.
 - Weekly / daily comparisons
-  - Technique: compute per-day buckets for the last 7 days using `LocalDate` and stream filters. Compose `DailySummaryDTO.DailyComparisonSummary` entries.
+  - Technique: calculate per-day buckets for the last 7 days using `LocalDate` and stream filters. Compose `DailySummaryDTO.DailyComparisonSummary` entries.
   - Why: Simple and explicit; easier to unit test and to tune later for DB‑side aggregation if performance requires.
 
 Why I chose these approaches
@@ -178,7 +178,7 @@ Alternatives considered
 
 - Push aggregation into the database (SQL GROUP BY / materialised views)
   - Pros: potentially much faster for very large datasets and can use DB indexes and parallel execution.
-  - Cons: increases SQL complexity, more migration scripts, and less flexibility for business logic changes. If profiling shows slow queries, I recommend moving heavy aggregates into DB views or precomputed tables.
+  - Cons: increases SQL complexity, more migration scripts, and less flexibility for business logic changes. If profiling shows slow queries, maybe moving heavy aggregates into DB views or precomputed tables.
 - Use OLAP / cube or analytics DB
   - Pros: best for large-scale analytics and historical comparisons.
   - Cons: heavy infra; out of scope for initial enhancement.

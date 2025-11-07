@@ -54,6 +54,5 @@ public class SubDeskService {
         logger.warn("Deleting subdesk with id: {}", id);
         subDeskRepository.deleteById(id);
     }
-    // Adding this line to force commit
 
 }

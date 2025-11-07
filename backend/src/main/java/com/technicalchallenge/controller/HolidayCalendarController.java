@@ -77,6 +77,5 @@ public class HolidayCalendarController {
                 .map(HolidayCalendar::getHolidayCalendar)
                 .toList();
     }
-    // Adding this line to force commit
 
 }

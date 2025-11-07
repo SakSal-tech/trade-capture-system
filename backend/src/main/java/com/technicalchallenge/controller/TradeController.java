@@ -125,7 +125,7 @@ public class TradeController {
 
         StringBuilder csv = new StringBuilder();
         // CSV header (columns: tradeId, settlementInstructions, nonStandard)
-        // Note: The nonStandard column is emitted as a textual boolean.
+        // The nonStandard column is emitted as a textual boolean.
         csv.append("tradeId,settlementInstructions,nonStandard\n");
 
         for (Trade trade : trades) {

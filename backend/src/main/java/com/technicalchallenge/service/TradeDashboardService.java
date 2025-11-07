@@ -330,7 +330,7 @@ public class TradeDashboardService {
             // the request must be denied unless the caller has ROLE_MIDDLE_OFFICE,
             // ROLE_SUPERUSER, or the TRADE_VIEW_ALL privilege. This avoids a simple
             // mistake in the UI exposing 'simon' data to 'joey'.
-            // NOTE: In test contexts or when no Authentication is present (e.g.
+            // In test contexts or when no Authentication is present (e.g.
             // direct service unit tests), do not enforce this guard so tests
             // that call the service with explicit traderIds continue to work.
             boolean canViewOthers = auth != null && auth.getAuthorities().stream().anyMatch(a -> {
@@ -338,7 +338,7 @@ public class TradeDashboardService {
                 return "ROLE_MIDDLE_OFFICE".equals(ga)
                         || "ROLE_SUPERUSER".equals(ga)
                         || "TRADE_VIEW_ALL".equals(ga);
-                // NOTE: do NOT treat the generic TRADE_VIEW privilege as permission
+                // do NOT treat the generic TRADE_VIEW privilege as permission
                 // to view other traders' data. TRADE_VIEW grants viewing rights for
                 // the caller's own data but not for arbitrary traders.
             });
@@ -408,7 +408,7 @@ public class TradeDashboardService {
             // Also expose as explicit all-time mapping
             summaryDTO.setAllTimeTradesByTypeAndCounterparty(tradesByTypeAndCounterparty);
 
-            // Risk placeholder: compute a naive 'delta' as sum(notional * rate)
+            // Risk placeholder: calculate a naive 'delta' as sum(notional * rate)
             // across legs. This is a demonstration value, not a financial Greek.
             BigDecimal delta = BigDecimal.ZERO;
             for (TradeDTO tradeDto : tradesForTrader) {
@@ -433,7 +433,7 @@ public class TradeDashboardService {
             summaryDTO.setAllTimeRiskExposureSummary(allTimeRisk);
 
             // Weekly comparisons: create seven per-day summaries (oldest -> newest)
-            // and at the same time compute weekly aggregate totals used for the
+            // and at the same time calculate weekly aggregate totals used for the
             // labeled weekly fields below.
             List<DailySummaryDTO.DailyComparisonSummary> weekly = new ArrayList<>();
             LocalDate today = LocalDate.now();
@@ -771,7 +771,7 @@ public class TradeDashboardService {
             return false; // ADDED: explicit deny for invalid inputs
         }
 
-        // NOTE: do not short-circuit when the DB-backed service is missing;
+        // do not short-circuit when the DB-backed service is missing;
         // tests must explicitly mock `UserPrivilegeService` where required.
 
         // First, check the SecurityContext authorities for a quick-path
@@ -866,7 +866,7 @@ public class TradeDashboardService {
         // This is optional and used for advanced validations (kept as a last
         // resort after direct authority + DB privilege checks).
         try {
-            // NOTE: privilegeValidationEngine expects domain objects; only call
+            // privilegeValidationEngine expects domain objects; only call
             // if available and applicable. cannot build a full TradeDTO here,
             // so this call is omitted. Keep this block for future integration.
         } catch (Exception e) {

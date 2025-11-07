@@ -1,8 +1,4 @@
-## Development log — Identify non-standard settlement instructions
-
-This document records the steps taken to implement detection and UX for non-standard settlement instructions across backend and frontend. It is intended as a concise developer log for reviewers and future maintainers.
-
----
+## Identify non-standard settlement instructions
 
 ### Summary
 
@@ -20,8 +16,8 @@ This document records the steps taken to implement detection and UX for non-stan
 
   - `additionalInfo` (the DTO that existing clients expect)
   - `fieldValue` (kept top-level for backward compatibility)
-  - `nonStandardKeyword` (string|null) — the matched keyword, null if standard
-  - `message` (string|null) — a human-friendly message for UI/Swagger
+  - `nonStandardKeyword` (string|null) the matched keyword, null if standard
+  - `message` (string|null) a human-friendly message for UI/Swagger
 
 - When a non-standard keyword is detected, the response also includes a response header `X-NonStandard-Keyword` so API consumers and Swagger UI can highlight the response.
 
@@ -36,7 +32,7 @@ Example response JSON (GET /api/trades/{id}/settlement-instructions):
   },
   "fieldValue": "Payment by manual instruction to account ...",
   "nonStandardKeyword": "manual",
-  "message": "Contains non-standard settlement instruction: 'manual' — please review manually."
+  "message": "Contains non-standard settlement instruction: 'manual' please review manually."
 }
 ```
 
@@ -63,7 +59,7 @@ return ResponseEntity.ok()
 
 ### Learned
 
-- Keep mappers pure — enrich DTOs in the service/controller layer rather than introducing service calls in mappers. This keeps tests and inversion of control simple.
+- Keep mappers pure enrich DTOs in the service/controller layer rather than introducing service calls in mappers. This keeps tests and inversion of control simple.
 - Returning a compatibility top-level `fieldValue` is low-risk; it avoids breaking clients expecting the earlier shape while letting us add additional metadata.
 - Adding a small response header (`X-NonStandard-Keyword`) makes it trivial for API clients (curl, Swagger UI) to detect and highlight non-standard responses without changing client JSON parsing.
 
@@ -71,7 +67,7 @@ return ResponseEntity.ok()
 
 - Backwards compatibility: changing response shape risks breaking clients. Solution: keep `fieldValue` at top-level and include `additionalInfo` envelope.
 - Deciding where to put rule definitions: server-side detection is authoritative, but some quick client-side rules are handy for UX. Consider centralizing rule-config (future work: endpoint to fetch rules).
-- Testing: need unit/integration tests to cover the controller envelope and presence of the header — not yet added here.
+- Testing: need unit/integration tests to cover the controller envelope and presence of the header not yet added here.
 
 ---
 
@@ -123,7 +119,7 @@ Example banner (Markdown with color notes):
   aria-live="polite"
   style="background:#dc2626;color:#ffffff;padding:8px;border-radius:4px;"
 >
-  ⚠️ Contains non-standard settlement instruction: 'manual' — please review
+  ⚠️ Contains non-standard settlement instruction: 'manual' please review
   manually.
 </div>
 ```
@@ -138,7 +134,7 @@ Example banner (Markdown with color notes):
 
 - Keeping server and client rule lists in sync. Current approach duplicates simple keyword list on client and uses service on server; future improvement: centralize rules on server and expose an endpoint so the UI can fetch them.
 - Accessibility: ensuring the banner is announced (aria-live) but not too intrusive. We used polite aria-live so screen-readers announce changes without interrupting.
-- Duplicate controls: parent modal had a second Clear — this caused confusion. We removed the duplicate so only the local red Clear near the textarea remains.
+- Duplicate controls: parent modal had a second Clear this caused confusion. We removed the duplicate so only the local red Clear near the textarea remains.
 
 ---
 
@@ -147,12 +143,12 @@ Example banner (Markdown with color notes):
 - Non-standard keywords used during development and tests:
   - "manual" (example: settlement text containing the word manual)
   - "non-dvp" / "non dvp"
-  - (intentionally omitted: "further credit" — this was removed from client detectors because it flagged an approved JPM template)
+  - (intentionally omitted: "further credit" this was removed from client detectors because it flagged an approved JPM template)
 
 Sample settlement text that should be flagged:
 
 ```
-Payment to account 123456 — manual instruction via custodian.
+Payment to account 123456 manual instruction via custodian.
 ```
 
 Sample settlement text that should NOT be flagged (standard):
@@ -165,10 +161,10 @@ DVP via Euroclear - settlement to account IBAN XXXX.
 
 ## Files edited during this work (high level)
 
-- `backend/src/main/java/.../controller/TradeSettlementController.java` — GET/PUT modified to return envelope and `X-NonStandard-Keyword` header.
-- `backend/src/main/java/.../service/AdditionalInfoService.java` — detection method exists and is used (no breaking change to public API of service).
-- `frontend/src/modal/SettlementTextArea.tsx` — client-side detection, insertion-space fix, accessible red banner, local Clear button styling.
-- `frontend/src/modal/TradeActionsModal.tsx` — removed duplicate small Clear adjacent to Save and passed server-provided detection through props (if implemented).
+- `backend/src/main/java/.../controller/TradeSettlementController.java` GET/PUT modified to return envelope and `X-NonStandard-Keyword` header.
+- `backend/src/main/java/.../service/AdditionalInfoService.java` detection method exists and is used (no breaking change to public API of service).
+- `frontend/src/modal/SettlementTextArea.tsx` client-side detection, insertion-space fix, accessible red banner, local Clear button styling.
+- `frontend/src/modal/TradeActionsModal.tsx` removed duplicate small Clear adjacent to Save and passed server-provided detection through props (if implemented).
 
 ---
 
@@ -187,13 +183,3 @@ Expect: response JSON contains `nonStandardKeyword` and `message`, and header `X
 - Open trade in UI, the settlement textarea should show the red banner if server or client detects non-standard text.
 - Type to remove the keyword; client banner should disappear immediately. Save and verify server detection clears too (if saved response returns null keyword).
 - Use the template insertion buttons to add a template that ends with a word (verify insertion-space prevents concatenation and detection still works).
-
----
-
-## Next steps (recommended)
-
-1. Add unit and integration tests in backend to assert controller envelope and header presence.
-2. Add an endpoint to expose server-side detection rules so the frontend can fetch them and avoid duplication.
-3. Add a small export endpoint for risk systems: `GET /api/trades/export/settlements?date=YYYY-MM-DD` including `nonStandardKeyword` and `fieldValue`.
-
----

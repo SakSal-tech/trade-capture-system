@@ -59,6 +59,5 @@ public class PrivilegeController {
         privilegeService.deletePrivilege(id);
         return ResponseEntity.noContent().build();
     }
-    // Adding this line to force commit
 
 }

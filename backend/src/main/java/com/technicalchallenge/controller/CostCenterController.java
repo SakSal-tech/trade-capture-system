@@ -72,6 +72,4 @@ public class CostCenterController {
                 .toList();
     }
 
-    // Adding this line to force commit
-
 }

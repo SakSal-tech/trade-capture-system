@@ -55,6 +55,5 @@ public class OpenApiConfig {
                                                 new Tag().name("System")
                                                                 .description("System monitoring and health check endpoints")));
         }
-        // Adding this line to force commit
 
 }

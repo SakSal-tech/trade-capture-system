@@ -4,7 +4,7 @@ import React from "react";
 // These buttons are simple navigation helpers for beginner-friendly demo
 // flows and link to the newly added Trade Dashboard route.
 //
-// NOTE: Previously this file contained local navigation helper functions
+// Previously this file contained local navigation helper functions
 // (goToNewBooking, goToSearch, goToDashboard) and a `useNavigate` import.
 // Those helpers were removed because they were not referenced anywhere and
 // caused ESLint `no-unused-vars` errors during `pnpm build`. Navigation

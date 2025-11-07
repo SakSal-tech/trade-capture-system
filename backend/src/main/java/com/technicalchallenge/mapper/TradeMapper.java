@@ -97,7 +97,7 @@ public class TradeMapper {
             dto.setTradeLegs(legDTOs);
         }
 
-        // NOTE: Settlement instructions are intentionally NOT fetched here to keep
+        // Settlement instructions are intentionally NOT fetched here to keep
         // the mapper side-effect free. If callers require settlement instructions
         // they should call AdditionalInfoService from the service/controller
         // layer and enrich the DTO explicitly. This prevents validation/ownership
@@ -141,7 +141,7 @@ public class TradeMapper {
             trade.setCounterparty(cp);
         }
 
-        // Note: Do NOT set settlementInstructions here they belong to AdditionalInfo
+        // Do NOT set settlementInstructions here they belong to AdditionalInfo
         return trade;
     }
 

@@ -35,6 +35,5 @@ public class ApplicationUserMapper {
         }
         return entity;
     }
-    // Adding this line to force commit
 
 }

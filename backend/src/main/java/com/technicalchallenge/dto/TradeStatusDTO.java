@@ -7,6 +7,5 @@ public class TradeStatusDTO {
     private Long id;
     private String tradeStatus;
     // getters and setters
-    // Adding this line to force commit
 
 }

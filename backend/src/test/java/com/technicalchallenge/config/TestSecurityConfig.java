@@ -50,8 +50,7 @@ public class TestSecurityConfig {
          */
         @Bean
         public PasswordEncoder passwordEncoder() {
-                return new BCryptPasswordEncoder(); // Refactored changed from NoOpPasswordEncoder to secure,
-                                                    // recommended for production
+                return new BCryptPasswordEncoder(); // Refactored changed from NoOpPasswordEncoder to secure
         }
 
         /**

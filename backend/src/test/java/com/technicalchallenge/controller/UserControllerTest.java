@@ -72,5 +72,5 @@ public class UserControllerTest extends BaseIntegrationTest {
         mockMvc.perform(get("/api/users"))
                 .andExpect(status().isOk());
     }
-    // Adding this line to force commit
+
 }

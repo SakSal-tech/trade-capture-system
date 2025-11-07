@@ -37,6 +37,5 @@ public class IndexService {
         logger.warn("Deleting index with id: {}", id);
         indexRepository.deleteById(id);
     }
-    // Adding this line to force commit
 
 }

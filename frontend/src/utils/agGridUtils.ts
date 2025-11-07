@@ -1,4 +1,4 @@
-// NOTE: Return types are `any[]` here because the ag-grid column/row
+// Return types are `any[]` here because the ag-grid column/row
 // definitions are dynamically created from runtime data. Narrowing to the
 // exact `ColDef` shape is possible but caused brittle type errors; using
 // `any[]` is a pragmatic compromise for these helpers.

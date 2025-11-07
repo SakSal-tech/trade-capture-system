@@ -9,7 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import staticStore from "../stores/staticStore";
 import { SingleUserModal } from "./SingleUserModal";
 import { ApplicationUser } from "../utils/ApplicationUser";
-// Recent edits summary:
+// Refactored:
 // - getDefaultUser now returns a fully-typed ApplicationUser to avoid
 //   Partial<ApplicationUser> <-> ApplicationUser state assignment errors.
 // - Fixed typing around create/update payloads so `id` is undefined when

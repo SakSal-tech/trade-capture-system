@@ -176,6 +176,5 @@ public class TradeLegServiceTest {
         // Then
         verify(tradeLegRepository).deleteById(tradeLegId);
     }
-    // Adding this line to force commit
 
 }

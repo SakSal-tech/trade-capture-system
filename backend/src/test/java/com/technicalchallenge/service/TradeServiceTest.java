@@ -103,7 +103,7 @@ class TradeServiceTest {
         trade = new Trade();
         trade.setId(1L);
         trade.setTradeId(100001L);
-        // NOTE: version intentionally not set here; tests that need it will set
+        // version intentionally not set here; tests that need it will set
         // explicitly.
     }
 
@@ -300,6 +300,5 @@ class TradeServiceTest {
         verify(cashflowRepository, times(12)).save(any(Cashflow.class));// Cashflow.class any instance of the Cashflow
                                                                         // type
     }
-    // Adding this line to force commit
 
 }

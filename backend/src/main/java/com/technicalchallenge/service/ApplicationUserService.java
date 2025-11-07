@@ -51,8 +51,7 @@ public class ApplicationUserService {
             } catch (Exception e) {
                 // If the PasswordEncoder throws (malformed value, unknown id,
                 // etc.) fall back to a plain equals check. This fallback is
-                // only intended to assist with legacy seed data and is not
-                // recommended for production use.
+                // only intended to assist with legacy seed.
                 boolean eq = stored.equals(password);
                 logger.debug("Password encoder failed for user '{}', falling back to plain equals: {}", loginId, eq);
                 return eq;

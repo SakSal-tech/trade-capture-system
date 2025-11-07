@@ -95,6 +95,5 @@ public class CounterpartyController {
                                 .map(Counterparty::getName)
                                 .toList();
         }
-        // Adding this line to force commit
 
 }

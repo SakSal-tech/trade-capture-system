@@ -37,6 +37,5 @@ public class TradeStatusService {
         logger.warn("Deleting trade status with id: {}", id);
         tradeStatusRepository.deleteById(id);
     }
-    // Adding this line to force commit
 
 }
