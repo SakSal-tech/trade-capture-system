@@ -9,6 +9,310 @@ Used jakarta.persistence.criteria.Predicate in the toPredicate method, not java.
 Adding the required @NonNull annotation to the parameters of the toPredicate method:
 Imported org.springframework.lang.NonNull and annotate Root<Trade> root, CriteriaQuery<?> query, and CriteriaBuilder criteriaBuilder in the anonymous inner class.
 
+## RSQL issues: wrong imports, missing operator, empty results and parsing errors
+
+### Problem
+
+RSQL search returned empty results or threw parsing errors for malformed queries. Tests such as AdvanceSearchDashboardIntegrationTest previously failed due to parsing exceptions or incorrect predicate construction.
+
+### Root Cause
+
+- Wrong imports in RSQL visitor: `java.util.function.Predicate` and `java.nio.file.Path` were used instead of `jakarta.persistence.criteria.Predicate` and `jakarta.persistence.criteria.Path`.
+- The wildcard operator `=like=` was not registered with the `RSQLParser` by default.
+- Malformed RSQL queries were not caught and propagated as 400 client errors; instead an uncaught parser exception produced 500 server errors.
+
+### Solution
+
+- Replace incorrect imports with `jakarta.persistence.criteria.Predicate` and `jakarta.persistence.criteria.Path`, and avoid parameterising non-generic JPA types.
+- Register a custom `ComparisonOperator` for `=like=` in parser setup and implement case-insensitive `LIKE` handling in the visitor by converting `*` to `%` and using `criteriaBuilder.lower(... )`.
+- Add robust value conversion utility `convertValue(Class<?> type, String value)` that throws `IllegalArgumentException` on invalid conversions.
+- Catch `RSQLParserException` at service level and return 400 Bad Request (controller should map null/invalid service result to 400).
+
+### Impact
+
+RSQL endpoint now supports wildcard `=like=` queries and returns client errors (400) for malformed queries rather than internal server errors. Search results match expected records.
+
+---
+
+## TradeRsqlVisitor missing return and raw type warnings
+
+### Problem
+
+Compilation errors such as "missing return statement" and raw-type warnings for `Predicate` were observed when implementing dynamic Specification<Trade> logic.
+
+### Root Cause
+
+- The `toPredicate` method had conditional branches with return statements but no unconditional final return, so the compiler reported a missing return for some code paths.
+- The wrong `Predicate` type (java.util.function.Predicate) or raw `Predicate` usage caused raw-type warnings.
+
+### Solution
+
+- Ensure `toPredicate` handles all operators explicitly and, where appropriate, throw an `IllegalArgumentException` for unsupported operators rather than returning `null` (safer and clearer).
+- Use `jakarta.persistence.criteria.Predicate` everywhere and remove imports of `java.util.function.Predicate`.
+
+### Impact
+
+Compilation errors were resolved. The visitor fails fast for unsupported operators and returns correct JPA predicates for supported operators.
+
+---
+
+## RSQL parser unknown operator (`=like=`) and token errors
+
+### Problem
+
+Parser exceptions occurred for queries using unknown or malformed operators, leading to test errors and 500 responses in API tests.
+
+### Root Cause
+
+The custom operator `=like=` had not been registered with the parser; malformed token sequences reached the parser without service-level validation.
+
+### Solution
+
+- Add `ComparisonOperator LIKE = new ComparisonOperator("=like=");` and include it in the operators `Set` passed to the `RSQLParser` constructor.
+- Add service-level parsing exception handling to return a 400 response for invalid queries.
+
+### Impact
+
+Wildcard searches now work and malformed queries produce expected 400 client errors in tests.
+
+---
+
+## Unit/integration test failures (Mockito type-safety, value conversion and mocking gaps)
+
+### Problem
+
+Several unit tests failed due to Mockito generics/type-safety issues and type conversion errors when tests supplied invalid values for numeric fields.
+
+### Root Cause
+
+- Mockito stubbing of JPA `Path` and generics produced `Type safety` warnings and `thenReturn` mismatches because of the `Path<T>` generic type.
+- Tests passed string values that could not convert to the field's Java type (for example 'NotANumber' for a Long field), which threw `IllegalArgumentException` in conversion utilities.
+
+### Solution
+
+- Use raw-type casting in test code with method-level `@SuppressWarnings({"unchecked","rawtypes"})` where necessary to mock `Path` and toReturn raw `Path` objects for tests.
+- Harden `convertValue(Class<?> type, String value)` to catch parse exceptions and rethrow a clear `IllegalArgumentException` when conversion fails. Tests then assert the exception is thrown when invalid input is given.
+
+### Impact
+
+Tests compile and properly verify error handling for invalid input. Mocking issues are contained via annotated suppressions in tests that mock low-level JPA constructs.
+
+---
+
+## NullPointerExceptions in validation due to null trade legs
+
+### Problem
+
+Validator tests (for example TradeDateValidatorTest) threw `NullPointerException` because `tradeDTO.getTradeLegs()` returned null and code attempted to iterate over it.
+
+### Root Cause
+
+The validation engine always called leg validation without confirming presence of legs; tests sometimes constructed DTOs without initialising `tradeLegs`.
+
+### Solution
+
+Change validation flow to only call leg validation when `tradeDTO.getTradeLegs()` is not null and not empty. Add guards such as:
+
+```
+if (tradeDTO.getTradeLegs() != null && !tradeDTO.getTradeLegs().isEmpty()) {
+    validateTradeLeg(tradeDTO.getTradeLegs(), errors);
+}
+```
+
+### Impact
+
+Date-only validation tests no longer fail due to missing legs. The validation engine is robust to DTOs lacking optional collections.
+
+---
+
+## TradeLegValidator pay/receive flag NPE and logic fix
+
+### Problem
+
+`NullPointerException` and incorrect validation logic when comparing pay/receive flags across legs.
+
+### Root Cause
+
+Code called `.equals()` on potentially null flags and the logic that checked for opposite flags was inverted or incorrect.
+
+### Solution
+
+- Add explicit null checks before `.equals()` comparisons.
+- Refactor logic to check for opposite flags using `if (!leg1.getPayReceiveFlag().equals(leg2.getPayReceiveFlag())) { /* flags are opposite */ }` and include null guards.
+
+### Impact
+
+Validator tests now pass and error messages are clearer. Edge cases with missing flags are handled gracefully.
+
+---
+
+## EntityStatusValidator assertion message mismatch
+
+### Problem
+
+Tests failed because expected assertion strings did not match actual validator error messages (for example expected "User must be active" but validator returned "ApplicationUser must be active").
+
+### Root Cause
+
+Tests assumed older, more generic error messages while validator produced more specific messages after refactor.
+
+### Solution
+
+Update test assertions to match the actual messages produced by `EntityStatusValidator` (for example assert for "ApplicationUser must be active"). Where appropriate, normalise message text or add test helper methods to compare messages in a tolerant way.
+
+### Impact
+
+Tests align with current validator outputs and pass. The validator remains precise in its messages which aids debugging.
+
+---
+
+## ApplicationContext failed to load due to data.sql reseed and missing beans
+
+### Problem
+
+ApplicationContext failed during startup because `data.sql` attempted to insert rows that already existed in a persisted H2 file DB; other causes included malformed JPQL and missing validator beans.
+
+### Root Cause
+
+- File-based H2 DB retained previous seed rows, causing duplicate key violations when `data.sql` ran again.
+- Some repository JPQL and missing `@Bean` annotations caused context initialisation to fail.
+
+### Solution
+
+- Short-term: remove file-based H2 DB files in developer environment to force a fresh seed.
+- Medium-term: scope SQL initialisation to the `test` profile or make `data.sql` idempotent (UPSERT/MERGE statements). Prefer scoping to `test` as quick mitigation.
+- Fix malformed JPQL and register missing validator beans so all required beans are available at startup.
+
+### Impact
+
+Application context loads reliably after fixes. Developer and CI environments are more deterministic.
+
+---
+
+## Duplicate seed data and primary-key collisions in tests
+
+### Problem
+
+`DataIntegrityViolationException` occurred because both `data.sql` and tests inserted rows with the same primary keys.
+
+### Root Cause
+
+Seed data existed both in production `data.sql` and in test scripts or programmatic test inserts with hard-coded IDs, causing collisions.
+
+### Solution
+
+- Consolidate seed data and avoid duplication between `src/main/resources/data.sql` and `src/test/resources/data.sql`.
+- Use programmatic creation with generated IDs in tests (or use a TestDataFactory that looks up seeded rows and only creates missing entities), avoid hard-coded IDs.
+
+### Impact
+
+No more primary-key collisions; tests become order-independent and stable.
+
+---
+
+## Security / Authorization test failures after re-enabling Spring Security
+
+### Problem
+
+Integration tests began failing with 401/403 responses when real security was re-enabled; some ApplicationContext load errors appeared due to management/actuator security wiring in slices.
+
+### Root Cause
+
+- Tests did not provide authentication (no `@WithMockUser` or MockMvc user), or lacked CSRF tokens for mutating requests.
+- Some tests relied on a permissive global test security config introduced earlier, which masked real behaviour.
+
+### Solution
+
+- Create a `TestSecurityConfig` for tests that need an active `SecurityFilterChain` and an in-memory `UserDetailsService`.
+- Use `@WithMockUser` for tests that require authentication; add `.with(csrf())` for POST/PUT/DELETE requests in MockMvc tests.
+- For controller slice tests where filters are not required, use `@AutoConfigureMockMvc(addFilters = false)` to disable HTTP filters and test the controller logic in isolation.
+- Remove global permit-all test security before merging; make test security explicit per-class or per-test.
+
+### Impact
+
+Tests exercise real security semantics and failures (401/403) indicate genuine authorisation issues rather than test configuration problems. The approach allows gradual hardening of tests to reflect production security.
+
+---
+
+## Controller and service-level authorization mismatches and programmatic login issues
+
+### Problem
+
+A logged-in user could sometimes view or mutate resources that should have been blocked. Programmatic login occasionally failed to persist the SecurityContext into the HTTP session, resulting in anonymous requests.
+
+### Root Cause
+
+- Authorization checks existed both as `@PreAuthorize` in controllers and as programmatic checks in services; mismatch in authority naming conventions caused inconsistencies.
+- `AuthorizationController.login` did not persist the SecurityContext into the session in some flows.
+
+### Solution
+
+- Implement `DatabaseUserDetailsService` that maps domain users and privileges to Spring Security `GrantedAuthority` objects, emitting both role-prefixed (`ROLE_*`) and plain privilege authorities (`TRADE_VIEW`) as needed.
+- Update `hasPrivilege(...)` helper to a deny-by-default implementation that consults both current `Authentication` authorities and DB-driven privileges.
+- Ensure programmatic login persists SecurityContext into the HTTP session where session-based flows are required:
+
+```
+request.getSession(true).setAttribute(
+  HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
+  SecurityContextHolder.getContext()
+);
+```
+
+- Add `ApiExceptionHandler` to map `AccessDeniedException` to compact JSON 403 responses instead of HTML pages.
+
+### Impact
+
+Authorisation became consistent across controller-level annotations and programmatic checks. Programmatic login now behaves correctly when session cookies are retained. Tests and API clients receive consistent JSON 403 payloads.
+
+---
+
+## Integration tests relying on mocks and unexpected JSON response shapes
+
+### Problem
+
+Integration tests failed because mocks returned DTOs without expected fields (for example `tradeId` missing), or controller endpoints returned a plain list whereas tests expected a paginated `{count, content}` structure.
+
+### Root Cause
+
+- Mixing mocks in integration tests produced DTOs that did not match real serialised responses.
+- Tests assumed a different JSON contract than the controller returned.
+
+### Solution
+
+- Reduce mocks in integration tests; use real mappers/services and programmatic test fixtures for end-to-end tests.
+- Where mocks are required, ensure the mock returns DTOs containing the exact fields asserted by the test.
+- Update controller responses to match test expectations (for example wrap results in a map with `content` and `count` if tests expect that shape) or update tests to match the API contract.
+
+### Impact
+
+Integration tests reflect real behaviour and become less brittle. Mocks are used only for controller-unit tests where full end-to-end wiring is not required.
+
+---
+
+## Miscellaneous test fixes and process notes
+
+### Problem
+
+A variety of test failures and flaky behaviour was traced to: missing CSRF tokens, role/authority mismatches, wrongly-named JSON properties (`legs` vs `tradeLegs`), and reliance on global seeded IDs.
+
+### Root Cause
+
+- Tests were written during multiple refactors and assumptions changed. Some used global seeded IDs while others deleted seed rows in `@BeforeEach` causing 404s.
+- CSRF and role/authority mismatch issues arose when security was tightened.
+
+### Solution
+
+- Use `@WithMockUser` or `.with(user("...").roles(...))` consistently where authentication is needed.
+- Add `.with(csrf())` to mutating MockMvc requests.
+- Ensure DTO field names in test JSON match DTOs (`tradeLegs` not `legs`).
+- Prefer creating required fixtures per-test rather than relying on global seeds, or centralise test fixtures in a `TestDataFactory` helper.
+
+### Impact
+
+Tests are predictable and isolated, less sensitive to execution order. Security and validation tests now assert the correct layer (validation vs authorisation).
+
+---
+
 ### problem
 
 [ERROR] /C:/Users/saksa/cbfacademy/trade-capture-system/backend/src/main/java/com/technicalchallenge/service/TradeRsqlVisitor.java:[22,39] cannot find symbol  
@@ -82,7 +386,7 @@ but it keeps returning an empty result, even though I have data in the H2 databa
 
 Despite all these changes and checks, the endpoint still returns empty results. The SQL queries show that matching data exists, and the foreign key relationships are correct. The RSQL visitor appears to be building the correct Specification, but the repository query does not return any matches.
 
-### Next Steps
+### Further Improvements Steps
 
 - Further debug the Specification logic and check for any subtle mapping issues between entity fields and DTOs.
 - Consider adding more detailed logging to the repository and service layers to trace the exact query being executed.
@@ -136,8 +440,6 @@ RSQLParser parser = new RSQLParser(operators);
 
 Below are per-issue records using the project's standard headings so they can be copy-pasted into release notes or a post-mortem. Each entry contains: ### Problem, ### Root cause, ### Solution, and ### Impact. I include short code snippets and the simple DB queries/values used to validate fixes.
 
----
-
 #### Issue: Dashboard search endpoint returned HTTP 400 for literal path segments (e.g. "/search")
 
 ### Problem
@@ -190,9 +492,7 @@ DB check used during debugging (hand-run):
 SELECT id, book_id, trade_status FROM trades WHERE book_id = 1000 LIMIT 5;
 ```
 
----
-
-#### Issue: Frontend build failed — ESLint and TypeScript errors blocked production build
+#### Issue: Frontend build failed ESLint and TypeScript errors blocked production build
 
 ### Problem
 
@@ -224,28 +524,26 @@ type DashboardSummary = {
 
 - Escaped problematic JSX characters using HTML entities (`&quot;`, `&apos;`) in copy-heavy components (e.g. `TradeActionsModal.tsx`, `TraderSales.tsx`, `TradeDashboard.tsx`).
 - Removed unused navigation helper functions from `HomeContent.tsx` that triggered `no-unused-vars`.
-- Fixed a JSX parsing glitch introduced during edits where a `.map(...)` expression was accidentally split outside the JSX expression — corrected the JSX so the file parses.
+- Fixed a JSX parsing glitch introduced during edits where a `.map(...)` expression was accidentally split outside the JSX expression corrected the JSX so the file parses.
 - Migrated `.eslintignore` patterns into the flat `eslint.config.js` `ignores` property to remove the runtime ESLint warning about `.eslintignore` deprecation.
 
 Example patch snippet (escaping JSX):
 
 ```diff
 <p>Click "Book New" above to create a trade.</p>
----
+
 <p>Click &quot;Book New&quot; above to create a trade.</p>
 ```
 
 ### Impact / Verification
 
 - After the edits `pnpm --prefix frontend build` completed successfully and Vite produced the production bundle (`dist/`).
-- Remaining warnings (non-blocking) recorded: `loading` and a couple of navigation helpers are unused and a `react-hooks/exhaustive-deps` suggestion — these are cosmetic and do not block the build.
+- Remaining warnings (non-blocking) recorded: `loading` and a couple of navigation helpers are unused and a `react-hooks/exhaustive-deps` suggestion these are cosmetic and do not block the build.
 - Verification commands executed locally:
 
 ```bash
 pnpm --prefix frontend build
 ```
-
----
 
 #### Issue: Cashflow demo fallback rate being shown/used in the UI (unexpected rates)
 
@@ -291,8 +589,6 @@ SELECT leg_id, rate_source, rate_value FROM cashflow_legs WHERE trade_id = (SELE
 ```
 
 If `rate_source` = 'demo' the UI now highlights the cell and does not silently use the demo value in totals without explicit indication.
-
----
 
 - Used a `Set` (specifically a `HashSet`to ensure each operator is unique and to provide fast lookup and insertion. This is important for operator registration, so user does not accidentally register the same operator multiple times and the parser can efficiently check available operators.
 - Created a new `RSQLParser` instance with the updated set of operators so it recognizes the new `=like=` operator.
@@ -580,8 +876,6 @@ The test did not initialize the `tradeLegs` field in `TradeDTO`. The validation 
 
 Refactored the validation engine to only call leg validation if `tradeLegs` is not null and not empty. This prevents errors in tests or code that do not involve legs.
 
----
-
 # Error 2
 
 2025-10-13T: TradeDateValidatorTest.failWhenStartBeforeTradeDate:52  
@@ -594,8 +888,6 @@ Same as Error 1: The test did not initialize the `tradeLegs` field in `TradeDTO`
 ## Solution
 
 Refactored the validation engine to check for non-null and non-empty `tradeLegs` before running leg validation logic instead of tradeDTO.
-
----
 
 # Error 3
 
@@ -672,8 +964,6 @@ Applying patch failed with error: Invalid context at character ...
 - Used the agent to read the latest file contents, then re-applied the patch with updated context, which succeeded.
 - When patching failed due to token budget, broke changes into smaller patches or provided manual code snippets for copy-paste.
 
----
-
 ### Problem
 
 Test failure in TradeDashboardServiceTest for paginated filtering.
@@ -694,8 +984,6 @@ when(tradeRepository.findAll(any(Specification.class), any(Pageable.class)))
     .thenReturn(new PageImpl<>(List.of(trade)));
 ```
 
----
-
 ### Problem
 
 Test stubbing errors in TradeDashboardServiceTest for overloaded repository methods.
@@ -715,8 +1003,6 @@ The method findAll(Example<Trade>is ambiguous for the type TradeRepository
 when(tradeRepository.findAll(any(Specification.class))).thenReturn(Arrays.asList(trade));
 ```
 
----
-
 ### Problem
 
 Test failure in TradeDashboardServiceTest for DTO mapping.
@@ -735,8 +1021,6 @@ AssertionFailedError: expected: <BigBank> but was: <null>
 ```java
 when(tradeMapper.toDto(any(Trade.class))).thenReturn(new TradeDTO("BigBank", ...));
 ```
-
----
 
 ### Problem
 
@@ -764,8 +1048,6 @@ And in the test, used assertThrows:
 assertThrows(AccessDeniedException.class, (-> service.getTradeSummary("traderId"));
 ```
 
----
-
 ### Problem
 
 Test failure in TradeDashboardServiceTest for summary calculation.
@@ -781,8 +1063,6 @@ expected: <2> but was: <0>
 - The test expected the summary DTO to aggregate trades correctly, but the mock data did not match the expected aggregation.
 - Fixed by ensuring the mock repository returns trades with the correct status and notional values, and the summary calculation logic is tested with realistic DTOs.
 
----
-
 ### Outcome
 
 All errors and test failures today (from 10amwere resolved by:
@@ -791,8 +1071,6 @@ All errors and test failures today (from 10amwere resolved by:
 - Improving test stubbing and DTO setup
 - Fixing assertion and privilege validation logic
 - Adapting to context changes and patch failures
-
----
 
 ### Problem
 
@@ -844,12 +1122,11 @@ Affected test methods:
 
 Despite all endpoint and parameter corrections, the response still does not contain the expected fields, leading to persistent test failures. The root cause is likely in the controller or service logic not populating `todaysTradeCount` and `historicalComparisons` in the response DTO.
 
-### Next Steps
+### Further Improvements Steps
 
 - Investigate the implementation of the summary endpoint in `TradeDashboardController` and `TradeDashboardService`.
 - Ensure the response DTO returned by the endpoint includes `todaysTradeCount` and `historicalComparisons` fields.
 - Add or fix mapping logic if these fields are missing or incorrectly named.
-- Re-run tests after confirming the response structure matches test expectations.
 
 **Date:** 2025-10-15  
 **File:** SummaryIntegrationTest.java  
@@ -859,8 +1136,6 @@ Despite all endpoint and parameter corrections, the response still does not cont
 # SummaryIntegrationTest Failures and Solutions
 
 This document narrates the journey of resolving all failures encountered in the `SummaryIntegrationTest` class for the TradeDashboardService summary endpoint. Each issue is presented with its problem, root cause (with code), and the solution applied, showing the step-by-step progress.
-
----
 
 ## Failure 1: ApplicationContext Not Loading
 
@@ -896,8 +1171,6 @@ _The addition of `@Service` (or `@Component`registers the class as a Spring bean
 
 Added `@Service` and `@Transactional` annotations to `TradeDashboardService`, allowing Spring to detect and inject the bean, resolving the context loading error.
 
----
-
 ## Failure 2: Endpoint Not Found (HTTP 404and Endpoint Name Change
 
 ### Problem
@@ -931,8 +1204,6 @@ _Both the endpoint path and parameter name were corrected to match the controlle
 ### Solution
 
 Updated the test methods to use the correct endpoint path (`/api/dashboard/daily-summary`and parameter name (`traderId`), matching the controller's mapping. This resolved the HTTP 404 errors and ensured the tests were targeting the correct endpoint.
-
----
 
 ## Failure 3: Response Structure Mismatch (Map vs. List)
 
@@ -982,8 +1253,6 @@ summaryDto.setHistoricalComparisons(historicalComparison);
 ### Solution
 
 Refactored the DTO and service logic to return a List for `historicalComparisons`, ensuring consistency with test expectations.
-
----
 
 ## Failure 4: Empty Array vs. Zeroed Summary Object
 
@@ -1041,8 +1310,6 @@ summaryDto.setHistoricalComparisons(historicalComparison);
 
 Updated the service to always return a zeroed summary object, and updated the test to expect this object instead of an empty array. Added comments explaining the change and the reasoning behind it.
 
----
-
 ## Final State
 
 After applying all solutions, all integration tests in `SummaryIntegrationTest` pass. The service and tests are now fully aligned, and the progress is documented for future reference.
@@ -1081,7 +1348,7 @@ I added catch RSQLParserException in the service RSQLSearch method and return nu
 [INFO]
 [ERROR] Tests run: 4, Failures: 1, Errors: 0, Skipped: 0
 [INFO]
-[INFO] ------------------------------------------------------------------------
+[INFO]
 [INFO] BUILD FAILURE
 
 ### Solution
@@ -1119,13 +1386,6 @@ Both are fixed by catching the parsing exception in the service and returning a 
 - Placed @PreAuthorize annotations directly above each method declaration.
 - Removed duplicate Spring Security dependencies from pom.xml and confirmed correct configuration.
 - Re-ran integration tests to validate privilege enforcement and endpoint security.
-
-### Next Steps
-
-- Fix any remaining compilation errors by verifying annotation placement and imports.
-- Ensure all privilege validation tests pass for secured endpoints.
-
----
 
 16/10/2025
 
@@ -1165,8 +1425,6 @@ After implementing advanced validation and RSQL filtering in the trade capture s
    ```
    The controller returned a raw list instead of the expected `{count, content}` structure.
 
----
-
 # ### Root Cause
 
 1. **Security Auto-Configuration and OAuth2 Interference**
@@ -1198,8 +1456,6 @@ After implementing advanced validation and RSQL filtering in the trade capture s
    The tests expected paginated data structures or specific JSON keys such as `$.content`.  
    The controller returned a plain list (array), so JSON path assertions failed.
 
----
-
 # ### Solution
 
 ## 1. Exclude OAuth2 and Security Auto-Configuration in Tests
@@ -1228,8 +1484,6 @@ public class UserPrivilegeIntegrationTest {
 
 This exclusion list completely disables all OAuth2 and servlet-based security auto-configuration for tests.
 
----
-
 ## 2. Add a Minimal Test Security Configuration
 
 Created `src/test/java/com/technicalchallenge/config/TestSecurityConfig.java`:
@@ -1255,8 +1509,6 @@ public class TestSecurityConfig {
 
 This ensures that any autowired security-related beans resolve cleanly without enabling full authentication.
 
----
-
 ## 3. Disable `data.sql` for Test Profile
 
 I added a test-specific configuration file at:
@@ -1275,8 +1527,6 @@ spring.jpa.show-sql=false
 
 This stops `data.sql` from running automatically in tests, avoiding duplicate inserts and constraint violations.  
 Each integration test now inserts only the data it requires.
-
----
 
 ## 4. Clean Database State Before Each Test
 
@@ -1297,8 +1547,6 @@ void setup({
 
 This guarantees every test starts with a clean slate.
 
----
-
 ## 5. Handle Invalid RSQL Queries Gracefully
 
 In `TradeDashboardService`, I added explicit error handling for malformed queries:
@@ -1315,8 +1563,6 @@ try {
 ```
 
 This ensures `AdvanceSearchDashboardIntegrationTest.testRsqlEndpointInvalidQuery` passes, expecting a 400 response.
-
----
 
 ## 6. Return Correct JSON Structure from Filter/Search Endpoints
 
@@ -1335,8 +1581,6 @@ public ResponseEntity<Map<String, Object>> filterTrades(...{
 
 This matches the JSON path used by existing tests.
 
----
-
 ## 7. Security Role Assertions in Privilege Tests
 
 Because OAuth2 and filters are disabled, I retained basic MockMvc request validation, but made sure that:
@@ -1346,8 +1590,6 @@ Because OAuth2 and filters are disabled, I retained basic MockMvc request valida
 - Valid users with permissions return 200 or 204 as expected.
 
 This consistency allows privilege tests to pass without a live authentication mechanism.
-
----
 
 ## 8. Final Test Order for Verification
 
@@ -1519,17 +1761,16 @@ I created two different test config classes for different purposes:
 
 - `TestSecurityConfig` a realistic test security config that defines an in-memory `UserDetailsService`, enables method security and registers a standard `SecurityFilterChain` that requires authentication. .
 
-## Next steps (Phase 2)
+## Further Improvements steps (Phase 2)
 
-I recommend the following sequence to restore meaningful security coverage in tests:
+1.To Remove or narrow `GlobalTestSecurityConfig` so it no longer applies globally. 2. For each controller/integration test that should exercise security, either:
 
-1. Remove or narrow `GlobalTestSecurityConfig` so it no longer applies globally.
-2. For each controller/integration test that should exercise security, either:
-   - Remove `addFilters = false`, import `TestSecurityConfig` and use `@WithMockUser` or `.with(user(...))` and `.with(csrf())`; or
-   - Keep `addFilters = false` for strict controller slices, but use `@WithMockUser`/`.with(user(...))` and explicitly test method-level `@PreAuthorize` behaviours.
-3. Add a small end-to-end smoke test (filters enabledthat authenticates and hits a protected endpoint to ensure CI exercises the real `SecurityFilterChain`.
+- Remove `addFilters = false`, import `TestSecurityConfig` and use `@WithMockUser` or `.with(user(...))` and `.with(csrf())`; or
+- Keep `addFilters = false` for strict controller slices, but use `@WithMockUser`/`.with(user(...))` and explicitly test method-level `@PreAuthorize` behaviours.
 
-## Next step
+3. To Add a small end-to-end smoke test (filters enabledthat authenticates and hits a protected endpoint to ensure CI exercises the real `SecurityFilterChain`.
+
+## Further Improvements step
 
 - All changes described are test-only: they live in `src/test/java` and do not affect production code.
 - `GlobalTestSecurityConfig` must be removed before merging to main; otherwise it will mask security regressions.
@@ -1583,8 +1824,7 @@ This log records the problems encountered while restoring Spring Security and ge
      - Declares a minimal `SecurityFilterChain` that requires authentication for requests, disables formLogin/httpBasic (so tests control auth), and keeps CSRF enabled (so MockMvc must use .with(csrf()for mutating requests).
    - Imported `TestSecurityConfig` into the failing test class with `@Import(TestSecurityConfig.class)`.
 
-```markdown
-## Changes / fixes since 2025-11-04 10:00 (UK time)
+## Changes / fixes since 04-11-2025
 
 Below is a consolidated log of the errors, test failures and functional issues I investigated and fixed in the repository (backend + frontend) during the current session. Each item includes a short description, the files changed and how I verified the fix.
 
@@ -1594,7 +1834,7 @@ Below is a consolidated log of the errors, test failures and functional issues I
   - Cause: `TradeController` exposes `@GetMapping("/{id}")` under `/api/trades`; a literal path segment like `search` was being matched as the `{id}` path variable and caused a NumberFormatException when Spring tried to convert it to Long.
   - Action: documented the cause and confirmed the correct search endpoints live under `/api/dashboard/*` (controller: `TradeDashboardController`). Updated developer docs to point to the correct endpoints.
   - Files changed (backend/docs):
-    - `docs/trades.http` — updated examples from `/api/trades/search` -> `/api/dashboard/search` and `/api/trades/rsql` -> `/api/dashboard/rsql` and replaced `book=` examples with numeric `bookId=1000` for clarity.
+    - `docs/trades.http` updated examples from `/api/trades/search` -> `/api/dashboard/search` and `/api/trades/rsql` -> `/api/dashboard/rsql` and replaced `book=` examples with numeric `bookId=1000` for clarity.
   - Verification: code inspection of controllers (`TradeController` and `TradeDashboardController`) and re-testing the example HTTP requests using the corrected `docs/trades.http` snippets.
 
 - Backend: OpenAPI / Swagger location discovery
@@ -1618,11 +1858,11 @@ Below is a consolidated log of the errors, test failures and functional issues I
     - Added small explanatory comments in the modified frontend files to document why changes were made (lint rule reasons and rationale).
     - Updated ESLint flat config to migrate ignore patterns from `.eslintignore` into `eslint.config.js` using the `ignores` property so the runtime warning about `.eslintignore` is resolved.
   - Files changed (frontend):
-    - `frontend/src/components/HomeContent.tsx` — removed unused nav helpers; added comment explaining why.
-    - `frontend/src/pages/TradeDashboard.tsx` — added local types, fixed JSX parsing, replaced `any` usages, escaped quotes, added comments.
-    - `frontend/src/modal/TradeActionsModal.tsx` — escaped quotes in instruction paragraphs and added comments.
-    - `frontend/src/pages/TraderSales.tsx` — escaped quotes/apostrophes and added comments.
-    - `frontend/eslint.config.js` — added `ignores` entries to match `.eslintignore` so ESLint no longer warns about the deprecated file.
+    - `frontend/src/components/HomeContent.tsx` removed unused nav helpers; added comment explaining why.
+    - `frontend/src/pages/TradeDashboard.tsx` added local types, fixed JSX parsing, replaced `any` usages, escaped quotes, added comments.
+    - `frontend/src/modal/TradeActionsModal.tsx` escaped quotes in instruction paragraphs and added comments.
+    - `frontend/src/pages/TraderSales.tsx` escaped quotes/apostrophes and added comments.
+    - `frontend/eslint.config.js` added `ignores` entries to match `.eslintignore` so ESLint no longer warns about the deprecated file.
   - Verification:
     - Re-ran `pnpm --prefix frontend build` (lint + build). After the edits the production build completed successfully (Vite produced the dist bundle) with only non-blocking warnings remaining (unused-vars & react-hooks/exhaustive-deps warnings). The previous blocking errors were removed.
 
@@ -1635,11 +1875,12 @@ Summary of verification steps executed during the session
 - Backend: code inspection of controllers to confirm routing behavior and root cause of the `/api/trades/search` 400.
 - Frontend: multiple runs of `pnpm --prefix frontend build` and a final successful production build after fixes.
 
-Notes and recommended next steps
+Notes and next steps
 
 - Backwards compatibility: If external clients still call `/api/trades/search` can add a compatibility mapping under `TradeController` for `/search` that forwards to the dashboard search method (low-risk change). I didn't add this automatically to avoid changing controller APIs without your confirmation.
 - Tidy remaining warnings: There are a few non-blocking warnings left in `TradeDashboard.tsx` (unused `loading`, `goToTrades`, `goToBooks` and a `react-hooks/exhaustive-deps` hint).
-```
+
+````
 
 ### Problem
 
@@ -1663,8 +1904,6 @@ Multiple separate issues produced similar symptoms:
 
 Tests that assert authorisation now exercise the correct layer and return expected 401/403 statuses. Validation tests reach the intended controller/service logic rather than stopping at JSON binding.
 
----
-
 ### Problem
 
 Duplicate seed data and ID collisions caused DataIntegrityViolationException and NonUniqueResultException in combined test runs.
@@ -1683,8 +1922,6 @@ Main `src/main/resources/data.sql` and test `src/test/resources/data.sql` contai
 
 Removal of duplicate seeds and careful test-scoped creation eliminated primary key collisions and non-unique result errors. Tests run reliably in any order.
 
----
-
 ### Problem
 
 403 responses were returned as HTML pages by Spring Security, which broke JSON-based client expectations and test assertions.
@@ -1700,8 +1937,6 @@ Added an `ApiExceptionHandler` controller advice that converts `AccessDeniedExce
 ### Impact
 
 Clients and tests receive JSON error payloads for authorisation failures. This simplifies assertions and improves the API's developer experience.
-
----
 
 ### Problem
 
@@ -1721,8 +1956,6 @@ Two authorisation models were in place: controller `@PreAuthorize` annotations a
 
 Authorisation decisions are now consistent across controllers and services. The mapping service makes authority composition explicit and debuggable and avoids brittle string mismatch errors.
 
----
-
 ### Problem
 
 Integration tests sometimes mocked services and mappers while still relying on the real database; this caused mismatches in serialised response fields (e.g. `tradeId` missing) and gave a false sense of correctness.
@@ -1740,16 +1973,12 @@ Mixing mocks with the real persistence layer meant some assertions referenced fi
 
 Integration tests represent real behaviour more faithfully and are less brittle. Mocks are used only where a narrow dependency requires deterministic stubbed behaviour.
 
----
-
 ### Verification and final state
 
 After applying the fixes above and re-running targeted tests, the settlement-instruction unit tests and the new `AdditionalInfoIntegrationTest` pass. The test suite is stable for the changes introduced in this refactor. The remaining TODOs are:
 
 - Implement the DB-driven deny-by-default lookup for `hasPrivilege(...)` and add focused unit tests for `DatabaseUserDetailsService`.
 - Run the full backend test suite and address any unrelated failures surfaced by the broader run.
-
----
 
 End of settlement-instructions refactor notes.
 
@@ -1773,7 +2002,7 @@ mockMvc.perform(post("/api/some-protected-endpoint")
         .with(csrf())
         .with(user("alice").roles("TRADER")))
     .andExpect(status().isCreated());
-```
+````
 
 `````
 
@@ -1959,13 +2188,6 @@ mvn -Dtest=com.technicalchallenge.controller.UserPrivilegeIntegrationTest test
 - Data seed: `src/main/resources/data.sql` / in test runs referenced at `target/classes/data.sql` (contains seeded book and counterparty records, e.g., `FX-BOOK-1`, `BigBank`, `MegaFund`)
 - Controllers reviewed: `TradeController.java`, `TradeDashboardController.java` (method security annotations aligned with test roles)
 
-### Next steps & follow-ups
-
-- Run the full project's test suite (`mvn test`to confirm these changes cause no regressions elsewhere. Expectation: most security-related failures are resolved; if other tests relied on different seeded names or different security assumptions, they might need small updates.
-- Make tests fully self-contained by creating and cleaning fixtures per-test (this avoids relying on `data.sql` but requires careful identity management to avoid PK collisions).
-- Add a small README in `docs/` describing the `TestSecurityConfig` usage so future contributors know why test security differs from production.
-
----
 
 Now I'll re-run mvn test to see how many failures remain after disabling security auto-configuration in test profile.
 
@@ -2008,7 +2230,7 @@ Several tests (SummaryIntegrationTestare failing to load ApplicationContext (Ill
 Other service/unit tests are passing (many service and validator tests passed).
 What I did next
 
-Option A (recommended, correct): Turn off the GlobalTestSecurityConfig mitigation and fix failing controller tests properly:
+To Turn off the GlobalTestSecurityConfig mitigation and fix failing controller tests properly:
 
 For each failing controller test add explicit authentication (import TestSecurityConfig or use with(user(...)on MockMvc), and add .with(csrf()for mutating requests.
 Convert tests to be isolated by creating a TestDataFactory and using transactional rollback or cleanup to avoid data.sql collisions.
@@ -2145,13 +2367,13 @@ This Phase 2 change set was deliberately conservative and incremental: convert o
 
 The test-suite is now a better indicator of real authorisation correctness and is resilient to DB state leakage between tests. If any further tightening of privilege logic is required (for example replacing the simple role checks with a centralised privilege engine), it is straightforward to implement now because tests already exercise the true SecurityFilterChain and the service-layer checks run under the same security context.
 
-# 🧾 Errors and Fixes Log
+#  Errors and Fixes Log
 
 **Date Range:** 18–19 October 2025
 **Project:** Trade Capture System
 **Context:** Backend feature branch `feat/comprehensive-trade-validation-engine`
 
----
+
 
 ## 1. Security Configuration Conflicts
 
@@ -2194,7 +2416,7 @@ Tests now load successfully without bean collisions.
 Integration tests can run with in-memory users.
 Some role-based tests began failing because real privilege checks were now enforced.
 
----
+
 
 ## 2. Excessive Test Failures After Enabling Real Security
 
@@ -2247,7 +2469,7 @@ Swagger UI and frontend CORS requests are allowed.
 Integration tests still fail where mock users or CSRF tokens are missing.
 Business logic now correctly blocks unauthorized access.
 
----
+
 
 ## 3. CSRF and Swagger UI Authorization
 
@@ -2287,7 +2509,7 @@ Swagger UI “Try it out” works.
 Frontend can call API endpoints without CSRF friction.
 Not production-grade yet final decision pending between JWT and Cookie-based CSRF strategy.
 
----
+
 
 ## 4. CORS (Cross-OriginConfiguration
 
@@ -2332,7 +2554,7 @@ CORS now works for both React (localhost:5173and Swagger UI.
 No more preflight (OPTIONSfailures.
 API endpoints accessible via browser and frontend.
 
----
+
 
 ## 5. NullPointerException in UserPrivilegeControllerTest
 
@@ -2367,7 +2589,7 @@ if (createdUserPrivilege == null{
 Still needs validation in test data setup.
 This is a _business logic test issue_, not a configuration error.
 
----
+
 
 ## 6. Integration Test 403/400/404 Cascade
 
@@ -2409,7 +2631,7 @@ mockMvc.perform(post("/api/trades")
 Currently still failing until all integration tests explicitly authenticate.
 Business logic correctness verified 403s confirm access control works.
 
----
+
 
 ## 7. Configuration Validation (Confirmed Stable)
 
@@ -2429,12 +2651,12 @@ The backend now runs with correct local dev setup.
 Tests use in-memory H2; runtime uses file-based H2.
 No duplicate beans, no startup errors.
 
----
+
 
 ## Still Failing and Why
 
 | Test Class                              | Main Issue     | Root Cause                                               |
-| --------------------------------------- | -------------- | -------------------------------------------------------- |
+| | --| --|
 | `UserPrivilegeIntegrationTest`          | 403/400 errors | Missing mock users and CSRF tokens                       |
 | `AdvanceSearchDashboardIntegrationTest` | 403 errors     | Unauthorized requests after access control enforcement   |
 | `SummaryIntegrationTest`                | 403 errors     | Role mismatch between tests and new security annotations |
@@ -2448,21 +2670,16 @@ No duplicate beans, no startup errors.
 🔹 Fixing them now would require updating each test with proper roles, mock authentication, and CSRF setup.
 🔹 Core configuration and runtime environment are functioning correctly.
 
----
 
-## Next Steps
 
-1. Proceed to **Step 4: Cashflow Bug Investigation** (isolated logic layer).
-2. Return to fix integration tests once the business logic and API features are stable.
-3. Either disable CSRF or update controllers remove pre-authorize
 
-# Test fix summary making the test suite green# 🧾 Errors and Fixes Log
+# Test fix summary making the test suite green#  Errors and Fixes Log
 
 **Date Range:** 18–19 October 2025
 **Project:** Trade Capture System
 **Context:** Backend feature branch `feat/comprehensive-trade-validation-engine`
 
----
+
 
 ## 1. Security Configuration Conflicts
 
@@ -2505,7 +2722,7 @@ Tests now load successfully without bean collisions.
 Integration tests can run with in-memory users.
 Some role-based tests began failing because real privilege checks were now enforced.
 
----
+
 
 ## 2. Excessive Test Failures After Enabling Real Security
 
@@ -2558,7 +2775,7 @@ Swagger UI and frontend CORS requests are allowed.
 Integration tests still fail where mock users or CSRF tokens are missing.
 Business logic now correctly blocks unauthorized access.
 
----
+
 
 ## 3. CSRF and Swagger UI Authorization
 
@@ -2598,7 +2815,7 @@ Swagger UI “Try it out” works.
 Frontend can call API endpoints without CSRF friction.
 Not production-grade yet final decision pending between JWT and Cookie-based CSRF strategy.
 
----
+
 
 ## 4. CORS (Cross-OriginConfiguration
 
@@ -2643,7 +2860,7 @@ CORS now works for both React (localhost:5173and Swagger UI.
 No more preflight (OPTIONSfailures.
 API endpoints accessible via browser and frontend.
 
----
+
 
 ## 5. NullPointerException in UserPrivilegeControllerTest
 
@@ -2678,7 +2895,7 @@ if (createdUserPrivilege == null{
 Still needs validation in test data setup.
 This is a _business logic test issue_, not a configuration error.
 
----
+
 
 ## 6. Integration Test 403/400/404 Cascade
 
@@ -2720,7 +2937,7 @@ mockMvc.perform(post("/api/trades")
 Currently still failing until all integration tests explicitly authenticate.
 Business logic correctness verified 403s confirm access control works.
 
----
+
 
 ## 7. Configuration Validation (Confirmed Stable)
 
@@ -2740,12 +2957,12 @@ The backend now runs with correct local dev setup.
 Tests use in-memory H2; runtime uses file-based H2.
 No duplicate beans, no startup errors.
 
----
+
 
 ## Still Failing and Why
 
 | Test Class                              | Main Issue     | Root Cause                                               |
-| --------------------------------------- | -------------- | -------------------------------------------------------- |
+| | --| --|
 | `UserPrivilegeIntegrationTest`          | 403/400 errors | Missing mock users and CSRF tokens                       |
 | `AdvanceSearchDashboardIntegrationTest` | 403 errors     | Unauthorized requests after access control enforcement   |
 | `SummaryIntegrationTest`                | 403 errors     | Role mismatch between tests and new security annotations |
@@ -2759,13 +2976,7 @@ No duplicate beans, no startup errors.
 🔹 Fixing them now would require updating each test with proper roles, mock authentication, and CSRF setup.
 🔹 Core configuration and runtime environment are functioning correctly.
 
----
 
-## Next Steps
-
-1. Proceed to **Step 4: Cashflow Bug Investigation** (isolated logic layer).
-2. Return to fix integration tests once the business logic and API features are stable.
-3. Either disable CSRF or update controllers remove pre-authorize
 
 # Test fix summary making the test suite green
 
@@ -2782,7 +2993,7 @@ mvn -Dtest=CashflowServiceTest#testGenerateQuarterlyCashflow test
 
 The test runner correctly executed the single test instead of aborting immediately.
 
----
+
 
 ## 2. Test Failed: “Expected 1 But Was 0”
 
@@ -2819,7 +3030,7 @@ List<Cashflow> cashflows = captor.getAllValues();
 Mockito successfully captured the cashflow saved by the service.
 The test now retrieved one cashflow object, progressing to the next error (value miscalculation).
 
----
+
 
 ## 3. Payment Dates Loop Skipped – No Cashflows Generated
 
@@ -2863,7 +3074,7 @@ This allowed the loop to run once and generate a single quarterly payment.
 
 The test now produced exactly one cashflow record, revealing the value miscalculation bug.
 
----
+
 
 ## 4. Calculation Bug – Wrong Cashflow Amount (100× Too High)
 
@@ -2910,7 +3121,7 @@ BigDecimal result = notional
 After this fix, the calculation correctly used 3.5% = 0.035,
 producing £87,500.00 for a £10m notional and a 3-month period.
 
----
+
 
 ## Final Result
 
@@ -2921,7 +3132,7 @@ After all fixes:
 - The cashflow payment value matched the expected £87,500.00.
 - `calculateCashflowValue()` now correctly handles percentage rates.
 
----
+
 
 ## Lessons Learned
 
@@ -2930,7 +3141,7 @@ After all fixes:
 3. Always normalize interest rates (divide by 100when switching between percentages and decimals.
 4. When debugging, write focused unit tests to isolate and reproduce each bug before fixing.
 
----
+
 
 **Final Test Output:**
 
@@ -2944,7 +3155,7 @@ The bug was fully reproduced, diagnosed, and fixed.
 
 This log is a narrative of how I investigated and fixed more than thirty failing tests across the backend, I include the original failure messages, the root cause I discovered, the solution I implemented with code snippets, and the impact on the codebase and test suite. I have grouped related failures so the story is readable and thorough.
 
----
+
 
 ## 1403 where 200 expected on read-only endpoints
 
@@ -2993,7 +3204,7 @@ void testSearchTradesEndpoint(throws Exception {
 
 All search and filter endpoints now authenticate correctly with the intended role. The three `AdvanceSearchDashboardIntegrationTest` failures and the group of `SummaryIntegrationTest` 403s went green once I assigned the right roles and ensured the database had the expected data.
 
----
+
 
 ## 2401 vs 403 for unauthenticated tests
 
@@ -3027,7 +3238,7 @@ void testUnauthenticatedUserDenied(throws Exception {
 
 The intent of the tests now matches the security behaviour. No accidental 200 or 403 due to inherited mock users. The unauthenticated test stabilised.
 
----
+
 
 ## 3400 Bad Request instead of 403 Forbidden for modifying endpoints
 
@@ -3073,7 +3284,7 @@ void testSupportRoleDeniedPatchTrade_Simple(throws Exception {
 
 All the tests expecting 403 now reach the security layer and assert 403, not 400. This resolved multiple failures at once across `UserPrivilegeIntegrationTest` and `TradeControllerTest`.
 
----
+
 
 ## 4404 Not Found when fetching specific trade by id
 
@@ -3125,7 +3336,7 @@ void testTradeViewRoleAllowedById(throws Exception {
 
 The 404s disappeared. I no longer couple these tests to a specific `data.sql` row that may change in future.
 
----
+
 
 ## 5JSON path tradeId expected 200001 but was null
 
@@ -3157,7 +3368,7 @@ when(tradeMapper.toDto(any(Trade.class))).thenReturn(tradeDTO);
 
 The create test now returns the expected JSON structure and passes.
 
----
+
 
 ## 6DataIntegrityViolationException on Book primary key
 
@@ -3197,7 +3408,7 @@ And in `src/test/resources/data.sql` I kept only minimal non-overlapping rows (f
 
 The suite stopped tripping over duplicate keys. The context loads consistently and the repository inserts do not fail.
 
----
+
 
 ## 7NonUniqueResultException on Counterparty findByName("BigBank")
 
@@ -3226,7 +3437,7 @@ INSERT INTO counterparty (id, name, ...VALUES (1000, 'TestBank', ...);
 
 All queries relying on a unique counterparty name behave predictably.
 
----
+
 
 ## 8CSRF missing on write requests
 
@@ -3254,7 +3465,7 @@ mockMvc.perform(post("/api/trades")
 
 The requests now pass the CSRF filter and the tests hit the controller methods properly.
 
----
+
 
 ## 9201 expected but 403 due to wrong role mapping
 
@@ -3281,7 +3492,7 @@ void testCreateTrade({ ... }
 
 Create now returns 201 as expected.
 
----
+
 
 ## 10200 expected but 404 because I deleted seed data in @BeforeEach
 
@@ -3309,7 +3520,7 @@ void setup({
 
 The tests are isolated and no longer rely on fragile global IDs.
 
----
+
 
 ## 11ApplicationContext failed due to FK order in data.sql
 
@@ -3345,7 +3556,7 @@ INSERT INTO trade_leg ...;
 
 Application context now loads reliably for every test run.
 
----
+
 
 ## 12Using wrong JSON property name for legs
 
@@ -3371,7 +3582,7 @@ I changed `legs` to `tradeLegs` everywhere.
 
 Binding succeeds and the controller reaches domain validation rather than failing at JSON binding.
 
----
+
 
 ## 13Testing with mocks inside integration tests
 
@@ -3399,7 +3610,7 @@ mockMvc.perform(get("/api/trades/" + saved.getId())).andExpect(status().isOk());
 
 Tests now reflect real behaviour and are less brittle.
 
----
+
 
 ## 14Duplicate user, role and privilege rows between main and test seeds
 
@@ -3425,7 +3636,7 @@ INSERT INTO application_user (id, login_id, user_profile_id, active, version, la
 
 No more collisions on ids or ambiguous results during combined runs.
 
----
+
 
 ## 15Summary endpoint assertions mismatched expected structure
 
@@ -3450,7 +3661,7 @@ I adjusted the assertion to expect a zeroed summary object.
 
 The summary tests align with the current API contract.
 
----
+
 
 ## 16Id collisions on create due to hard-coded tradeId
 
@@ -3480,7 +3691,7 @@ I removed hard-coded ids from create payloads unless I specifically needed to as
 
 No more duplicate key problems or flaky behaviour on repeated runs.
 
----
+
 
 ## 17Clearing repositories twice in @BeforeEach
 
@@ -3509,7 +3720,7 @@ void setup({
 
 Faster tests and clearer intent.
 
----
+
 
 ## 18Missing parent FK rows for new test-created trades
 
@@ -3535,7 +3746,7 @@ Trade t = tradeRepository.save(...);
 
 No more FK exceptions during tests.
 
----
+
 
 ## 19Confusion between business roles and granular authorities
 
@@ -3559,7 +3770,7 @@ For tests I added the exact authorities in the roles list or updated the user pr
 
 Security tests assert the intended policy rather than a simplified role model.
 
----
+
 
 ## 20When to mock vs not to mock in integration
 
@@ -3583,7 +3794,7 @@ As a rule:
 
 Cleaner tests, more predictable outcomes, and fewer brittle assertions.
 
----
+
 
 ## 21Fixed ordering and isolation in `SummaryIntegrationTest`
 
@@ -3610,7 +3821,7 @@ void testSummaryEndpointMultipleTradesToday(throws Exception {
 
 All summary tests pass regardless of execution order.
 
----
+
 
 ## 22RSQL and filter endpoints reliance on default data
 
@@ -3636,7 +3847,7 @@ mockMvc.perform(get("/api/dashboard/rsql?query=book.id==1"))
 
 The RSQL tests are stable.
 
----
+
 
 ## 23Move to class-level or method-level `@WithAnonymousUser`
 
@@ -3656,7 +3867,7 @@ I removed class-level `@WithAnonymousUser` and placed it only on the specific te
 
 No accidental loss of authentication across a whole class.
 
----
+
 
 ## 24Ensuring CSRF plays nicely with custom SecurityConfig
 
@@ -3676,7 +3887,7 @@ Kept production config unchanged, but in tests I included `.with(csrf())` on wri
 
 Security behaviour in tests mirrors production semantics sufficiently without making tests brittle.
 
----
+
 
 ## 25Double-deletion of all tables in Summary test setup
 
@@ -3696,7 +3907,7 @@ Removed the duplicate deletions and left a single, well-ordered cleanup.
 
 Cleaner and quicker setup.
 
----
+
 
 ## 26Aligning controller expectations for “my trades” and “daily summary”
 
@@ -3722,7 +3933,7 @@ mockMvc.perform(get("/api/dashboard/daily-summary").param("traderId", "testTrade
 
 The “my trades” suite of endpoints is green.
 
----
+
 
 ## 27Build failures due to context not loading when all tests run
 
@@ -3750,7 +3961,7 @@ public abstract class BaseIntegrationTest {}
 
 Stable green runs irrespective of execution order.
 
----
+
 
 ## 28Adjusting expectations for controller behaviour once validation passes
 
@@ -3766,7 +3977,7 @@ Refreshed all expectations to assert the intended layer. If the test is meant to
 
 Tests now clearly differentiate between validation and authorisation failures.
 
----
+
 
 ## 29Ensuring serialisation returns expected fields
 
@@ -3786,7 +3997,7 @@ when(tradeMapper.toDto(any(Trade.class))).thenReturn(new TradeDTO({{ setTradeId(
 
 JSONPath assertions are meaningful and stable.
 
----
+
 
 ## 30Removing magic IDs from tests unless absolutely necessary
 
@@ -3802,7 +4013,7 @@ Create the entities in the test and use the saved ID. Where I depend on a specif
 
 Tests are self-contained and do not depend on fragile global assumptions.
 
----
+
 
 ## 31Consistency of naming between DTOs and entities
 
@@ -3816,7 +4027,7 @@ Audited the DTO and mapper and ensured test JSON uses DTO names exactly. Where n
 
 ```java
 /*
- * Note: JSON uses "tradeLegs" which maps to TradeDTO.tradeLegs via Jackson.
+ * JSON uses "tradeLegs" which maps to TradeDTO.tradeLegs via Jackson.
  * Using "legs" will fail to bind and return 400.
  */
 ```
@@ -3825,7 +4036,7 @@ Audited the DTO and mapper and ensured test JSON uses DTO names exactly. Where n
 
 Binding is reliable and tests document the contract clearly.
 
----
+
 
 # Final state
 
@@ -3895,7 +4106,7 @@ Mapping conventions and rationale
 
 - Profile -> ROLE* mapping: the user's domain profile (`ApplicationUser.userProfile.userType`is mapped into a `ROLE*`authority. Example: a profile value`TRADER`becomes`ROLE_TRADER`. The service also adds normalised aliases such as `ROLE_MIDDLE_OFFICE`when the profile contains`MO`or`MIDDLE` so controller checks that expect the canonical role succeed.
 - Privilege -> authority mapping: privileges stored in `UserPrivilege`/`Privilege` are mapped into plain authorities (for example `TRADE_VIEW`). Mapping them as plain authorities allows the codebase to use either `hasRole('TRADER')` or `hasAuthority('TRADE_VIEW')` depending on the check's intent. The service also adds aliases when the DB uses different names (for example `READ_TRADE` is aliased to `TRADE_VIEW`).
-- Deny-by-default: the service returns whatever authorities it can compute from the DB. If a user has no privileges recorded, the authority set may be empty (only role-derived authorities may be present). Programmatic checks that use `hasPrivilege(...)` must therefore be defensive and assume absence of an authority means deny.
+- Deny-by-default: the service returns whatever authorities it can calculate from the DB. If a user has no privileges recorded, the authority set may be empty (only role-derived authorities may be present). Programmatic checks that use `hasPrivilege(...)` must therefore be defensive and assume absence of an authority means deny.
 
 Why this mattered for the 403 problems
 
@@ -3934,11 +4145,11 @@ Interaction with other components
   - TRADE_VIEW privilege or ROLE_TRADE_VIEW can view other trader summaries (200)
   - MIDDLE_OFFICE role can view other trader summaries (200)
 
-Next steps and improvements
+Further Improvements steps and improvements
 
-- Implement a direct lookup in `UserPrivilegeService` such as `List<UserPrivilege> findByUserId(Long userId)` or a repository method to avoid scanning all privileges in memory.
-- Replace permissive `hasPrivilege(...)` stubs with DB-driven checks that consult the same authority names produced by `DatabaseUserDetailsService` (deny-by-default semantics).
-- Add unit tests for `DatabaseUserDetailsService` that assert specific sample users produce the expected `GrantedAuthority` set (role aliases + privilege aliases). This will prevent regressions when privilege names change.
+- To Implement a direct lookup in `UserPrivilegeService` such as `List<UserPrivilege> findByUserId(Long userId)` or a repository method to avoid scanning all privileges in memory.
+- To  Replace permissive `hasPrivilege(...)` stubs with DB-driven checks that consult the same authority names produced by `DatabaseUserDetailsService` (deny-by-default semantics).
+- ATo dd unit tests for `DatabaseUserDetailsService` that assert specific sample users produce the expected `GrantedAuthority` set (role aliases + privilege aliases). This will prevent regressions when privilege names change.
 
 #### Problem
 
@@ -4045,8 +4256,7 @@ I saved the corrected repository file in the workspace and re-ran the test suite
 
 ### Impact
 
-Fixing that one query allowed Spring to instantiate the repository bean and start the ApplicationContext. The cascade of `Failed to load ApplicationContext` errors disappeared and the affected tests ran normally. As a small preventive measure I recommend adding a focused repository-level integration test that exercises custom `@Query` methods so JPQL parse errors are caught early in CI rather than at full test startup.
-
+Fixing that one query allowed Spring to instantiate the repository bean and start the ApplicationContext. The cascade of `Failed to load ApplicationContext` errors disappeared and the affected tests ran normally.
 ### Problem
 
 The method `setFieldType(String)` was undefined for the type `AdditionalInfoRequestDTO`.
@@ -4067,7 +4277,7 @@ The `AdditionalInfoRequestDTO` already holds the correct information through `fi
 The controller compiled successfully and became simpler.
 It also clarified the distinction between entity metadata (like entity type and ID) and business data (field name and value).
 
----
+
 
 ### Problem
 
@@ -4088,7 +4298,7 @@ and added a corresponding `findAllByTradeIdIn(List<Long> ids)` method in the `Tr
 
 Allowed batch fetching of trades by their IDs, improving efficiency and enabling the settlement search endpoint to work properly.
 
----
+
 
 ### Problem
 
@@ -4106,7 +4316,7 @@ Added the following method to the repository:
 ````java
 List<Trade> findAllByTradeIdIn(List<Long> tradeIds);
 
----
+
 
 ## 2025-10-26 Errors encountered while implementing Settlement Instructions refactor
 
@@ -4142,17 +4352,7 @@ wiring audit usernames and getting tests to run in the backend module.
 
 - Re-ran `com.technicalchallenge.controller.TradeControllerTest` from the `backend` module after registering the validator bean: Tests for that class ran and passed (7 tests, 0 errors).
 
-### Next steps
-
-- Remove the unused `SettlementInstructionValidator` constructor parameter/assignment from `AdditionalInfoService` (small code cleanup).
-- Re-run the full backend test suite and confirm no further ApplicationContext bootstrap errors.
-- Add unit tests for `SettlementInstructionValidator` and service-level tests around AdditionalInfo create/update/upsert flows (validation + audit username wiring).
-
-
 ### Additional fixes and lessons from the settlement-instructions refactor (2025-10-26)
-
-
----
 
 ### Problem
 
@@ -4176,7 +4376,7 @@ Several contributing issues surfaced during the refactor:
 
 Context now initialises cleanly and the integration test exercises the real controller path. The central validator is the single source of settlement validation logic and is available to any future callers via the validation engine.
 
----
+
 
 ### Problem
 
@@ -4202,9 +4402,7 @@ Added defensive null checks and sensible fallbacks. Integration test asserts now
 
 Audit trail records now reliably show the authenticated principal when available. This improves traceability and supports regulatory and operational auditing.
 
----
-
-## Consolidated error and test-failure log 2025-10-27
+## Consolidated error and test-failure log 27-10-2025
 
 ### Problem
 
@@ -4231,8 +4429,6 @@ Some traders could view or create settlement instructions that belonged to other
 - Audit trail reliability improved: `changed_by` now reflects the authenticated principal when available, enabling admin/MO users to see correct audit entries.
 - The immediate removal of file H2 DB files is a recovery step the long-term fix is to make `data.sql` idempotent or scope SQL init to tests to prevent reseed failures.
 
----
-
 ### Problem
 
 Multiple integration and controller tests failed with HTTP 401/403, JSON path misses, or ApplicationContext load errors; a local full test run reported many failures and errors and the suite was noisy and non-deterministic.
@@ -4258,8 +4454,6 @@ Multiple integration and controller tests failed with HTTP 401/403, JSON path mi
 - Test suite stabilised: with in-memory test profile and explicit test security the majority of 401/403 and duplicate-key failures were resolved. JPQL and bean fixes removed many ApplicationContext startup errors.
 - Tests now exercise authorisation correctly (401/403 asserted at the expected layer) and are deterministic when run in CI.
 
----
-
 ### Problem
 
 ApplicationContext failed to load on startup in multiple runs; the Spring Boot app sometimes failed to start, resulting in the API being unavailable for manual verification.
@@ -4272,15 +4466,12 @@ ApplicationContext failed to load on startup in multiple runs; the Spring Boot a
 ### Solution
 
 - Short term: removed the file H2 database files to force a fresh seed and successful startup. This restored API availability so I could verify persistence and audit behaviour.
-- Medium term: moved tests to an in-memory profile and suggested two long-term options: (A) make `data.sql` idempotent (use MERGE/UPSERT semantics) or (B) scope SQL initialisation to the `test` profile only. I recommended Option B as quick mitigation and Option A as the durable fix.
-- Also fixed malformed JPQL and registered the missing validator bean so repository parsing and bean wiring no longer block startup.
+- Medium term: moved tests to an in-memory profile and suggested two long-term options: (A) make `data.sql` idempotent (use MERGE/UPSERT semantics) or (B) scope SQL initialisation to the `test` profile only.
 
 ### Impact
 
 - Removing the file DB restored the running API immediately and allowed functional verification.
-- The recommended configuration changes prevent accidental reseed failures in developer environments and improve CI determinism.
-
----
+- The configuration changes prevent accidental reseed failures in developer environments and improve CI determinism.
 
 ### Problem
 
@@ -4302,8 +4493,6 @@ Specific endpoint behaviour and validation issues surfaced during the work: inco
 
 - Endpoints now accept the correct DTO shapes and batch-fetch trade use cases work. Test assertions relying on `tradeId` and other fields no longer fail due to empty DTOs.
 
----
-
 ### Problem
 
 RSQL search and wildcard operator handling caused search endpoints to return empty results or throw parsing errors for malformed queries; AdvanceSearchDashboardIntegrationTest and RSQL-related tests failed earlier.
@@ -4322,13 +4511,11 @@ RSQL search and wildcard operator handling caused search endpoints to return emp
 
 - RSQL endpoint now recognises `=like=` and returns expected search results for wildcard queries. Malformed RSQL queries return 400 responses so tests expecting client errors pass.
 
----
-
-### Final remarks and recommended next steps
+### Plan next steps
 
 - The immediate and highest priority follow-ups are:
 
-  1. Make `data.sql` idempotent or restrict SQL init to the test profile to avoid startup reseed failures (I recommend moving SQL init to `application-test.properties` as a quick mitigation and converting `data.sql` to idempotent statements for a durable fix).
+  1. Make `data.sql` idempotent or restrict SQL init to the test profile to avoid startup reseed failure maybe moving SQL init to `application-test.properties` as a quick mitigation and converting `data.sql` to idempotent statements for a durable fix).
   2. Add a focused integration test asserting the upsert behaviour writes both `additional_info` and `additional_info_audit` in the same transaction and that `changed_by` equals the authenticated principal.
   3. Replace any remaining permissive `hasPrivilege(...)` test shortcuts with DB-driven deny-by-default checks and add the small matrix tests that assert TRADER vs MIDDLE_OFFICE vs ADMIN behaviours on settlement read/write and audit visibility.
 
@@ -4344,8 +4531,6 @@ RSQL search and wildcard operator handling caused search endpoints to return emp
 ## FRONTEND
 
 # Errors and Fixes Summary
-
----
 
 ## ESLint blocking error during frontend build
 
@@ -4368,8 +4553,6 @@ Catch blocks used unsafe `any` casts such as `(err as any)?.response?.status`, a
 
 The blocking ESLint error was cleared and the frontend build could proceed. Code is now aligned with the project's ESLint and TypeScript rules, reducing lint-related build failures.
 
----
-
 ## ESLint scanning generated/bundled files (thousands of errors)
 
 ### Problem
@@ -4388,8 +4571,6 @@ ESLint was configured (or invoked) to scan the entire workspace, including gener
 ### Impact
 
 ESLint output became actionable again; the enormous error list disappeared and developers can focus on real source issues only.
-
----
 
 ## Vite bundle-size warning (chunks > 500 KB)
 
@@ -4412,8 +4593,6 @@ Recommended steps:
 ### Impact
 
 No functional failure; however, initial page load may be negatively affected. The proposed optimisations will reduce initial payload and improve performance for users.
-
----
 
 ## Settlement-instructions editor missing and frontend wiring
 
@@ -4470,8 +4649,6 @@ The component had subtle behaviour and lint issues: the initialValue sync effect
 
 The textarea now preserves user edits, templates insert at the expected caret position and the caret is restored reliably. Validation is accurate (trimmed) and forbids unsafe characters. ESLint warnings related to unused catch parameters were removed.
 
----
-
 ### File: `frontend/src/modal/TradeActionsModal.tsx`
 
 ### Problem
@@ -4494,8 +4671,6 @@ After wiring the settlement editor, the modal produced an ESLint error caused by
 
 The modal loads the existing settlement instructions (treating 404 as ‘none’), persists updates via the correct API shape, and surfaces success/failure to the user. Linting errors related to `any` and unused variables were eliminated and the build is no longer blocked by these issues.
 
----
-
 ### File: `frontend/src/components/Sidebar.tsx` (small lint fix)
 
 ### Problem
@@ -4514,11 +4689,7 @@ Change the destructuring to ignore the first element: `const [, setSearchParams]
 
 Lint warning removed. No behavioural change; intent and functionality of the component remain the same.
 
----
-
-## 2025-10-30 Frontend errors encountered while wiring settlement editor and persistence
-
----
+## 30-10-2025 Frontend errors encountered while wiring settlement editor and persistence
 
 ### Problem
 
@@ -4540,8 +4711,6 @@ There were two separate issues:
 
 After these fixes I could create and update trades (HTTP 201/200). The authentication and payload-type errors no longer block the requests. This also removed a blocking developer friction point when testing the modal.
 
----
-
 ### Problem
 
 Settlement updates appeared to be sent but I could not always see the `additional_info` row or the audit entry in the dev database after saving sometimes the UI reported success but the DB did not show the row after restarting the app.
@@ -4557,14 +4726,12 @@ Three contributing causes:
 ### Solution
 
 1. I centralised settlement persistence into the parent Save Trade flow: the per-field Save button was removed and the `saveSettlement(tradeId, settlement)` handler is called only after the trade POST/PUT returns the persistent business trade id. This guarantees `entityId` is available and avoids race conditions.
-2. I advised and performed a local dev recovery step: remove the file H2 DB artefacts and restart so `data.sql` can seed a fresh DB. Longer term I recommended scoping SQL init to the test profile or making `data.sql` idempotent to avoid repeated reseed failures.
+2. I performed a local dev recovery step: remove the file H2 DB artefacts and restart so `data.sql` can seed a fresh DB.
 3. I verified and used the exact AdditionalInfo payload shape the backend expects: { entityType: 'TRADE', entityId: <trade_business_id>, fieldName: 'SETTLEMENT_INSTRUCTIONS', fieldValue: '...' } and confirmed the PUT call went to `/api/trades/{tradeId}/settlement-instructions`.
 
 ### Impact
 
 After centralising the save, persisting settlement became reliable when the trade creation succeeded. Removing the problematic file-backed DB files allowed the application to start cleanly and the upsert + audit rows were visible in the database. The audit `changed_by` now correctly shows the authenticated principal for requests performed via the UI.
-
----
 
 ### Problem
 
@@ -4584,8 +4751,6 @@ The initial implementation updated textarea value and selection synchronously wh
 
 The editor now behaves accessibly and predictably. Keyboard users keep caret position when inserting templates. Validation messages are clear and Save is centralised, avoiding accidental partial saves.
 
----
-
 ### Problem
 
 TypeScript / ESLint issues introduced by recent edits (implicit any, unused imports, and catching axios errors with `any`) were blocking builds and CI lint steps.
@@ -4604,8 +4769,6 @@ Refactors introduced implicit-`any` signatures in a few API helpers and some err
 
 The frontend linter and TypeScript checks no longer block the build. The changes also made runtime error handling safer and easier to reason about.
 
----
-
 ### Files I changed (quick summary)
 
 - `frontend/src/modal/SettlementTextArea.tsx` controlled textarea, templates, insertAtCursor, validation, clear handler, accessibility labels.
@@ -4614,8 +4777,6 @@ The frontend linter and TypeScript checks no longer block the build. The changes
 - `frontend/src/stores/staticStore.ts` normalised dropdown options to `{ value, label }` where value is numeric id.
 - `frontend/src/utils/api.ts` and `frontend/src/types/User.ts` explicit types and `withCredentials` on axios instance.
 - `frontend/.eslintignore` ignore generated files (dist, .vite, node_modules).
-
----
 
 ### Errors and test failures 02/11/2025 (detailed)
 
@@ -4650,9 +4811,9 @@ The frontend linter and TypeScript checks no longer block the build. The changes
 - Symptom: An `AdditionalInfo` row existed in the DB for the trade, but GET /api/trades/{id} still returned `settlementInstructions: null`.
 - Example DB row (conceptual):
 
-| id  | entity_type | entity_id | field_name              | field_value                           |
-| --- | ----------- | --------- | ----------------------- | ------------------------------------- |
-| 42  | TRADE       | 10024     | SETTLEMENT_INSTRUCTIONS | Pay USD to account 123-456 at BigBank |
+| id | entity_type | entity_id | field_name | field_value |
+| | --| | --| -|
+| 42 | TRADE | 10024 | SETTLEMENT_INSTRUCTIONS | Pay USD to account 123-456 at BigBank |
 
 - Root cause: the Trade -> TradeDTO mapper used a broad search/search-by-key approach and missed the exact AdditionalInfo row for the trade. The lookup was not scoped to (entity_type, entity_id, field_name).
 - Fix applied: changed the mapper to call a targeted service method `additionalInfoService.getSettlementInstructionsByTradeId(trade.getTradeId())` and set `dto.setSettlementInstructions(...)` when present.
@@ -4718,7 +4879,7 @@ tsconfig.json:18:37
 7. Notes about tests
 
 - Backend build was done with `mvn -DskipTests package`, so unit/integration tests were not executed during the quick verification build.
-- No automated test failures were recorded in the CI run today because tests were skipped during the packaging run. I recommend adding a focused backend integration test asserting that posting a trade with `settlementInstructions` creates an `additional_info` row, and a frontend unit test that asserts the form DTO includes `settlementInstructions` when the textarea is filled.
+- No automated test failures were recorded in the CI run today because tests were skipped during the packaging run.
 
 ## Summary of immediate fixes applied
 
@@ -4742,7 +4903,7 @@ tsconfig.json:18:37
   "tradeSubType": "Vanilla",
   "tradeDate": "2025-11-03T00:00"
   // ... many fields ...
-  // NOTE: Missing "settlementInstructions"
+  // Missing "settlementInstructions"
 }
 ```
 
@@ -4771,7 +4932,7 @@ tsconfig.json:18:37
   - frontend/src/modal/SettlementTextArea.tsx -> insertAtCursor(text)
   - frontend/src/modal/TradeActionsModal.tsx -> keeps `settlement` state and passes `onChange={(text)=>setSettlement(text)}` to the textarea
 - Fix applied:
-  - In `insertAtCursor()` compute the new value deterministically from the textarea DOM, call `setValue(newValue)` and `onChange?.(newValue)` so the parent `settlement` receives the template text.
+  - In `insertAtCursor()` calculate the new value deterministically from the textarea DOM, call `setValue(newValue)` and `onChange?.(newValue)` so the parent `settlement` receives the template text.
   - Added a fallback branch to call `onChange` when the DOM ref is not available.
 
 ### 3) Duplicate AdditionalInfo rows created on create (UI PUT + controller create)
@@ -4859,15 +5020,11 @@ Caused by: org.hibernate.exception.ConstraintViolationException:
 - TS type missing: `@types/tailwindcss` referenced in tsconfig caused local tsc to fail (setup issue).
 - Frontend dev server often restarted during manual testing (exit code 130) typically manual interruption.
 
----
-
 3/11/25
 
 # Development & Error Resolution Log
 
 This log documents the major test and integration issues encountered during the development of the **Trade Capture System** and how they were systematically resolved. Each section includes the real data, code references, and outcomes.
-
----
 
 ## Integration Test Failure: 404 Not Found (Trade Edit)
 
@@ -4907,8 +5064,6 @@ savedTradeBusinessId = trade.getTradeId();
 - Test passes (`200 OK`).
 - End-to-end validation confirmed working path from controller → service → repository.
 
----
-
 ## Integrity Violation: Duplicate Application User
 
 ### Problem
@@ -4936,8 +5091,6 @@ var simon = applicationUserRepository.findByLoginId("simon").orElseThrow();
 - Prevented constraint violation.
 - Reduced redundant test setup.
 - Database consistency restored.
-
----
 
 ## IncorrectResultSizeDataAccessException (Duplicate TradeStatus)
 
@@ -4972,8 +5125,6 @@ or disabled data.sql loading via:
 - Query now returns one unique row.
 - No more duplicate data conflicts.
 - Database lookups reliable across tests.
-
----
 
 ## HTTP 400 on Trade Creation
 
@@ -5016,8 +5167,6 @@ String payload = "{\n" +
 - Controller receives valid data and returns `201 Created`.
 - Trade creation integration test passes.
 
----
-
 ## Data Conflicts Between `data.sql` and Test Setup
 
 ### Problem
@@ -5042,8 +5191,6 @@ var counterparty = counterpartyRepository.findByName("BigBank").orElseThrow();
 - Prevented duplicate constraint violations.
 - Faster test execution (fewer inserts).
 - Aligned integration tests with production reference data.
-
----
 
 ## TradeController Patch Logic Fix
 
@@ -5072,8 +5219,6 @@ mockMvc.perform(patch("/api/trades/" + savedTradeBusinessId)
 - End-to-end integration confirmed.
 - Test now consistently returns `200 OK`.
 
----
-
 ## Overall Outcome
 
 - All integration tests fo not pass pass (`163/165`).
@@ -5093,10 +5238,55 @@ mockMvc.perform(patch("/api/trades/" + savedTradeBusinessId)
 
 # Errors Summary
 
-Generated: 2025-11-03
+Generated: 03-11-2025
 Source: development_error_log.md
 
----
+## 1) Integration Test Failure: 404 Not Found (Trade Edit)
+
+- Test: `UserPrivilegeIntegrationTest.testTradeEditRoleAllowedPatch`
+- Symptom: Status expected:<200> but was:<404>
+- Cause: PATCH used an ID not present in DB; controller expects business tradeId (`trade.tradeId`) not the DB primary key.
+- Fix: Create a trade with `trade.setTradeId(...)` and use its business id for PATCH.
+
+## 2) Integrity Violation: Duplicate Application User
+
+- Symptom: DataIntegrityViolationException on APPLICATION_USER(login_id)
+- Cause: Test inserted user already present in `data.sql`.
+- Fix: Reuse existing user via `applicationUserRepository.findByLoginId("simon")` instead of inserting duplicate.
+
+## 3) IncorrectResultSizeDataAccessException (Duplicate TradeStatus)
+
+- Symptom: query did not return a unique result: 2
+- Cause: `data.sql` and test setup both inserted `TradeStatus` rows (e.g., `NEW`) causing duplicates.
+- Fix: Reuse `data.sql` values or clean `trade_status` before inserting; use `tradeStatusRepository.findByTradeStatus("NEW")`.
+
+## 4) HTTP 400 on Trade Creation (Field name mismatch)
+
+- Symptom: Status expected:<201> but was:<400>
+- Cause: Test JSON used wrong field names (e.g., `startDate`/`maturityDate`) instead of DTO-expected names (e.g., `tradeStartDate` / `tradeMaturityDate`).
+- Fix: Align payload to DTO naming (e.g., `"tradeMaturityDate": "2026-10-15"`).
+
+## 5) Data Conflicts Between `data.sql` and Test Setup
+
+- Symptom: Duplicate inserts for Books, Counterparties, Trade Statuses.
+- Cause: Spring loaded `data.sql` and tests re-seeded the same records.
+- Fix: Reuse seeded rows via repository lookups (e.g., `bookRepository.findByBookName("FX-BOOK-1")`).
+
+## 6) TradeController Patch Logic (404) ID mismatch
+
+- Symptom: PATCH returned 404 due to ID mismatch.
+- Cause: Controller/test used internal DB id while `amendTrade()` expects business id.
+- Fix: Use business tradeId in controller path and tests (e.g., `patch("/api/trades/" + savedTradeBusinessId)`).
+
+### Quick verification note
+
+Focused run executed during debugging:
+
+```bash
+mvn -f backend/pom.xml -Dtest=UserPrivilegeIntegrationTest#testTradeEditRoleAllowedPatch test
+```
+
+Result (focused): create returned `201`, patch returned `200` (focused scenario fixed locally).
 
 ## 1) Integration Test Failure: 404 Not Found (Trade Edit)
 
@@ -5141,8 +5331,270 @@ Source: development_error_log.md
 
 Focused run executed during debugging:
 
-```bash
+````bash
 mvn -f backend/pom.xml -Dtest=UserPrivilegeIntegrationTest#testTradeEditRoleAllowedPatch test
+
+## Errors and test failures  06-Nov-2025
+
+---
+
+### 1) Syntax / stray-brace error in TradeDashboardService
+
+### Problems
+
+- Tests and compilation failed locally with a Java syntax error originating from `TradeDashboardService` (a stray or mismatched brace). The compiler stack trace pointed to that class and prevented the test suite from starting.
+
+### Root cause
+
+- During refactoring to extract settlement enrichment logic the file ended up with a mismatched brace (likely from a cut-and-paste or an incomplete edit). This produced a compile-time syntax error and prevented any further test execution.
+
+### Solution
+
+- Manually corrected the brace placement in `TradeDashboardService.java` so the class compiles. Verified compilation by running targeted tests that depend on the service.
+
+Files changed:
+
+- backend/src/main/java/com/technicalchallenge/service/TradeDashboardService.java
+
+Commands used to verify:
+
+```bash
+mvn -Dtest=com.technicalchallenge.service.TradeDashboardServiceAuthTest test
+````
+
+### Impact
+
+- Immediate: prevented the build/test runner from compiling the project, blocking all further automated testing and local development runs until fixed.
+- After fix: compilation restored and the test harness could start up; allowed following fixes to proceed.
+
+---
+
+### 2) Large number of ApplicationContext startup errors after constructor change ("missing bean")
+
+### Problems
+
+- After adding `AdditionalInfoRepository` as a constructor parameter to `TradeDashboardService` (and similar wiring changes), many tests failed to start: the initial full test run showed ~74 ApplicationContext startup errors. These failures manifested as Spring unable to create beans for slices/tests that didn't declare a repository bean.
+
+### Root cause
+
+- Constructor injection was changed to include a new required dependency (`AdditionalInfoRepository`). Several Spring test slices (controller-level tests, @WebMvcTest or similar) did not provide that repository bean in their slice context. Spring failed to resolve the dependency when creating the service bean, causing ApplicationContext startup failures across many tests.
+
+### Solution
+
+- Three-pronged mitigation applied:
+  1. Added a wiring compatibility measure to service class by annotating the primary constructor with `@Autowired` so Spring selects the intended constructor explicitly (reduces ambiguity in auto-wiring during tests). This was a safe, non-behavioral change to make Spring's constructor selection deterministic.
+  2. For controller/test slices that failed to start because they don't load repository beans, added `@MockBean AdditionalInfoRepository` to those test classes. This injects a mock repository into the test ApplicationContext so the service bean can be created without changing production behavior.
+  3. Verified the fixes by running targeted controller tests and iterating until the contexts started successfully.
+
+Files changed (test-side only):
+
+- backend/src/test/java/com/technicalchallenge/controller/BookControllerTest.java (added `@MockBean AdditionalInfoRepository`)
+- backend/src/test/java/com/technicalchallenge/controller/UserControllerTest.java (added `@MockBean AdditionalInfoRepository`)
+- backend/src/test/java/com/technicalchallenge/controller/TradeLegControllerTest.java (added `@MockBean AdditionalInfoRepository`)
+- backend/src/test/java/com/technicalchallenge/controller/CounterpartyControllerTest.java (added `@MockBean AdditionalInfoRepository`)
+- backend/src/test/java/com/technicalchallenge/controller/CashflowControllerTest.java (added `@MockBean AdditionalInfoRepository`)
+- backend/src/test/java/com/technicalchallenge/controller/TradeControllerTest.java (added `@MockBean AdditionalInfoRepository`)
+
+Commands used to verify:
+
+```bash
+mvn -Dtest=BookControllerTest,UserControllerTest,TradeLegControllerTest,CounterpartyControllerTest,CashflowControllerTest test
 ```
 
-Result (focused): create returned `201`, patch returned `200` (focused scenario fixed locally).
+### Impact
+
+- Immediate: Large number of tests failed to start; CI / local dev runs reporting dozens of ApplicationContext errors.
+- After fix: Controller slice tests started successfully when provided a `@MockBean` for the missing repository; this is a test-context-only wiring change and does not alter production behavior.
+
+Notes and rationale:
+
+- Adding `@MockBean` is the least intrusive way to restore Spring test slices. It keeps the production code unchanged except for the `@Autowired` annotation used to make constructor selection explicit. An alternative is to revert the constructor change and introduce a setter or optional dependency but that would require a design decision and touches production code more broadly. The approach used preserves domain behavior.
+
+---
+
+### 3) Malformed / corrupted test file: TradeDashboardServiceAuthTest.java
+
+### Problems
+
+- A test file (`TradeDashboardServiceAuthTest.java`) was malformed (corrupted contents) which caused compilation/test harness failures for that test class.
+
+### Root cause
+
+- During earlier refactors (edits and multiple patches), that test file became malformed likely due to an incomplete patch or accidental paste that left invalid Java syntax. The JUnit run reported compile errors for that file.
+
+### Solution
+
+- Repaired the file by restoring a valid Java test class structure and re-adding necessary mocks (including `@Mock AdditionalInfoRepository`) and wiring the mock into the service under test within the `@BeforeEach` setup.
+
+Files changed:
+
+- backend/src/test/java/com.technicalchallenge.service/TradeDashboardServiceAuthTest.java (fixed corrupted content, restored valid test class and mocks)
+
+Commands used to verify:
+
+```bash
+mvn -Dtest=com.technicalchallenge.service.TradeDashboardServiceAuthTest test
+```
+
+### Impact
+
+- Immediate: The malformed test prevented the individual test from compiling/running, and could have contributed to noisy build output.
+- After fix: the test compiled and ran successfully, reducing unrelated noise and enabling focused debugging.
+
+---
+
+### 4) UnfinishedStubbingException in TradeControllerTest (nested mock invocation)
+
+### Problems
+
+- While running `TradeControllerTest`, an `UnfinishedStubbingException` occurred when using Mockito `when(...)` with an argument that indirectly called another mock. This is the familiar "invoking a mock inside a when(...)" anti-pattern that causes nested/mock scheduling issues.
+
+### Root cause
+
+- Test code used `when(mockA.someMethod(mockB.otherMethod(...)))` or otherwise called into another mocked object's method inside the `when(...)` argument. Mockito treats this as unfinished stubbing because the inner mock call is evaluated at stubbing time.
+
+### Solution
+
+- Reworked the test stubbing to avoid invoking other mocks while building the `when(...)` call. The stable approach was to create concrete return objects (e.g., a real `TradeDTO` instance) and use that concrete instance in `when(...).thenReturn(...)`. This removed nested mock calls and avoided `UnfinishedStubbingException`.
+
+Files changed (test-only):
+
+- backend/src/test/java/com/technicalchallenge/controller/TradeControllerTest.java (adjusted stubbing to return concrete `TradeDTO` and avoid nested mock calls)
+
+Example verification command:
+
+```bash
+mvn -Dtest=com.technicalchallenge.controller.TradeControllerTest test
+```
+
+### Impact
+
+- Immediate: caused a test run to abort with an exception, blocking verification until the test was fixed.
+- After fix: the test suite progressed; the `TradeControllerTest` executed cleanly.
+
+---
+
+### 5) TradeControllerTest failures after controller started delegating to TradeService.getTradeDtoById(...)
+
+### Problems
+
+- After the controller was changed to delegate to a new service method `tradeService.getTradeDtoById(...)` (which enriches a single trade DTO), `TradeControllerTest` failed because the test's existing stubs expected the old service methods and did not stub this new method.
+
+### Root cause
+
+- The controller change introduced a new interaction point (a service method) that the slice test was not aware of. Tests continued to stub the old service behavior and therefore did not provide a return value for the new call causing test failures.
+
+### Solution
+
+- Updated `TradeControllerTest` to stub `tradeService.getTradeDtoById(...)` and return a concrete `TradeDTO` instance. Also added `@MockBean AdditionalInfoRepository` to the controller test context (see item 2) so the overall ApplicationContext could create the service bean.
+
+Files changed:
+
+- backend/src/test/java/com.technicalchallenge.controller/TradeControllerTest.java
+
+Commands used to verify:
+
+```bash
+mvn -Dtest=com.technicalchallenge.controller.TradeControllerTest test
+```
+
+### Impact
+
+- Immediate: caused controller tests to fail until updated.
+- After fix: the controller test runs green and accurately tests controller-to-service delegation.
+
+---
+
+### 6) Missing `@MockBean` in other controller test slices (propagating failures)
+
+### Problems
+
+- Several controller-level tests (slices) failed to start because the new required repository bean was not present in their test ApplicationContext.
+
+### Root cause
+
+- When production constructors require additional beans, test slices must supply them (via `@MockBean` or configuration). The tests in those slices had not been updated to provide `AdditionalInfoRepository` and so Spring could not construct the service graph.
+
+### Solution
+
+- Added `@MockBean AdditionalInfoRepository` to the affected controller test classes (BookControllerTest, UserControllerTest, TradeLegControllerTest, CounterpartyControllerTest, CashflowControllerTest, TradeControllerTest). After that the ApplicationContext for each slice could start and run tests.
+
+Files changed (test-only):
+
+- backend/src/test/java/com/technicalchallenge/controller/BookControllerTest.java
+- backend/src/test/java/com/technicalchallenge/controller/UserControllerTest.java
+- backend/src/test/java/com/technicalchallenge/controller/TradeLegControllerTest.java
+- backend/src/test/java/com/technicalchallenge/controller/CounterpartyControllerTest.java
+- backend/src/test/java/com/technicalchallenge/controller/CashflowControllerTest.java
+- backend/src/test/java/com/technicalchallenge/controller/TradeControllerTest.java
+
+Verification command used iteratively:
+
+```bash
+mvn -Dtest=BookControllerTest,UserControllerTest,TradeLegControllerTest,CounterpartyControllerTest,CashflowControllerTest,TradeControllerTest test
+```
+
+### Impact
+
+- Immediate: without the mocks, many tests could not start and the overall test run appeared to fail with dozens of ApplicationContext errors.
+- After fix: the controller slice tests started and executed as expected; build noise reduced significantly.
+
+these `@MockBean` additions only affect test contexts; they do not change runtime application wiring in production.
+
+---
+
+### 7) Interrupted / cancelled test run
+
+### Problems
+
+- A previously-started `mvn -Dtest=TradeControllerTest test` run was interrupted/cancelled during a troubleshooting session. This left the immediate verification incomplete.
+
+### Root cause
+
+- Manual interruption (tool/terminal cancel) during iterative debugging.
+
+### Solution
+
+- Re-ran the specific test thereafter to completion. The rerun succeeded: `TradeControllerTest` finished with 7 tests, 0 failures.
+
+Command re-run:
+
+```bash
+mvn -Dtest=TradeControllerTest test
+```
+
+### Impact
+
+- Minimal this was an operational interruption; no code change was needed. The later re-run completed successfully and confirmed the fix.
+
+---
+
+## Summary of current state (end of day 06-Nov-2025)
+
+- All problems described above were investigated and addressed with targeted, low-risk fixes, primarily in test code and test configuration. No production business logic, validation, or privilege checks were changed.
+- Compiler/syntax error was fixed first so the codebase could be compiled.
+- The majority of failures stemmed from making a constructor require an extra repository bean; the safe mitigation was to provide test-context mocks (`@MockBean AdditionalInfoRepository`) for controller slices and make Spring's constructor selection explicit via `@Autowired` on the intended constructor.
+- Nested mock stubbing issues were resolved by returning concrete DTO objects in Mockito stubs instead of calling mocks inside `when(...)`.
+
+1. TradeDashboardService syntax error stray/mismatched brace prevented compilation.
+2. ApplicationContext startup failures (~74 initially) after adding `AdditionalInfoRepository` to a constructor (missing bean in test slices).
+3. Malformed test file `TradeDashboardServiceAuthTest.java` corrupted contents fixed.
+4. `UnfinishedStubbingException` in `TradeControllerTest` due to nested mock invocation in `when(...)` fixed by returning concrete DTOs.
+5. `TradeControllerTest` failures after controller now delegates to `tradeService.getTradeDtoById(...)` updated test stubs accordingly.
+6. Several controller slice tests missing `@MockBean AdditionalInfoRepository` added mocks to restore ApplicationContext.
+7. Interrupted/cancelled `TradeControllerTest` run re-ran and confirmed success (7 tests, 0 failures).
+
+Quick links
+
+- Detailed writeup (appendix): `docs/Development-Errors-and-fixes-2025-11-06.md`
+- Main development error log: `docs/Development-Errors-and-fixes.md` (you previously asked to append; I created the dated appendix file instead due to patching issues)
+
+Verification commands used during debugging (examples run locally):
+
+```bash
+# run a single test class
+mvn -Dtest=com.technicalchallenge.controller.TradeControllerTest test
+
+# run multiple controller slice tests together
+mvn -Dtest=BookControllerTest,UserControllerTest,TradeLegControllerTest,CounterpartyControllerTest,CashflowControllerTest test
+```

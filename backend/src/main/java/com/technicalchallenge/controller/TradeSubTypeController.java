@@ -21,6 +21,5 @@ public class TradeSubTypeController {
         List<TradeSubType> subTypes = tradeSubTypeRepository.findAll();
         return subTypes.stream().map(TradeSubType::getTradeSubType).collect(Collectors.toList());
     }
-    // Adding this line to force commit
 
 }

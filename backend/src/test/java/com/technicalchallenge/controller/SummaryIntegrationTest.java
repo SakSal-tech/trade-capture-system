@@ -406,6 +406,5 @@ public class SummaryIntegrationTest extends BaseIntegrationTest {
                 mockMvc.perform(get(SUMMARY_ENDPOINT))
                                 .andExpect(status().isBadRequest());
         }
-        // Adding this line to force commit
 
 }

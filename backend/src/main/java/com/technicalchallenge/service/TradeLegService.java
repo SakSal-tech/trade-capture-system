@@ -42,6 +42,5 @@ public class TradeLegService {
 
     // Business logic: notional > 0, trade, currency, legRateType required (enforced
     // in controller)
-    // Adding this line to force commit
 
 }

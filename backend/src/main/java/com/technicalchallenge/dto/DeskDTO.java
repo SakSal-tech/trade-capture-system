@@ -12,6 +12,5 @@ import lombok.Setter;
 public class DeskDTO {
     private Long id;
     private String deskName;
-    // Adding this line to force commit
 
 }

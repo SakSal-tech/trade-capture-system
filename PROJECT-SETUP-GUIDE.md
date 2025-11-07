@@ -165,7 +165,7 @@ pnpm install
 # Install dependencies
 npm install
 
-# Note: You may need to delete pnpm-lock.yaml first if switching from pnpm
+# You may need to delete pnpm-lock.yaml first if switching from pnpm
 # rm pnpm-lock.yaml  # Linux/macOS
 # del pnpm-lock.yaml  # Windows
 ```

@@ -67,6 +67,5 @@ public class BusinessDayConventionController {
                 .map(BusinessDayConvention::getBdc)
                 .toList();
     }
-    // Adding this line to force commit
 
 }

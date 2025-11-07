@@ -48,7 +48,7 @@ function formatCurrency(value?: number | string | null) {
   //  it should return it as it is e.g : if the value is a non-numeric string (for example "N/A"), don't try to format it as USD
   if (typeof value === "number") {
     if (Number.isNaN(value)) return String(value);
-    //value = "1234" → parses to number and returns "$1,234.00"
+    //value = "1234", parses to number and returns "$1,234.00"
     return value.toLocaleString(undefined, {
       style: "currency",
       currency: "USD",
@@ -340,7 +340,7 @@ function TradeDashboard() {
                         // so build dates for the last N days (oldest -> newest).
                         summary.weeklyComparisons.map(
                           (item: WeeklyComparison, idx: number, arr) => {
-                            // Use the mapped array `arr` to compute the index-based
+                            // Use the mapped array `arr` to calculate the index-based
                             // label rather than referencing `summary.weeklyComparisons`
                             // directly. This avoids a TypeScript 'possibly undefined'
                             // error while preserving the original semantics.

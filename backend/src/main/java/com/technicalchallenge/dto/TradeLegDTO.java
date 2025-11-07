@@ -61,6 +61,5 @@ public class TradeLegDTO {
 
     // ADDED: each leg to have a maturityDate
     private LocalDate tradeMaturityDate;
-    // Adding this line to force commit
 
 }

@@ -42,6 +42,5 @@ public class UserPrivilegeValidatorTest {
         assertTraderCanPerformAction(trader, tradeDTO, "TERMINATE");
         assertTraderCanPerformAction(trader, tradeDTO, "CANCEL");
     }
-    // Adding this line to force commit
 
 }

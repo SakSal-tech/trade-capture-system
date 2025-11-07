@@ -1,0 +1,29 @@
+# docker-compose: orchestrates backend and frontend for local development
+# - backend: built from ./backend, exposed on host:8080
+# - frontend: built from ./frontend and served by nginx on container:80 mapped to host:3000
+# - backend healthcheck probes /actuator/health (enable Spring Actuator for readiness)
+# - restart policies help keep services up during local development
+version: "3.8"
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=local
+    restart: unless-stopped
+    healthcheck:
+      test:
+        ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

@@ -314,7 +314,7 @@ public class TradeDashboardServiceTest {
     }
 
     @Test
-    @DisplayName("getTradeSummary: Should compute totals dynamically for multiple currencies")
+    @DisplayName("getTradeSummary: Should calculate totals dynamically for multiple currencies")
     void testGetTradeSummary_ComputesDynamicTotals() {
         org.mockito.Mockito.lenient()
                 .when(privilegeValidationEngine.validateUserPrivilegeBusinessRules(any(TradeDTO.class), any()))
@@ -409,6 +409,5 @@ public class TradeDashboardServiceTest {
         assertEquals(1, result.size());
         assertEquals(123L, result.get(0).getTradeId());
     }
-    // Adding this line to force commit
 
 }

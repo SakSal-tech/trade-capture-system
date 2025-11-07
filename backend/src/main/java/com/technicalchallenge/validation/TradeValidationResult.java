@@ -23,6 +23,5 @@ public class TradeValidationResult {
     public List<String> getErrors() {
         return errorStrings;
     }
-    // Adding this line to force commit
 
 }

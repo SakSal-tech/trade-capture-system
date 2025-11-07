@@ -1,10 +1,10 @@
-// REFACTORED: Cashflow grouping filters made tolerant to DTO label variations (2025-11-04).
+// REFACTORED: Cashflow grouping filters made tolerant to DTO label variations .
 // Rationale: backend sometimes returns abbreviated pay/rec labels (e.g. "Rec") or
 // different casing. This front-end change uses normalized, prefix-based matching
 // to avoid hiding legitimately-generated cashflows in the UI. Long-term: centralise
 // normalization in a shared util and align backend enums with frontend constants.
 /*
- * REFACTORED: 2025-11-04
+ * REFACTORED:
  * - Made pay/receive and paymentType matching tolerant to abbreviations
  *   (e.g. 'Rec' vs 'Receive') using a normaliser and prefix matching.
  * - Added developer-facing comments describing rationale and next steps.
@@ -34,7 +34,7 @@ const CashflowModal: React.FC<CashflowModalProps> = ({
     (inputStr ?? "").toString().trim().toLowerCase();
 
   /**
-   * REFACTOR NOTE (2025-11-04):
+   * REFACTOR :
    * The cashflow grouping logic used to rely on strict, full-word
    * equality checks (e.g. payRec === 'receive'). In practice the
    * backend/DTO sometimes returns abbreviated labels (e.g. 'Rec') or
@@ -70,7 +70,7 @@ const CashflowModal: React.FC<CashflowModalProps> = ({
   // Detect whether any cashflows for a leg used the demo fallback rate.
   // Toconsider the fallback used when the paymentType is 'floating'
   // (case-insensitive) and the rate exactly equals the shared demo rate.
-  // Note: this heuristic is intentionally simple integrate a
+  // this heuristic is intentionally simple integrate a
   // proper RateProvider, remove this UI-only label logic.
   const usedFallback = (cfs: CashflowDTO[]) =>
     cfs.some(
@@ -114,7 +114,7 @@ const CashflowModal: React.FC<CashflowModalProps> = ({
               Leg 1 Cashflows
               {leg1UsedFallback && (
                 <div className="text-xs text-yellow-700 mt-1">
-                  Note: values computed using demo fallback rate (
+                  values computed using demo fallback rate (
                   {(DEFAULT_FALLBACK_FLOATING_RATE * 100).toFixed(2)}
                   %)
                 </div>
@@ -131,7 +131,7 @@ const CashflowModal: React.FC<CashflowModalProps> = ({
               Leg 2 Cashflows
               {leg2UsedFallback && (
                 <div className="text-xs text-yellow-700 mt-1">
-                  Note: values computed using demo fallback rate (
+                  values computed using demo fallback rate (
                   {(DEFAULT_FALLBACK_FLOATING_RATE * 100).toFixed(2)}
                   %)
                 </div>

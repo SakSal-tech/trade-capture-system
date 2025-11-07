@@ -24,6 +24,5 @@ public class CashflowDTO {
     private String paymentBusinessDayConvention;
     private LocalDateTime createdDate;
     private Boolean active;
-    // Adding this line to force commit
 
 }

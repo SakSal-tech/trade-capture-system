@@ -64,6 +64,5 @@ public class TradeLegController {
         tradeLegService.deleteTradeLeg(id);
         return ResponseEntity.noContent().build();
     }
-    // Adding this line to force commit
 
 }

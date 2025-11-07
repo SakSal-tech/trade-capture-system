@@ -60,6 +60,5 @@ public class BookService {
         logger.warn("Deleting book with id: {}", id);
         bookRepository.deleteById(id);
     }
-    // Adding this line to force commit
 
 }

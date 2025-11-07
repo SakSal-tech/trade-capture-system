@@ -37,6 +37,5 @@ public class TradeTypeService {
         logger.warn("Deleting trade type with id: {}", id);
         tradeTypeRepository.deleteById(id);
     }
-    // Adding this line to force commit
 
 }

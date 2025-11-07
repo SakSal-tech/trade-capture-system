@@ -66,7 +66,7 @@ Notes and trade-offs:
 - Indexes increase storage usage and slow down writes (inserts/updates) to the indexed column. Settlement instructions updates are expected to be infrequent, so the read performance benefit typically outweighs the write cost.
 - Tests run against H2 during CI will not reflect production Postgres indexing behaviour. Treat H2 tests as functional; add staging validation on a Postgres instance to confirm index impact.
 
-Suggested follow-up (optional): provide a Liquibase changeSet that adds the index and a short verification script. See `docs/postgres/add_lower_index_additional_info.sql` for copy-paste SQL and comments.
+Future improvements: To provide a Liquibase changeSet that adds the index and a short verification script. See `docs/postgres/add_lower_index_additional_info.sql` for copy-paste SQL and comments.
 **Service Layer Delegation** Moved filtering logic from controller to repository queries Reduces memory load in the controller and leverages JPA/Hibernate’s built-in query optimisation, improving execution time and scalability.
 **Optional Field Validation** Only validates and saves non-null settlement instructions Reduces unnecessary operations and database writes, leading to faster and more efficient data handling.
 **Audit Trail** Introduced a separate, lightweight table to store change history Keeps the `AdditionalInfo` table smaller and more responsive for real-time queries, while still satisfying the auditability requirement.

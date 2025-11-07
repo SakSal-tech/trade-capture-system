@@ -12,6 +12,5 @@ public class AuthorizationService {
     public boolean authenticateUser(String userName, String password) {
         return applicationUserService.validateCredentials(userName, password);
     }
-    // Adding this line to force commit
 
 }

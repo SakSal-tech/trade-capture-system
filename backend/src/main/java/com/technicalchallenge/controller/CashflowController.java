@@ -144,7 +144,7 @@ public class CashflowController {
     // cashflows when the frontend supplied an explicit numeric rate for a
     // Floating leg (for testing or one-off pricing). To make the endpoint
     // more useful during UI-driven testing and to keep behaviour consistent
-    // with calculateCashflowValue in TradeService, now compute payments
+    // with calculateCashflowValue in TradeService, now calculate payments
     // for Floating legs when the caller provides a concrete `rate` value.
     // If no rate is provided for a Floating leg preserve the old
     // behaviour (paymentValue remains zero) so production behaviour that
@@ -242,6 +242,5 @@ public class CashflowController {
             return 12;
         return 0;
     }
-    // Adding this line to force commit
 
 }

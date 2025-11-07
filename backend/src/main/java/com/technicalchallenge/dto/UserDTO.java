@@ -21,6 +21,5 @@ public class UserDTO {
     private int version;
     private LocalDateTime lastModifiedTimestamp;
     private String userProfile;
-    // Adding this line to force commit
 
 }

@@ -48,7 +48,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * required; the class prefers a central UserPrivilegeValidator when
  * available and falls back to inline checks to preserve testability.
  *
- * Note: this class performs soft-deletes (preserves historical rows) and
+ * this class performs soft-deletes (preserves historical rows) and
  * writes explicit audit records whenever settlement instructions are
  * changed or deactivated.
  */
@@ -75,7 +75,7 @@ public class AdditionalInfoService {
 
     /**
      * Refactor after tests failed, I added extra parameter
-     * ApplicationEventPublisher — t later after
+     * ApplicationEventPublisher t later after
      * tests writing. Backwards-compatible constructor used by older tests
      * and callers that do
      * not provide an ApplicationEventPublisher. Delegates to the full
@@ -131,7 +131,7 @@ public class AdditionalInfoService {
         if (fieldValue != null && !fieldValue.trim().isEmpty()) {
             fieldValue = fieldValue.trim();
 
-            // REFACTOR NOTE: settlement-specific validation has been centralised
+            // REFACTOR settlement-specific validation has been centralised
             // into `SettlementInstructionValidator`. If this AdditionalInfo record
             // is a settlement instruction, use the validator; otherwise preserve
             // the original lightweight checks for other fields.
@@ -215,7 +215,7 @@ public class AdditionalInfoService {
         if (updatedValue != null && !updatedValue.trim().isEmpty()) {
             updatedValue = updatedValue.trim();
 
-            // REFACTOR NOTE: Moved validations to the SettlementInstructionValidator to use
+            // REFACTOR Moved validations to the SettlementInstructionValidator to use
             // central settlement validator for settlement fields
             // If existing record field is "SETTLEMENT_INSTRUCTIONS" run validator
             if ("SETTLEMENT_INSTRUCTIONS".equalsIgnoreCase(existingAdditionalInfo.getFieldName())) {
@@ -441,7 +441,7 @@ public class AdditionalInfoService {
         request.setEntityId(tradeId); // Links record to the correct trade
         request.setFieldName("SETTLEMENT_INSTRUCTIONS");
         request.setFieldValue(instructions); // The new or updated instruction text
-        // Note: do NOT set fieldType on the DTO (request object) because
+        // do NOT set fieldType on the DTO (request object) because
         // AdditionalInfoRequestDTO does not include that property. The mapper
         // and the entity-level defensive check in createAdditionalInfo will
         // ensure fieldType is populated before persistence to avoid 500 errors.
@@ -679,7 +679,7 @@ public class AdditionalInfoService {
      * Authorization: only the trade owner or users with elevated edit roles
      * are permitted; AccessDeniedException is thrown otherwise.
      *
-     * Note: this method assumes at most one active settlement row per trade.
+     * this method assumes at most one active settlement row per trade.
      * Use deleteAdditionalInfoById for operator-precise cleanup of duplicates.
      */
     @Transactional
@@ -710,7 +710,7 @@ public class AdditionalInfoService {
                         "Insufficient privileges to delete settlement instructions for trade " + tradeId);
             }
         } else {
-            // NOTE: align fallback edit authority with other service paths
+            // align fallback edit authority with other service paths
             // (e.g., upOrInsertTradeSettlementInstructions and deleteAdditionalInfoById)
             // The controller already allows MIDDLE_OFFICE; the service must also
             // recognise ROLE_MIDDLE_OFFICE and ROLE_ADMIN as elevated editors.
@@ -883,9 +883,8 @@ public class AdditionalInfoService {
     }
 
     /*
-     * Notes about deleteAdditionalInfoById:
      * - Purpose: provides a precise operator-facing way to deactivate a single
-     * AdditionalInfo row by its primary key. This is the recommended approach
+     * AdditionalInfo row by its primary key. This is the best approach
      * when cleaning up duplicate rows because it avoids ambiguity about which
      * row will be removed.
      * - Authorization: For records linked to trades the same ownership/edit

@@ -222,7 +222,7 @@ export function convertEmptyStringsToNull(
         // conversion is broad and can convert required fields to `null` if
         // fields (e.g. tradeDate, tradeLegs[].notional) are not nulled.
         // List of fields that should be null if empty string (including enums)
-        // NOTE: include UTI, settlement and common user/id fields so the
+        // include UTI, settlement and common user/id fields so the
         // backend receives `null` (allowing auto-generation) rather than
         // an empty string which some endpoints treat as a value.
         const keysToNullIfEmpty = [

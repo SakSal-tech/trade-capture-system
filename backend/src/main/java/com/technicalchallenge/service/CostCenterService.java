@@ -55,6 +55,5 @@ public class CostCenterService {
         logger.warn("Deleting cost center with id: {}", id);
         costCenterRepository.deleteById(id);
     }
-    // Adding this line to force commit
 
 }

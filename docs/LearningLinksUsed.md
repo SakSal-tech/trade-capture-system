@@ -272,7 +272,7 @@ SLF4J LoggerFactory Javadoc (slf4j-api 2.0.9)
 https://www.javadoc.io/doc/org.slf4j/slf4j-api/2.0.9/org/slf4j/LoggerFactory.html
 (API docs for LoggerFactory.getLogger and binding notes.)
 
-Logback manual (recommended SLF4J implementation)
+Logback manual (+ SLF4J implementation)
 https://logback.qos.ch/manual/index.html
 (Configuration, appenders, encoders and MDC usage.)
 
@@ -337,3 +337,11 @@ https://www.baeldung.com/spring-events
 ### Web Socket SSE
 
 https://www.baeldung.com/spring-server-sent-events
+
+#### Docker Containers
+
+https://www.geeksforgeeks.org/devops/docker-compose-for-java-applications-simplifying-deployment/
+
+https://www.geeksforgeeks.org/devops/docker-compose-for-java-applications-simplifying-deployment/
+
+https://www.baeldung.com/docker-maven-build-multi-module-projects

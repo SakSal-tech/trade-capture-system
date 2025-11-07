@@ -140,6 +140,5 @@ public class UserController {
                                 .map(ApplicationUser::getLoginId)
                                 .toList();
         }
-        // Adding this line to force commit
 
 }

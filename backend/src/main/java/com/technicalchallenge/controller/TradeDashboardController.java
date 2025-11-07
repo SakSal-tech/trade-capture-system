@@ -86,7 +86,7 @@ public class TradeDashboardController {
 
         Page<TradeDTO> pagedResult = tradeDashboardService.filterTrades(criteria, page, size);
 
-        // I’m now wrapping the response to include both count and content
+        // I'm now wrapping the response to include both count and content
         Map<String, Object> response = Map.of(
                 "count", pagedResult.getTotalElements(),
                 "content", pagedResult.getContent());

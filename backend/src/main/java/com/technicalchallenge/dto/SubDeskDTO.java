@@ -13,6 +13,5 @@ public class SubDeskDTO {
     private Long id;
     private String subdeskName;
     private String deskName;
-    // Adding this line to force commit
 
 }

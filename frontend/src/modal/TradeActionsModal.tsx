@@ -35,7 +35,7 @@ export const TradeActionsModal: React.FC = observer(() => {
     client-side state is strictly a UI cache that mirrors what the server
     returns or what the user saves.
   */
-  // REFACTOR NOTE:
+  // REFACTOR
   // Previously the settlement editor performed its own HTTP request and
   // persistence. To improve maintainability and ensure a single source of
   // truth for settlements (so Save Trade and the settlement UI behave

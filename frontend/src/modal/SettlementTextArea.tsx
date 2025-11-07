@@ -1,5 +1,5 @@
 import { FC, useState, useRef, useEffect, ChangeEvent } from "react"; // React: JSX runtime
-// FC: Functional Component type for typing the component
+// Functional Component type for typing the component
 // useState: controlled value storage for the textarea
 // useRef: hold a reference to the <textarea> so can insert at cursor
 // useEffect: small lifecycle needs (e.g., focus or syncing initial value)
@@ -24,7 +24,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
   onSave,
   onChange,
 }) => {
-  // REFACTOR NOTE:
+  // REFACTOR
   // This component was intentionally refactored to be a UI-only, controlled
   // textarea with helper features (templates, insert-at-cursor, validation)
   // and an optional `onSave` callback. The component does not perform any
@@ -96,7 +96,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
       }
     }
 
-    // no indicators matched — clear previous match and return null
+    // no indicators matched clear previous match and return null
     setNonStandardKeyword(null);
     return null;
   }
@@ -121,7 +121,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
     runNonStandardDetection(newValue);
   }
 
-  // Note: the component remains UI-only and delegates persistence to the parent.
+  // the component remains UI-only and delegates persistence to the parent.
   // Reference `onSave` so linters do not mark it as unused when callers omit it.
   useEffect(() => {
     void onSave;
@@ -194,7 +194,7 @@ export const SettlementTextArea: FC<SettlementTextareaProps> = ({
         // because the insertion itself is still correct and editable.
       }
     });
-    // Note: already used requestAnimationFrame above to focus and set selection.
+    // already used requestAnimationFrame above to focus and set selection.
     // The duplicate call was removed to avoid running the focus/selection twice.
   }
 

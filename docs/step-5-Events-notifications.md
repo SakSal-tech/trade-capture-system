@@ -8,7 +8,7 @@ Objective
 - Preserve existing persistence and audit semantics (the service must still validate, persist and audit every change).
 - Deliver a small, testable and reversible implementation that can later be migrated to a durable broker (Kafka, RabbitMQ) if operational needs require.
 
-Constraints I observed in the codebase
+Constraints I observed
 
 - `AdditionalInfoService.upOrInsertTradeSettlementInstructions(...)` is the canonical, transactional method that validates input, writes the AdditionalInfo row and writes the audit trail. Because this method encloses the full business transaction, it is the correct place to publish notification events.
 - Controllers are intentionally thin and delegate to services. To keep controllers thin I published events from the service layer rather than from controllers.
@@ -21,7 +21,7 @@ Chosen high‑level architecture
 
 Rationale short
 
-- SSE is simple, firewall friendly and fits a unidirectional server→client use case (operations UIs mainly consume events).
+- SSE is simple, firewall friendly and fits a unidirectional server-client use case (operations UIs mainly consume events).
 - Emitting from the service ensures correctness subscribers only receive committed and audited changes.
 
 ---
@@ -44,19 +44,6 @@ Programming techniques used
 - Defensive checks: emit only when there is a meaningful change (oldValue != newValue). This reduces noisy events on idempotent updates.
 - Use of authenticated principal: the service reads the username from `SecurityContextHolder` (the code already derives `authUser`) and uses that value in the event payload to prevent spoofed actor values.
 
-Alternatives considered (and why I deferred them)
-
-- Directly publishing to an external broker (Kafka/RabbitMQ) from the service.
-  - Pros: Durable, scalable, decouples producers and consumers.
-  - Cons: Requires infra, extra config, security hardening. For a first incremental rollout this is heavy and increases operational burden.
-  - Decision: Defer to a follow‑up step after validate UX and volume.
-- Using Spring ApplicationEventPublisher to fire an application event and then a listener sends to a broker.
-  - Pros: decouples publisher/listener responsibilities and simplifies unit testing.
-  - Cons: still requires a downstream transport implementation and slightly more moving parts.
-  - Decision: acceptable alternative; easy to switch to later.
-- Publishing from the controller.
-  - Rejected because controllers may publish before transaction commit and it duplicates logic between booking and amendment paths.
-
 Testing notes
 
 - Unit test: mock an emitter manager and assert the publish method is invoked with the expected `tradeId`, `changedBy` and a timestamp when `upOrInsertTradeSettlementInstructions` runs.
@@ -68,27 +55,21 @@ Code references
 
 ---
 
-## Enhancement 2 SSE subscription endpoint and emitter manager
-
-What I implemented conceptually
-
-- A subscription endpoint that returns an `SseEmitter` and registers it in an in‑memory manager keyed by `tradeId` (or a wildcard key for all trades).
-- The manager holds a thread-safe map: `ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>>` (or similar), with cleanup handlers for completion, error and timeout.
-
-Why SSE
-
-- Browser friendly: `EventSource` is supported natively and handles reconnection automatically.
-- Simpler to implement and operate than WebSockets for a unidirectional use case.
-- Less operational friction for early rollout works through corporate proxies and standard ports.
-
-Programming techniques used
-
-- Concurrency: use thread‑safe collections (`ConcurrentHashMap`, `CopyOnWriteArrayList`) to avoid synchronization bugs when multiple threads register/deregister emitters.
-- Emitter lifecycle handling: attach `onCompletion`, `onTimeout` and `onError` callbacks to remove dead emitters from the manager avoids memory leaks.
-- Heartbeats: send occasional keep‑alive comments or ping events so intermediary proxies don’t silently drop idle connections.
-- Security: protect the endpoint with `@PreAuthorize` and perform the same ownership and privilege checks used by `AdditionalInfoService.getSettlementInstructionsByTradeId(...)` so one user cannot subscribe to another user’s private trade unless authorised.
+## Future Enhancement
 
 Alternatives considered and why I deferred them
+
+- Directly publishing to an external broker (Kafka/RabbitMQ) from the service.
+  - Pros: Durable, scalable, decouples producers and consumers.
+  - Cons: Requires infra, extra config, security hardening. For a first incremental rollout this is heavy and increases operational burden.
+  - Decision: Defer to a follow‑up step after validate UX and volume.
+- Using Spring ApplicationEventPublisher to fire an application event and then a listener sends to a broker.
+  - Pros: decouples publisher/listener responsibilities and simplifies unit testing.
+  - Cons: still requires a downstream transport implementation and slightly more moving parts.
+  - Decision: acceptable alternative; easy to switch to later.
+- Publishing from the controller.
+
+  - Rejected because controllers may publish before transaction commit and it duplicates logic between booking and amendment paths.
 
 - WebSocket server (Spring WebSocket + STOMP)
   - Pros: bidirectional, better for interactive editors or chatty UIs.
@@ -97,11 +78,11 @@ Alternatives considered and why I deferred them
 - Broker + fan‑out service
   - Pros: durable and horizontally scalable; consumer decoupling.
   - Cons: external infra required and more work for on‑boarding.
-  - Decision: recommended when scaling to multiple instances or many subscribers.
+  - Decision: when scaling to multiple instances or many subscribers.
 
 Scaling limitations
 
-- In‑memory SSE does not scale across multiple application instances and offers no durable delivery. For multi‑instance production, I recommended introducing a message broker (Kafka) and a separate fan‑out service that consumes broker messages and pushes to connected SSE/WebSocket clients.
+- In‑memory SSE does not scale across multiple application instances and offers no durable delivery. For multi‑instance production, I prefer introducing a message broker (Kafka) and a separate fan‑out service that consumes broker messages and pushes to connected SSE/WebSocket clients.
 
 Testing notes
 
@@ -146,7 +127,7 @@ Why I did it this way full justification
 - Low friction rollout: SSE requires no additional infra and is easy to test and demo to stakeholders. It buys immediate operational value while keeping the long‑term design open to durable options.
 - Future‑proof: by publishing from the service layer (not the controller) and keeping event publication abstract (via a manager or an event publisher), made the implementation easy to refactor to a brokered, durable architecture later.
 
-Known limitations and recommendations
+Known limitations and Future improvements
 
 - Limitations
   - Not durable: in‑memory SSE will lose events on instance restart or crash.
@@ -164,3 +145,90 @@ Known limitations and recommendations
 - `AdditionalInfoService.saveOrUpdateSettlementInstructions(...)`, `createAdditionalInfo(...)`, `updateAdditionalInfo(...)` other service helpers used during trade booking and amendments.
 - `TradeSettlementController.getSettlementInstructions(...)` and `updateSettlementInstructions(...)` endpoints that contain the read/update contract and were the natural place to add subscription endpoint in the same controller.
 - `TradeController.createTrade(...)` trade booking logic saves initial settlement instructions through `additionalInfoService.createAdditionalInfo(...)`. Because booking and amendment feed into the same service methods, publishing at the service layer covers both paths.
+
+## Files changed / added
+
+1. backend/src/main/java/com/technicalchallenge/Events/SettlementInstructionsUpdatedEvent.java
+
+   - Purpose: immutable domain event published when settlement instructions are created/updated/deleted.
+   - What was added/changed:
+     - Class-level Javadoc explaining the event's purpose and intended listeners (notifications, SSE, metrics).
+     - Per-field comments (tradeId, tradeDbId, changedBy, timestamp, details).
+     - Constructor Javadoc describing parameters.
+   - Rationale: clarify payload shape and make the event easy to use by listeners.
+
+2. backend/src/main/java/com/technicalchallenge/Events/TradeCancelledEvent.java
+
+   - Purpose: immutable domain event published when a trade is cancelled.
+   - What was added/changed:
+     - Class-level Javadoc and per-field comments.
+   - Rationale: same as above make the event explicit and documented for listeners.
+
+3. backend/src/main/java/com/technicalchallenge/Events/RiskExposureChangedEvent.java (NEW)
+
+   - Purpose: immutable domain event for future use when a trade's risk exposure changes.
+   - What was added:
+     - A simple POJO with fields: tradeId, tradeDbId, changedBy, timestamp, oldExposure, newExposure.
+     - Class-level Javadoc describing purpose.
+   - Rationale: prepared the event type so risk services can publish exposure changes later.
+
+4. backend/src/main/java/com/technicalchallenge/Events/NotificationEventListener.java (NEW)
+
+   - Purpose: a minimal `@Component` that demonstrates event listening.
+   - What was added:
+     - `@EventListener` methods for SettlementInstructionsUpdatedEvent and RiskExposureChangedEvent.
+     - Each handler logs the event payload (using SLF4J logger).
+     - Class-level Javadoc describing that this is a place to persist Notifications or push SSE.
+   - Rationale: example and starting point for notification persistence and real-time push.
+
+5. backend/src/main/java/com/technicalchallenge/service/AdditionalInfoService.java
+   - Purpose: service that manages AdditionalInfo rows (existing) updated to publish events.
+   - What was added/changed (high level):
+     - Injected `ApplicationEventPublisher` via constructor and stored in a final field.
+     - Added imports `ApplicationEventPublisher`, `java.time.Instant` and `java.util.Map`.
+     - Added Javadocs for the class and key public methods (create/update/get/search/upsert/delete) to make responsibilities and error modes explicit.
+     - **Event publishing:** published `SettlementInstructionsUpdatedEvent` in three places:
+       a) At the end of `upOrInsertTradeSettlementInstructions(...)` when settlement text was created or updated (payload includes oldValue and newValue).
+       b) At the end of `deleteSettlementInstructions(...)` after the audit record is written for a soft-delete (payload oldValue, newValue=null).
+       c) At the end of `deleteAdditionalInfoById(...)` but only when the deleted record is of fieldName `SETTLEMENT_INSTRUCTIONS` (payload oldValue, newValue=null).
+       Each publish call is wrapped in a try/catch so that failures in event handling do not break the main DB flow.
+     - The publishes use the existing `SettlementInstructionsUpdatedEvent` class; payload is a small `Map.of("oldValue", old, "newValue", new)` for quick consumer convenience.
+     - For publish failure I temporarily use `System.err.println(...)` to avoid adding a logger to a large service class; this is noted as a TODO to replace with SLF4J logging.
+   - Rationale: add application events so internal notifications, SSE, or other listeners can react to settlement changes without coupling them to the service logic.
+
+## Future Improvements
+
+- Synchronous vs asynchronous listeners:
+
+  - `ApplicationEventPublisher.publishEvent(...)` calls listeners synchronously by default. If I want non-blocking behaviour ( for UI pushes or slow persistence), add `@EnableAsync` to a @Configuration class, inject a TaskExecutor bean, and annotate listener methods with `@Async`.
+
+- Logging: replace `System.err.println(...)` with a proper SLF4J logger in `AdditionalInfoService` so failures are centrally recorded and monitored.
+
+- Testing: publishing is side-effect-only (no behavior change). If I later add asynchronous listeners or persistence of `Notification` entities, I need to add tests to ensure events are published and listeners persist notifications as expected (unit + small integration tests).
+
+- RiskExposureChangedEvent: it's created but not wired into risk services yet. Use it in `RiskService` once I have exposure calculation triggers.
+
+## Suggested immediate follow-ups
+
+1. Replace `System.err.println(...)` with a logger in `AdditionalInfoService`.
+2. Enable async processing and annotate the `NotificationEventListener` methods with `@Async`.
+3. Implement `Notification` entity+repo and update the listener to persist notifications for target users.
+4. Add frontend SSE client and small bell UI to surface notifications.
+
+Added/published domain events:
+Created RiskExposureChangedEvent (new POJO).
+Documented SettlementInstructionsUpdatedEvent and TradeCancelledEvent.
+Wired events into settlement flows:
+Injected ApplicationEventPublisher into AdditionalInfoService.
+Published SettlementInstructionsUpdatedEvent after upsert and after deletes (including delete-by-id when appropriate).
+Wrapped publishes in try/catch so failures don’t break main flows.
+Added an example listener:
+NotificationEventListener with @EventListener handlers that currently log events (placeholder for persistence / SSE).
+Small security/behaviour fixes:
+Ensured service fallback checks align with controller roles (allowed ROLE_MIDDLE_OFFICE where controller expects it).
+Removed accidental duplicate/undefined publish code introduced during edits.
+
+## How I tested the new events locally
+
+- Start the backend (e.g. `mvn spring-boot:run` or run tests that boot the context).
+- Perform a settlement upsert (via existing controller endpoints) or delete; watch the backend logs `NotificationEventListener` will log the received event.

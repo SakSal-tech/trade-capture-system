@@ -46,7 +46,7 @@ public class AdditionalInfoIntegrationTest {
     private ObjectMapper objectMapper;
 
     // Repository is used to verify persisted state after controller calls.
-    // Note: only need the audit repository in this test because the
+    // only need the audit repository in this test because the
     // controller endpoint writes an audit record; do not read
     // AdditionalInfoRepository here so it is intentionally omitted.
     @Autowired
@@ -121,7 +121,7 @@ public class AdditionalInfoIntegrationTest {
         // Using Map.of keeps the test concise and flexible.
         // Use a real trade identifier from test fixtures (see
         // src/main/resources/data.sql).
-        // Note: the repository uses the column `trade_id` (not the PK id) when
+        // the repository uses the column `trade_id` (not the PK id) when
         // looking up trades, so must use the trade_id value found in the
         // seed data. The row with PK 2000 has trade_id = 200001, therefore we
         // use 200001L here so the controller finds an active trade.

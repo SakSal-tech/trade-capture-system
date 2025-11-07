@@ -1,7 +1,5 @@
 # Detailed Project Plan: Trading Application Technical Challenge
 
----
-
 ## Step 1: Project Setup (Backend & Frontend)
 
 **Objective:** Set up backend (Spring Boot) and frontend (React) locally, verify connectivity and basic functionality.
@@ -29,8 +27,6 @@
   - Run frontend (`npm start`)
   - Verify UI loads and connects to backend
 
----
-
 ## Step 2: Fix Failing Test Cases (Backend)
 
 **Objective:** Debug and fix backend test failures, document fixes.
@@ -45,8 +41,6 @@
   - Investigate failures, fix code or test logic
   - Document each fix in `docs/test-fixes-template.md`
   - Use proper commit messages (`docs/git-commit-standards.md`)
-
----
 
 ## Step 3: Implement Missing Functionality (Backend & Frontend)
 
@@ -109,8 +103,6 @@
 |                | TradeControllerTest.java               | (add tests)                            |
 |                | AGGridTable.test.tsx                   | (add tests)                            |
 
----
-
 ### Enhancement 2: Comprehensive Trade Validation Engine
 
 #### Backend
@@ -134,17 +126,15 @@
 
 #### Summary Table
 
-| Layer      | Class/File                           | Method(s) to Add/Update                                                         |
-| ---------- | ------------------------------------ | ------------------------------------------------------------------------------- |
-| Service    | TradeService.java                    | validateTradeBusinessRules, validateUserPrivileges, validateTradeLegConsistency |
-| Controller | TradeController.java                 | (invoke validation before create/amend)                                         |
-| DTOs       | TradeDTO.java, TradeLegDTO.java      | (update if needed)                                                              |
-| Frontend   | TradeBookingModal.tsx, TradeForm.tsx | (add validation UI)                                                             |
-|            | api.ts                               | (handle validation errors)                                                      |
-| Testing    | TradeServiceTest.java                | (add tests for validation)                                                      |
-|            | TradeControllerTest.java             | (add tests for validation)                                                      |
-
----
+| Layer | Class/File | Method(s) to Add/Update |
+| - | | - |
+| Service | TradeService.java | validateTradeBusinessRules, validateUserPrivileges, validateTradeLegConsistency |
+| Controller | TradeController.java | (invoke validation before create/amend) |
+| DTOs | TradeDTO.java, TradeLegDTO.java | (update if needed) |
+| Frontend | TradeBookingModal.tsx, TradeForm.tsx | (add validation UI) |
+| | api.ts | (handle validation errors) |
+| Testing | TradeServiceTest.java | (add tests for validation) |
+| | TradeControllerTest.java | (add tests for validation) |
 
 ### Enhancement 3: Trader Dashboard and Blotter System
 
@@ -177,20 +167,18 @@
 
 #### Summary Table
 
-| Layer      | Class/File                                 | Method(s) to Add/Update                                      |
-| ---------- | ------------------------------------------ | ------------------------------------------------------------ |
-| Controller | TradeController.java                       | getMyTrades, getBookTrades, getTradeSummary, getDailySummary |
-| Service    | TradeService.java                          | getMyTrades, getBookTrades, getTradeSummary, getDailySummary |
-| DTOs       | TradeSummaryDTO.java                       | (new class)                                                  |
-|            | DailySummaryDTO.java                       | (new class)                                                  |
-| Frontend   | TraderSales.tsx, Main.tsx, AGGridTable.tsx | (add dashboard UI)                                           |
-|            | api.ts                                     | (dashboard API methods)                                      |
-|            | tradeStore.ts                              | (dashboard state/actions)                                    |
-| Testing    | TradeServiceTest.java                      | (add tests for dashboard)                                    |
-|            | TradeControllerTest.java                   | (add tests for dashboard)                                    |
-|            | TraderSales.test.tsx                       | (add tests for dashboard UI)                                 |
-
----
+| Layer | Class/File | Method(s) to Add/Update |
+| - | | |
+| Controller | TradeController.java | getMyTrades, getBookTrades, getTradeSummary, getDailySummary |
+| Service | TradeService.java | getMyTrades, getBookTrades, getTradeSummary, getDailySummary |
+| DTOs | TradeSummaryDTO.java | (new class) |
+| | DailySummaryDTO.java | (new class) |
+| Frontend | TraderSales.tsx, Main.tsx, AGGridTable.tsx | (add dashboard UI) |
+| | api.ts | (dashboard API methods) |
+| | tradeStore.ts | (dashboard state/actions) |
+| Testing | TradeServiceTest.java | (add tests for dashboard) |
+| | TradeControllerTest.java | (add tests for dashboard) |
+| | TraderSales.test.tsx | (add tests for dashboard UI) |
 
 ## Step 4: Bug Investigation and Fix (Backend)
 
@@ -213,8 +201,6 @@
 | Service       | TradeService.java                                     | calculateCashflowValue  |
 | Testing       | CashflowServiceTest.java, CashflowControllerTest.java | (add/fix tests)         |
 | Documentation | test-fixes-template.md                                | (document bug and fix)  |
-
----
 
 ## Step 5: Full-Stack Feature Implementation (Backend & Frontend)
 
@@ -246,19 +232,17 @@
 
 #### Summary Table
 
-| Layer      | Class/File                                            | Method(s) to Add/Update                                      |
-| ---------- | ----------------------------------------------------- | ------------------------------------------------------------ |
-| Controller | TradeController.java                                  | searchBySettlementInstructions, updateSettlementInstructions |
-| Service    | TradeService.java                                     | searchBySettlementInstructions, updateSettlementInstructions |
-| Entity     | Trade.java, AdditionalInfo.java                       | (add instructions field or logic)                            |
-| DTO        | SettlementInstructionsUpdateDTO.java                  | (new class)                                                  |
-| Frontend   | SingleTradeModal.tsx, TradeBlotterModal.tsx           | (add/edit UI)                                                |
-|            | api.ts                                                | (instructions API methods)                                   |
-|            | tradeStore.ts                                         | (instructions state/actions)                                 |
-| Testing    | TradeServiceTest.java, TradeControllerTest.java       | (add tests)                                                  |
-|            | SingleTradeModal.test.tsx, TradeBlotterModal.test.tsx | (add tests)                                                  |
-
----
+| Layer | Class/File | Method(s) to Add/Update |
+| - | -- | |
+| Controller | TradeController.java | searchBySettlementInstructions, updateSettlementInstructions |
+| Service | TradeService.java | searchBySettlementInstructions, updateSettlementInstructions |
+| Entity | Trade.java, AdditionalInfo.java | (add instructions field or logic) |
+| DTO | SettlementInstructionsUpdateDTO.java | (new class) |
+| Frontend | SingleTradeModal.tsx, TradeBlotterModal.tsx | (add/edit UI) |
+| | api.ts | (instructions API methods) |
+| | tradeStore.ts | (instructions state/actions) |
+| Testing | TradeServiceTest.java, TradeControllerTest.java | (add tests) |
+| | SingleTradeModal.test.tsx, TradeBlotterModal.test.tsx | (add tests) |
 
 ## Step 6: Application Containerization (DevOps)
 
@@ -288,8 +272,6 @@
 | Frontend | frontend/Dockerfile | Multi-stage build |
 | DevOps   | docker-compose.yml  | Compose setup     |
 
----
-
 ## Step 7: Azure Cloud Architecture Design (Documentation)
 
 **Objective:** Document Azure architecture for cloud deployment.
@@ -304,16 +286,12 @@
 
 #### Summary Table
 
-| Layer         | File                        | Task/Method                                                                                 |
-| ------------- | --------------------------- | ------------------------------------------------------------------------------------------- |
+| Layer | File | Task/Method |
+| - | | - |
 | Documentation | design.md, functionality.md | Architecture diagrams, service selection, deployment strategy, monitoring, cost, governance |
-
----
 
 ## Testing & Documentation
 
 - **Backend:** All new features and fixes must have unit/integration tests (`src/test/java/...`)
 - **Frontend:** Add/Update component tests (`*.test.tsx`)
 - **Documentation:** Update `docs/test-fixes-template.md`, `docs/design.md`, and other guides as progress
-
----

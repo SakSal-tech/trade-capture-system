@@ -967,7 +967,7 @@ public class TradeService {
             // Refactor: when an explicit `rate` is present on the TradeLeg. Historically
             // floating legs always returned zero here because the system expects
             // index fixings from market data. To make UI-driven testing and
-            // one-off pricing easier compute payments when the caller
+            // one-off pricing easier calculate payments when the caller
             // provides a concrete rate. If no rate is supplied preserve the
             // prior behaviour and return zero so production flows that rely on
             // a RateProvider remain unchanged.
@@ -975,7 +975,7 @@ public class TradeService {
             // updated to fetch index fixings and fall back to any explicit
             // rate only when market data is unavailable.
             // If a floating leg has an explicit rate (e.g. provided by the UI or
-            // pre-populated), use it to compute the cashflow value using the same
+            // pre-populated), use it to calculate the cashflow value using the same
             // accrual logic as a fixed leg. If no rate is available keep the
             // previous behaviour and return zero (this preserves current behaviour
             // until a MarketData/RateProvider is implemented).
