@@ -42,7 +42,22 @@ function SummaryCard(props: { title: string; value: string }) {
 // presenting a hardcoded placeholder number in the UI.
 function formatCurrency(value?: number | string | null) {
   if (value === undefined || value === null) return "-";
-  const n = Number(value as any);
+  //Refactored from any type after error message.  If it's already a number use it directly
+  // (the equivalent of a double). For display I use the built-in
+  // toLocaleString formatter. If the backend sends a non-numeric string
+  //  it should return it as it is e.g : if the value is a non-numeric string (for example "N/A"), don't try to format it as USD
+  if (typeof value === "number") {
+    if (Number.isNaN(value)) return String(value);
+    //value = "1234" → parses to number and returns "$1,234.00"
+    return value.toLocaleString(undefined, {
+      style: "currency",
+      currency: "USD",
+    });
+  }
+
+  // value is a string here (or other non-number), try to parse a numeric
+  // representation. Avoid casting to `any` to satisfy ESLint rules.
+  const n = Number(value);
   if (Number.isNaN(n)) return String(value);
   return n.toLocaleString(undefined, { style: "currency", currency: "USD" });
 }
