@@ -39,8 +39,10 @@ RUN apt-get update \
 # Copy JAR from build stage
 COPY --from=build /app/target/*.jar app.jar
 
-# Ensure non-root ownership
-RUN chown appuser:appuser /app/app.jar
+# Ensure non-root ownership of the whole app directory and create a data directory
+# so embedded H2 can write files (fixes AccessDeniedException when H2 creates /app/data).
+RUN mkdir -p /app/data \
+	&& chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8080
