@@ -70,11 +70,11 @@ public class AdditionalInfoIntegrationTest {
         // The new logic checks for existence before inserting, keeping the setup
         // idempotent.
 
-        // Check if a book named "TestBook" exists before inserting to prevent
+        // Check if a book named "TEST-BOOK-1" exists before inserting to prevent
         // duplicates
-        if (bookRepository.findByBookName("TestBook").isEmpty()) {
+        if (bookRepository.findByBookName("TEST-BOOK-1").isEmpty()) {
             Book book = new Book();
-            book.setBookName("TestBook");
+            book.setBookName("TEST-BOOK-1");
             book.setActive(true);
             bookRepository.saveAndFlush(book);
         }

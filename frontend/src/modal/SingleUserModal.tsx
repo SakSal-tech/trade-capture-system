@@ -131,7 +131,7 @@ export const SingleUserModal: React.FC<UserDetailModalProps> = observer(
                           e.target.value
                         )
                       }
-                      className="min-w-[150px] h-fit bg-white"
+                      className="min-w-[150px] h-fit bg-white" //Fixed there was wrong Tailwind syntax ( = instead of -).
                     />
                   </div>
                 );

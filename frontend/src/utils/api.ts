@@ -6,6 +6,7 @@ import { ApplicationUser } from "../utils/ApplicationUser";
 // same-site cookies used by Spring Security) are sent with cross-origin
 // requests. The backend must have CORS configured to allow credentials
 // (Access-Control-Allow-Credentials: true) and the specific Origin.
+//Without this, authentication will silently fail.
 const api = axios.create({
   baseURL: "http://localhost:8080/api",
   timeout: 10000,

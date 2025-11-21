@@ -25,7 +25,7 @@ export const TradeActionsModal: React.FC = observer(() => {
   const [modalKey, setModalKey] = React.useState(0);
   /*
     ADDED: local state to hold settlement instructions for the currently
-    selected trade. We keep a local copy for the editor to display so the
+    selected trade. To keep a local copy for the editor to display so the
     user sees up-to-date data immediately after selecting a trade.
 
     Business mapping:

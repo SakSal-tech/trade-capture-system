@@ -116,7 +116,7 @@ public class TradeDashboardServiceTest {
         // Set up reusable test data
         tradeDTO = new TradeDTO();
         tradeDTO.setTradeId(100001L);
-        tradeDTO.setTradeDate(LocalDate.of(2025, 1, 15));
+        tradeDTO.setTradeDate(LocalDate.now());
         tradeDTO.setTradeStartDate(LocalDate.of(2025, 1, 17));
         tradeDTO.setTradeMaturityDate(LocalDate.of(2026, 1, 17));
 

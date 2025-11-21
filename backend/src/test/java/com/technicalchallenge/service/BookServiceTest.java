@@ -38,7 +38,7 @@ public class BookServiceTest {
 
         // FIX: Stubbed repository and mapper behavior to avoid NullPointerException
         when(bookRepository.findById(1L)).thenReturn(Optional.of(book));
-        when(bookMapper.toDto(book)).thenReturn(new BookDTO(1L, "TestBook", true, 1, "CostCenter1"));
+        when(bookMapper.toDto(book)).thenReturn(new BookDTO(1L, "TEST-BOOK-1", true, 1, "CostCenter1"));
 
         Optional<BookDTO> found = bookService.getBookById(1L);
 

@@ -39,11 +39,13 @@ function getDefaultUser(): ApplicationUser {
 
 interface UserActionsModalProps {
   user?: ApplicationUser;
+  //Optional prop: function to change views in parent component
   setView?: (view: string, user?: ApplicationUser) => void;
 }
 
 export const UserActionsModal: React.FC<UserActionsModalProps> = observer(
   ({ user: initialUser, setView }) => {
+    //
     const [userId, setUserId] = React.useState<string>("");
     const [snackBarOpen, setSnackbarOpen] = React.useState<boolean>(false);
     const [snackBarType, setSnackbarType] = React.useState<"success" | "error">(

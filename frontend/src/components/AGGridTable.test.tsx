@@ -25,5 +25,6 @@ describe("AGGridTable Component", () => {
     );
     // Check for the test ID instead of the class
     expect(getByTestId("ag-grid")).toBeTruthy();
+    //expect(getByTestId("ag-grid")).toBeInTheDocument();
   });
 });
