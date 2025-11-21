@@ -63,7 +63,7 @@ public class TradeControllerTest extends BaseIntegrationTest {
         tradeDTO.setTradeStartDate(LocalDate.now().plusDays(2));
         tradeDTO.setTradeMaturityDate(LocalDate.now().plusYears(5));
         tradeDTO.setTradeStatus("LIVE");
-        tradeDTO.setBookName("TestBook");
+        tradeDTO.setBookName("TEST-BOOK-1");
         tradeDTO.setCounterpartyName("TestCounterparty");
         tradeDTO.setTraderUserName("TestTrader");
         tradeDTO.setInputterUserName("TestInputter");
@@ -98,7 +98,7 @@ public class TradeControllerTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].tradeId", is(1001)))
-                .andExpect(jsonPath("$[0].bookName", is("TestBook")))
+                .andExpect(jsonPath("$[0].bookName", is("TEST-BOOK-1")))
                 .andExpect(jsonPath("$[0].counterpartyName", is("TestCounterparty")));
 
         verify(tradeService).getAllTrades();
@@ -116,7 +116,7 @@ public class TradeControllerTest extends BaseIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tradeId", is(1001)))
-                .andExpect(jsonPath("$.bookName", is("TestBook")))
+                .andExpect(jsonPath("$.bookName", is("TEST-BOOK-1")))
                 .andExpect(jsonPath("$.counterpartyName", is("TestCounterparty")));
 
         verify(tradeService).getTradeDtoById(1001L);

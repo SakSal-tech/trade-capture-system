@@ -8,6 +8,8 @@ const Support: React.FC = () => {
   const [searchParams] = useSearchParams();
   const view = searchParams.get("view") || "default";
   return (
+    // added header design for consistency
+
     <Layout>
       <div className="w-full px-6 py-4">
         <h1 className="text-2xl font-semibold">Support</h1>

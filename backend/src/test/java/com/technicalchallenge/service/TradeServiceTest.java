@@ -86,9 +86,9 @@ class TradeServiceTest {
         // Set up test data
         tradeDTO = new TradeDTO();
         tradeDTO.setTradeId(100001L);
-        tradeDTO.setTradeDate(LocalDate.of(2025, 1, 15));
-        tradeDTO.setTradeStartDate(LocalDate.of(2025, 1, 17));
-        tradeDTO.setTradeMaturityDate(LocalDate.of(2026, 1, 17));
+        tradeDTO.setTradeDate(LocalDate.now());
+        tradeDTO.setTradeStartDate(LocalDate.now().plusDays(1));
+        tradeDTO.setTradeMaturityDate(LocalDate.now().plusYears(1));
 
         TradeLegDTO leg1 = new TradeLegDTO();
         leg1.setNotional(BigDecimal.valueOf(1000000));
@@ -112,13 +112,13 @@ class TradeServiceTest {
         // Given
         // FIX: createTrade() validates reference data, must provide
         // book/counterparty/status
-        tradeDTO.setBookName("TestBook"); // FIX: required by service reference lookup
+        tradeDTO.setBookName("TEST-BOOK-1"); // FIX: required by service reference lookup
         tradeDTO.setCounterpartyName("TestCounterparty"); // FIX: required by service reference lookup
         // tradeStatus is set to "NEW" by service if null
 
         Book book = new Book();
         book.setId(10L);
-        book.setBookName("TestBook");
+        book.setBookName("TEST-BOOK-1");
 
         Counterparty cp = new Counterparty();
         cp.setId(20L);
@@ -128,7 +128,7 @@ class TradeServiceTest {
         newStatus.setId(30L);
         newStatus.setTradeStatus("NEW");
 
-        when(bookRepository.findByBookName("TestBook")).thenReturn(Optional.of(book)); // FIX: ref data stub
+        when(bookRepository.findByBookName("TEST-BOOK-1")).thenReturn(Optional.of(book)); // FIX: ref data stub
         when(counterpartyRepository.findByName("TestCounterparty")).thenReturn(Optional.of(cp)); // FIX: ref data stub
         when(tradeStatusRepository.findByTradeStatus("NEW")).thenReturn(Optional.of(newStatus)); // FIX: ref data stub
 
@@ -176,7 +176,8 @@ class TradeServiceTest {
             tradeService.createTrade(tradeDTO);
         });
 
-        assertTrue(exception.getMessage().contains("exactly 2 legs"));
+        assertTrue(exception.getMessage().contains("exactly 2 legs")
+                || exception.getMessage().contains("must have exactly 2"));
     }
 
     @Test

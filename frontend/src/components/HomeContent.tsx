@@ -1,17 +1,5 @@
 import React from "react";
 
-// ADDED: Home page quick actions (Search, New Booking, Trade Dashboard).
-// These buttons are simple navigation helpers for beginner-friendly demo
-// flows and link to the newly added Trade Dashboard route.
-//
-// Previously this file contained local navigation helper functions
-// (goToNewBooking, goToSearch, goToDashboard) and a `useNavigate` import.
-// Those helpers were removed because they were not referenced anywhere and
-// caused ESLint `no-unused-vars` errors during `pnpm build`. Navigation
-// is implemented via the left-sidebar and routed components; if these
-// helpers are needed again they can be reintroduced in context where
-// they are actually used.
-
 export const HomeContent: React.FC = () => {
   return (
     <div className="flex flex-col items-center justify-start w-full h-full pt-12 space-y-6">

@@ -17,7 +17,7 @@ import { ApplicationUser } from "../utils/ApplicationUser";
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 // Recent change: AllUserView accepts an optional `setView` prop so the
-// list can request the page-level `Main` component to switch views and
+// list can request the page-level `Main` component. To allow navigation from the user list to another screen or modal (e.g., "Edit User" view).
 // provide the selected user to the editor modal. This keeps navigation
 // state owned by `Main` while enabling the list to trigger edits.
 interface AllUserViewProps {
@@ -81,10 +81,11 @@ export const AllUserView: React.FC<AllUserViewProps> = observer(
 
     const handleEditUser = () => {
       if (currentUser) {
+        //Problem before clicking “Edit User” did NOT open an edit screen
         // If a setView handler is provided (from Main), use it to switch to
         // the `user-actions` view and pass the selected user so the
-        // UserActionsModal opens pre-loaded for editing. Otherwise fall
-        // back to showing a snackbar (legacy behaviour).
+        // UserActionsModal opens pre-loaded for editing. Switch to the user-actions screen and load this user into the edit form. Otherwise fall
+        // back to showing a snackbar.
         if (setView) {
           setView("user-actions", currentUser);
         } else {

@@ -14,7 +14,7 @@ const TradeBooking: React.FC = () => {
   // SingleTradeModal will show a retry state.
   const saveSettlement = async (tradeId: string, text: string) => {
     const id = tradeId;
-    if (!id) throw new Error("No trade id available to save settlement");
+    if (!id) throw new Error("No trade id available to save settlement"); // validation
     const payload = {
       entityType: "TRADE",
       entityId: Number(id),

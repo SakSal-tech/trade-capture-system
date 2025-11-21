@@ -14,6 +14,7 @@ import org.springframework.http.MediaType;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 
 import java.time.LocalDate;
 
@@ -84,7 +85,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
 
                         // Also create a book matching the create-trade test payload.
                         var createBook = new Book();
-                        createBook.setBookName("TestBook");
+                        createBook.setBookName("TEST-BOOK-1");
                         createBook = bookRepository.saveAndFlush(createBook);
 
                         var counterparty = new Counterparty();
@@ -162,33 +163,6 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                 mockMvc.perform(get(DAILY_SUMMARY_ENDPOINT)).andExpect(status().isOk());
         }
 
-        @DisplayName("SUPPORT role should be denied to patch trade")
-        @Test
-        @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
-        void testSupportRoleDeniedPatchTrade() throws Exception {
-                // Changed payload to include required fields so validation passes
-                String validPatchJson = "{\n" +
-                                "  \"bookName\": \"UpdatedBook\",\n" +
-                                "  \"counterpartyName\": \"BigBank\",\n" +
-                                "  \"tradeDate\": \"2025-10-15\",\n" +
-                                "  \"tradeStartDate\": \"2025-10-15\",\n" +
-                                "  \"tradeMaturityDate\": \"2026-10-15\",\n" +
-                                "  \"tradeLegs\": [\n" +
-                                "    {\"legId\":1,\"notional\":2000000,\"currency\":\"USD\",\"legType\":\"FIXED\",\"payReceiveFlag\":\"PAY\",\"rate\":1.5,\"tradeMaturityDate\":\"2026-10-15\"},\n"
-                                +
-                                "    {\"legId\":2,\"notional\":2000000,\"currency\":\"USD\",\"legType\":\"FIXED\",\"payReceiveFlag\":\"RECEIVE\",\"rate\":1.5,\"tradeMaturityDate\":\"2026-10-15\"}\n"
-                                +
-                                "  ]\n" +
-                                "}";
-
-                // Added .with(csrf()) to satisfy Spring Security for write operations
-                mockMvc.perform(patch("/api/trades/" + savedTradeBusinessId)
-                                .contentType("application/json")
-                                .content(validPatchJson)
-                                .with(csrf()))
-                                .andExpect(status().isForbidden());
-        }
-
         // Privilege validation for GET /api/trades
 
         @DisplayName("TRADER role should be allowed to access all trades")
@@ -254,22 +228,26 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\n" +
                                                 "  \"tradeId\": 200002,\n" +
-                                                "  \"bookName\": \"TestBook\",\n" +
+                                                "  \"bookName\": \"TEST-BOOK-1\",\n" +
                                                 "  \"counterpartyName\": \"BigBank\",\n" +
-                                                "  \"tradeDate\": \"2025-10-15\",\n" +
-                                                "  \"startDate\": \"2025-10-15\",\n" +
-                                                "  \"maturityDate\": \"2026-10-15\",\n" +
+                                                "  \"tradeDate\": \"" + LocalDate.now() + "\",\n" +
+                                                "  \"startDate\": \"" + LocalDate.now().plusDays(1) + "\",\n" +
+                                                "  \"maturityDate\": \"" + LocalDate.now().plusYears(1) + "\",\n" +
                                                 "  \"tradeType\": \"SWAP\",\n" +
                                                 "  \"tradeStatus\": \"NEW\",\n" +
                                                 "  \"tradeLegs\": [\n" +
-                                                "    {\"legId\": 1, \"notional\": 1000000, \"currency\": \"USD\", \"legType\": \"FIXED\", \"payReceiveFlag\": \"PAY\", \"rate\": 1.5, \"tradeMaturityDate\": \"2026-10-15\"},\n"
+                                                "    {\"legId\": 1, \"notional\": 1000000, \"currency\": \"USD\", \"legType\": \"FIXED\", \"payReceiveFlag\": \"PAY\", \"rate\": 1.5, \"tradeMaturityDate\": \""
+                                                + LocalDate.now().plusYears(1) + "\"},\n"
                                                 +
-                                                "    {\"legId\": 2, \"notional\": 1000000, \"currency\": \"USD\", \"legType\": \"FIXED\", \"payReceiveFlag\": \"RECEIVE\", \"rate\": 1.5, \"tradeMaturityDate\": \"2026-10-15\"}\n"
+                                                "    {\"legId\": 2, \"notional\": 1000000, \"currency\": \"USD\", \"legType\": \"FIXED\", \"payReceiveFlag\": \"RECEIVE\", \"rate\": 1.5, \"tradeMaturityDate\": \""
+                                                + LocalDate.now().plusYears(1) + "\"}\n"
                                                 +
                                                 "  ]\n" +
                                                 "}"))
+                                .andDo(print()) // To show the 400 error details
+
                                 .andExpect(status().isCreated())
-                                .andExpect(jsonPath("$.bookName", is("TestBook"))); // assert created payload echoed
+                                .andExpect(jsonPath("$.bookName", is("TEST-BOOK-1"))); // assert created payload echoed
         }
 
         @DisplayName("SUPPORT role should be denied to create trade")
@@ -285,9 +263,9 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\n" +
                                                 "  \"tradeId\": 200002,\n" +
-                                                "  \"bookName\": \"TestBook\",\n" +
+                                                "  \"bookName\": \"TEST-BOOK-1\",\n" +
                                                 "  \"counterpartyName\": \"BigBank\",\n" +
-                                                "  \"tradeDate\": \"2025-01-01\",\n" +
+                                                "  \"tradeDate\": \"" + LocalDate.now() + "\",\n" +
                                                 "  \"tradeType\": \"SWAP\",\n" +
                                                 "  \"tradeStatus\": \"NEW\",\n" +
                                                 "  \"tradeLegs\": [\n" +
@@ -315,17 +293,19 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                  * By creating the trade first, the test becomes self-contained and reliable.
                  */
                 String createTradeJson = "{\n" +
-                                "  \"bookName\": \"TestBook\",\n" +
+                                "  \"bookName\": \"TEST-BOOK-1\",\n" +
                                 "  \"counterpartyName\": \"BigBank\",\n" +
-                                "  \"tradeDate\": \"2025-10-20\",\n" +
-                                "  \"startDate\": \"2025-10-20\",\n" +
-                                "  \"maturityDate\": \"2026-10-20\",\n" +
+                                "  \"tradeDate\": \"" + LocalDate.now() + "\",\n" +
+                                "  \"startDate\": \"" + LocalDate.now() + "\",\n" +
+                                "  \"maturityDate\": \"" + LocalDate.now().plusYears(1) + "\",\n" +
                                 "  \"tradeType\": \"Spot\",\n" +
                                 "  \"tradeSubType\": \"Vanilla\",\n" +
                                 "  \"tradeLegs\": [\n" +
-                                "    {\"notional\":1000000,\"currency\":\"USD\",\"legType\":\"Fixed\",\"payReceiveFlag\":\"Pay\",\"rate\":0.05,\"tradeMaturityDate\":\"2026-10-20\"},\n"
+                                "    {\"notional\":1000000,\"currency\":\"USD\",\"legType\":\"Fixed\",\"payReceiveFlag\":\"Pay\",\"rate\":0.05,\"tradeMaturityDate\":\""
+                                + LocalDate.now().plusYears(1) + "\"},\n"
                                 +
-                                "    {\"notional\":1000000,\"currency\":\"USD\",\"legType\":\"Floating\",\"payReceiveFlag\":\"Receive\",\"rate\":0.04,\"tradeMaturityDate\":\"2026-10-20\",\"index\":\"LIBOR\"}\n"
+                                "    {\"notional\":1000000,\"currency\":\"USD\",\"legType\":\"Floating\",\"payReceiveFlag\":\"Receive\",\"rate\":0.04,\"tradeMaturityDate\":\""
+                                + LocalDate.now().plusYears(1) + "\",\"index\":\"LIBOR\"}"
                                 +
                                 "  ]\n" +
                                 "}";
@@ -360,15 +340,17 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                  * authorization and amend logic, not input validation errors.
                  */
                 String patchJson = "{\n" +
-                                "  \"bookName\": \"TestBook\",\n" +
+                                "  \"bookName\": \"TEST-BOOK-1\",\n" +
                                 "  \"counterpartyName\": \"BigBank\",\n" +
-                                "  \"tradeDate\": \"2025-10-21\",\n" +
-                                "  \"startDate\": \"2025-10-21\",\n" +
-                                "  \"maturityDate\": \"2026-10-21\",\n" +
+                                "  \"tradeDate\": \"" + LocalDate.now() + "\",\n" +
+                                "  \"startDate\": \"" + LocalDate.now() + "\",\n" +
+                                "  \"maturityDate\": \"" + LocalDate.now().plusYears(1) + "\",\n" +
                                 "  \"tradeLegs\": [\n" +
-                                "    {\"notional\":2000000,\"currency\":\"USD\",\"legType\":\"Fixed\",\"payReceiveFlag\":\"Pay\",\"rate\":0.06,\"tradeMaturityDate\":\"2026-10-21\"},\n"
+                                "    {\"notional\":2000000,\"currency\":\"USD\",\"legType\":\"Fixed\",\"payReceiveFlag\":\"Pay\",\"rate\":0.06,\"tradeMaturityDate\":\""
+                                + LocalDate.now().plusYears(1) + "\"},\n"
                                 +
-                                "    {\"notional\":2000000,\"currency\":\"USD\",\"legType\":\"Floating\",\"payReceiveFlag\":\"Receive\",\"rate\":0.05,\"tradeMaturityDate\":\"2026-10-21\",\"index\":\"LIBOR\"}\n"
+                                "    {\"notional\":2000000,\"currency\":\"USD\",\"legType\":\"Floating\",\"payReceiveFlag\":\"Receive\",\"rate\":0.05,\"tradeMaturityDate\":\""
+                                + LocalDate.now().plusYears(1) + "\",\"index\":\"LIBOR\"}"
                                 +
                                 "  ]\n" +
                                 "}";
@@ -412,18 +394,33 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
 
         @Test
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
-        void testSupportRoleDeniedPatchTrade_Simple() throws Exception {
-                String validPatchJson = """
-                                {
-                                        "bookName": "ValidBook",
-                                        "counterpartyName": "ValidCounterparty",
-                                        "tradeDate": "2025-01-01",
-                                        "tradeLegs": [
-                                                {"legId":1,"notional":1000000,"currency":"USD","tradeMaturityDate":"2026-01-01"},
-                                                {"legId":2,"notional":1000000,"currency":"USD","tradeMaturityDate":"2026-01-01"}
-                                        ]
-                                }
-                                """;
+        void testSupportRoleDeniedPatchTrade() throws Exception {
+                // DEBUG: Print the trade ID being used. For debugging reasons
+                System.out.println("DEBUG: Testing PATCH with trade ID: " + savedTradeBusinessId);
+                // using string template and format function to fix date and string
+                // interpolation error
+                String validPatchJson = String.format(
+                                """
+                                                {
+                                                        "bookName": "TEST-BOOK-1",
+                                                        "counterpartyName": "BigBank",
+                                                        "tradeDate": "%s",
+                                                        "startDate": "%s",
+                                                        "maturityDate": "%s",
+                                                        "tradeLegs": [
+                                                                {"legId":1,"notional":1000000,"currency":"USD","tradeMaturityDate":"%s"},
+                                                                {"legId":2,"notional":1000000,"currency":"USD","tradeMaturityDate":"%s"}
+                                                        ]
+                                                }
+                                                """,
+                                LocalDate.now(),
+                                LocalDate.now().plusDays(1),
+                                LocalDate.now().plusYears(1),
+                                LocalDate.now().plusYears(1),
+                                LocalDate.now().plusYears(1));
+
+                // DEBUG: Print the JSON payload
+                System.out.println("DEBUG: PATCH JSON payload: " + validPatchJson);
 
                 // This test intentionally hits a trade id that does not belong to
                 // the caller (supportUser) the controller/service should return 403.
@@ -431,6 +428,7 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(validPatchJson)
                                 .with(csrf()))
+                                .andDo(print()) // DEBUG: Print full request/response details
                                 .andExpect(status().isForbidden()); // will now reach security filter
         }
 

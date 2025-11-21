@@ -28,7 +28,7 @@ import org.springframework.security.config.annotation.authentication.configurati
 @Configuration
 @EnableMethodSecurity // Enables @PreAuthorize / @PostAuthorize annotations for controller methods
 public class SecurityConfig {
-    // Enable method-level security and provide in-memory users for test/dev
+    // Enable method-level security and provide in-memory fake users for test/dev
 
     // @Bean
     // public UserDetailsService userDetailsService() {
@@ -126,8 +126,9 @@ public class SecurityConfig {
     }
 
     /**
-     * Expose the AuthenticationManager from the configuration so other beans
-     * (for example controllers performing programmatic login) can authenticate
+     * This exposes the AuthenticationManager so I can manually authenticate in a
+     * controller or service
+     * (for example controllers performing login) can authenticate
      * credentials using the same providers registered
      * (DaoAuthenticationProvider).
      */

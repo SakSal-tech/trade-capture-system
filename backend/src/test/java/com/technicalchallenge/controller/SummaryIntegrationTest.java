@@ -96,7 +96,7 @@ public class SummaryIntegrationTest extends BaseIntegrationTest {
 
                 // Create and save a book
                 book = new Book();
-                book.setBookName("TestBook");
+                book.setBookName("TEST-BOOK-1");
                 book.setActive(true);
                 book.setVersion(1); // preserve variable naming
                 bookRepository.save(book);

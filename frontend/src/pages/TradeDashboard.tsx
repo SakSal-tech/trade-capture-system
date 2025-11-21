@@ -288,7 +288,7 @@ function TradeDashboard() {
             value={
               myTrades && Array.isArray(myTrades)
                 ? String(myTrades.length)
-                : "124"
+                : "-"
             }
           />
           <SummaryCard
@@ -303,7 +303,7 @@ function TradeDashboard() {
                       style: "currency",
                       currency: "USD",
                     })
-                : "$23,450,000"
+                : "$-"
             }
           />
           <SummaryCard
@@ -311,7 +311,7 @@ function TradeDashboard() {
             value={
               summary?.bookActivitySummaries
                 ? String(Object.keys(summary.bookActivitySummaries).length)
-                : "6"
+                : "-"
             }
           />
           <SummaryCard

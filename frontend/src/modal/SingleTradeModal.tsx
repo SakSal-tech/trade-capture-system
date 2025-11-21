@@ -490,7 +490,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
 
     try {
       if (editableTrade.tradeId) {
-        await api.put(`/trades/${editableTrade.tradeId}`, tradeDto);
+        await api.put(`/trades/${editableTrade.tradeId}`, tradeDto); //You wait for the server to confirm if the trade succeeds.
         setSnackbarMsg(
           `Trade updated successfully! Trade ID: ${editableTrade.tradeId}`
         );
@@ -659,7 +659,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
                     onFieldChange={
                       props.mode === "edit"
                         ? (key, value) => handleLegFieldChange(idx, key, value)
-                        : undefined
+                        : undefined // do nothing
                     }
                   />
                   {props.mode === "edit" && idx === tradeLegs.length - 1 && (
@@ -723,7 +723,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
         type={snackbarType}
         onClose={() => setSnackbarOpen(false)}
         // Added: Retry action when settlement save previously failed
-        actionLabel={settlementUnsaved ? "Retry" : undefined}
+        actionLabel={settlementUnsaved ? "Retry" : undefined} // undefined means do nothing
         onAction={
           settlementUnsaved
             ? () => {

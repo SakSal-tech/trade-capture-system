@@ -11,6 +11,8 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 
+//This class customises the OpenAPI/Swagger documentation
+//OpenAPI groups endpoints by the @Tag annotation placed on a controller class
 @Configuration
 public class OpenApiConfig {
 

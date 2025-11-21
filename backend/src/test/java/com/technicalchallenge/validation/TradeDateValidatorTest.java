@@ -27,7 +27,7 @@ public class TradeDateValidatorTest {
     // invalid and returns a clearer message.
     void failWhenMajurityBeforeStartDate() {
         // SETUP: building a trade where majurity < start
-        trade.setTradeDate(LocalDate.of(2025, 10, 10));// Create a specific fixed date
+        trade.setTradeDate(LocalDate.now());// Create a specific fixed date
         trade.setTradeStartDate(LocalDate.of(2025, 10, 15));
         trade.setTradeMaturityDate(LocalDate.of(2025, 10, 12)); // earlier than start which is invalid
 
@@ -45,7 +45,7 @@ public class TradeDateValidatorTest {
     @Test
     void failWhenStartBeforeTradeDate() {
         // setup
-        trade.setTradeDate(LocalDate.of(2025, 10, 15));
+        trade.setTradeDate(LocalDate.now());
         trade.setTradeStartDate(LocalDate.of(2025, 10, 10)); // invalid
         trade.setTradeMaturityDate(LocalDate.of(2025, 10, 20));
 
