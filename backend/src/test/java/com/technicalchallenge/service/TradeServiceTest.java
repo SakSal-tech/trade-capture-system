@@ -290,7 +290,6 @@ class TradeServiceTest {
         LocalDate startDate = LocalDate.of(2025, 1, 1); // FIX: renamed from starDate
         LocalDate maturityDate = LocalDate.of(2026, 1, 1);
 
-        // when
         // When this method is called, it uses Monthly and generates 12 cashflows for 1
         // year period
         tradeService.generateCashflows(leg, startDate, maturityDate);

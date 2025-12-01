@@ -220,7 +220,7 @@ public class CashflowServiceTest {
 
         LocalDate startDate = LocalDate.of(2025, 1, 1);
         LocalDate endDate = LocalDate.of(2025, 4, 2);// 3 months a quarter. REFACTORED changed the date to 2nd as I got
-                                                     // and er due to this while loop in calculatePaymentDates
+                                                     // and error due to this while loop in calculatePaymentDates
         // trigger the calculation.calls the production method, then save a new cashflow
         // in the database
         tradeService.generateCashflows(leg, startDate, endDate);
@@ -235,7 +235,7 @@ public class CashflowServiceTest {
 
         assertEquals(1, cashflows.size(), "Should generate exactly one quarterly cashflow");
 
-        BigDecimal actualValue = cashflows.get(0).getPaymentValue(); // get payment amount calculated ans saved.Should
+        BigDecimal actualValue = cashflows.get(0).getPaymentValue(); // get payment amount calculated and saved.Should
                                                                      // be 875,000.00 when the bug exists.
 
         BigDecimal correctValue = new BigDecimal("87500.00");// expected value

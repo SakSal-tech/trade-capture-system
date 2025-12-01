@@ -14,13 +14,14 @@ export default [
   // See: https://eslint.org/docs/latest/use/configure/migration-guide#ignoring-files
   {
     ignores: [
-      'node_modules/**',
-      'dist/**',
-      '.vite/**',
-      'coverage/**',
-      'playwright-report/**',
+      'node_modules/',
+      'dist/',
+      '.vite/',
+      'coverage/',
+      '*.min.js',
       '*.log',
-      '*.tmp'
+      '*.tmp',
+      'playwright-report/'
     ]
   },
   js.configs.recommended,

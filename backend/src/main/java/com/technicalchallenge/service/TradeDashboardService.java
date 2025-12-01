@@ -214,7 +214,6 @@ public class TradeDashboardService {
         }
         return tradeDtos;
     }
-    // correctly and didn’t cause test failures ...
 
     // RSQL Search
     @Transactional(readOnly = true)
@@ -488,6 +487,28 @@ public class TradeDashboardService {
             summaryDTO.setWeeklyNotionalByCurrency(weeklyNotionalByCurrency);
             summaryDTO.setWeeklyTradesByTypeAndCounterparty(weeklyTradesByTypeAndCounterparty);
             summaryDTO.setWeeklyRiskExposureSummary(weeklyRisk);
+
+            // Book-level activity summaries: group all trades by bookId and aggregate
+            // trade count and notional by currency for each book. This supports the
+            // dashboard "Active Books" count display.
+            Map<Long, DailySummaryDTO.BookActivitySummary> bookActivitySummary = new HashMap<>();
+            for (TradeDTO tradeDto : tradesForTrader) {
+                Long bookKey = tradeDto.getBookId() == null ? -1L : tradeDto.getBookId();
+                DailySummaryDTO.BookActivitySummary activitySummary = bookActivitySummary.computeIfAbsent(bookKey,
+                        bookIdKey -> {
+                            DailySummaryDTO.BookActivitySummary bookSummary = new DailySummaryDTO.BookActivitySummary();
+                            bookSummary.setTradeCount(0);
+                            bookSummary.setNotionalByCurrency(new HashMap<>());
+                            return bookSummary;
+                        });
+                activitySummary.setTradeCount(activitySummary.getTradeCount() + 1);
+                Map<String, BigDecimal> legTotals = sumNotionalByCurrency(List.of(tradeDto));
+                for (Map.Entry<String, BigDecimal> entry : legTotals.entrySet()) {
+                    activitySummary.getNotionalByCurrency().merge(entry.getKey(), entry.getValue(), BigDecimal::add);
+                }
+            }
+            summaryDTO.setBookActivitySummaries(bookActivitySummary);
+
             return summaryDTO;
         } catch (Exception e) {
             // Protect the dashboard read path from runtime validation errors
@@ -580,6 +601,7 @@ public class TradeDashboardService {
             return; // nothing to do
         }
         try {
+            // LinkedHashSet Removes duplicates. Preserves order. Faster lookup than List
             java.util.Set<Long> idSet = new java.util.LinkedHashSet<>();
             for (Trade tradeItem : tradeEntities) {
                 if (tradeItem == null)
@@ -593,8 +615,11 @@ public class TradeDashboardService {
             if (idSet.isEmpty()) {
                 return;
             }
-
+            // convert Because your repository method requiresto ArrayList because
+            // repository method requires
             java.util.List<Long> idList = new java.util.ArrayList<>(idSet);
+            // Batch database query so one query retrieves all settlement instructions.to
+            // avoid N+1(running a query for each trade)
             List<AdditionalInfo> infos = additionalInfoRepository
                     .findByEntityTypeAndEntityIdInAndFieldName("TRADE", idList, "SETTLEMENT_INSTRUCTIONS");
 
@@ -614,6 +639,7 @@ public class TradeDashboardService {
             for (TradeDTO dto : dtos) {
                 if (dto == null || dto.getTradeId() == null)
                     continue;
+                // Attach settlement instructions to each DTO
                 dto.setSettlementInstructions(settlementByTrade.get(dto.getTradeId()));
             }
         } catch (Exception e) {
@@ -679,7 +705,8 @@ public class TradeDashboardService {
             DailySummaryDTO summaryDto = new DailySummaryDTO();
             summaryDto.setTodaysTradeCount(todayTradeDtos.size());
             summaryDto.setTodaysNotionalByCurrency(sumNotionalByCurrency(todayTradeDtos));
-
+            // Creates a key-value metrics block to show simple performance numbers in the
+            // UI
             Map<String, Object> performanceMetrics = new HashMap<>();
             performanceMetrics.put("tradeCount", todayTradeDtos.size());
             performanceMetrics.put("notionalCcyCount", summaryDto.getTodaysNotionalByCurrency().size());
@@ -688,6 +715,8 @@ public class TradeDashboardService {
             Map<Long, DailySummaryDTO.BookActivitySummary> bookActivitySummary = new HashMap<>();
             for (TradeDTO tradeDto : todayTradeDtos) {
                 Long bookKey = tradeDto.getBookId() == null ? -1L : tradeDto.getBookId();
+                // computeIfAbsent, if the map does contain the key, return the existing one.
+                // Having to check manually with containsKey()
                 DailySummaryDTO.BookActivitySummary activitySummary = bookActivitySummary.computeIfAbsent(bookKey,
                         bookIdKey -> {
                             DailySummaryDTO.BookActivitySummary bookSummary = new DailySummaryDTO.BookActivitySummary();

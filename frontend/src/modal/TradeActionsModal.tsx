@@ -107,26 +107,7 @@ export const TradeActionsModal: React.FC = observer(() => {
     try {
       const tradeResponse = await api.get(`/trades/${tradeId}`);
       if (tradeResponse.status === 200) {
-        const convertToDate = (val: string | undefined) =>
-          val ? new Date(val) : undefined;
         const tradeData = tradeResponse.data;
-        const dateFields = [
-          "tradeDate",
-          "startDate",
-          "maturityDate",
-          "executionDate",
-          "lastTouchTimestamp",
-          "validityStartDate",
-        ];
-
-        const formatDateForInput = (date: Date | undefined) =>
-          date ? date.toISOString().slice(0, 10) : undefined;
-        dateFields.forEach((field) => {
-          if (tradeData[field]) {
-            const dateObj = convertToDate(tradeData[field]);
-            tradeData[field] = formatDateForInput(dateObj);
-          }
-        });
         if (Array.isArray(tradeData.tradeLegs)) {
           console.log(
             `Found ${tradeData.tradeLegs.length} trade legs in the response`
@@ -184,6 +165,12 @@ export const TradeActionsModal: React.FC = observer(() => {
   const handleBookNew = () => {
     const defaultTrade = getDefaultTrade();
     console.log("DEBUG getDefaultTrade:", defaultTrade);
+    console.log(
+      "DEBUG tradeId from default trade:",
+      defaultTrade.tradeId,
+      "type:",
+      typeof defaultTrade.tradeId
+    );
     setTrade(defaultTrade);
     setModalKey((prev) => prev + 1);
   };
@@ -406,6 +393,23 @@ export const TradeActionsModal: React.FC = observer(() => {
                 onClear={handleClearAll}
                 settlement={settlement}
                 saveSettlement={saveSettlement}
+                onTradeUpdated={(updatedTrade) => {
+                  console.debug(
+                    "TradeActionsModal received trade update:",
+                    updatedTrade.tradeId,
+                    "Previous tradeId:",
+                    trade?.tradeId
+                  );
+                  // CRITICAL: Update parent trade state with new ID
+                  // This fixes the settlement save "Save trade first" issue
+                  setTrade(updatedTrade);
+
+                  // Also clear and reset settlement to ensure fresh state
+                  console.debug(
+                    "Parent trade state updated, tradeId now:",
+                    updatedTrade.tradeId
+                  );
+                }}
               />
             </div>
 
@@ -428,17 +432,30 @@ export const TradeActionsModal: React.FC = observer(() => {
                     size="sm"
                     onClick={async () => {
                       try {
-                        if (!trade?.tradeId) {
+                        // FIXED: Check for valid trade ID more flexibly
+                        // For new trades, tradeId might be empty string but still valid after save
+                        const tradeIdToUse =
+                          trade?.tradeId && String(trade.tradeId).trim() !== "";
+
+                        if (!tradeIdToUse) {
                           setSnackbarOpen(true);
                           setSnackbarMessage(
-                            "Save the trade first to persist settlement"
+                            "Save the trade first to persist settlement. The trade must be saved and have a valid ID before settlement instructions can be saved separately."
                           );
                           return;
                         }
+
+                        console.debug(
+                          "Manual settlement save - trade ID:",
+                          trade.tradeId,
+                          "settlement length:",
+                          settlement?.length
+                        );
                         await saveSettlement(String(trade.tradeId), settlement);
                         setSnackbarOpen(true);
-                        setSnackbarMessage("Settlement saved");
+                        setSnackbarMessage("Settlement saved successfully");
                       } catch (err) {
+                        console.error("Manual settlement save failed:", err);
                         setSnackbarOpen(true);
                         setSnackbarMessage(
                           err instanceof Error ? err.message : String(err)

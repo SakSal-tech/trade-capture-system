@@ -31,7 +31,7 @@ public class TradeRsqlVisitorTest {
     // Specification<Trade> object.
     public void testVisitAndNode() {
         // GIVEN
-        // Creating tow child nodes
+        // Creating two child nodes
         // First child node
         ComparisonNode childOne = new ComparisonNode(new ComparisonOperator("==", false), // operator not a multi value
                 "counterparty.name", // field name

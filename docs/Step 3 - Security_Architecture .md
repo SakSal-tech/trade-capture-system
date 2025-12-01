@@ -16,7 +16,7 @@
 - From `userProfile.userType` I build a role like `ROLE_TRADER`, and I also add **normalised** roles for hybrids to keep checks robust.
 - I fetch the user’s privileges via `UserPrivilegeService.findPrivilegesByUserLoginId(...)`, map `Privilege.name` to authorities, and add **aliases** where historical names differ (for example `READ_TRADE` implies `TRADE_VIEW`).
 
-**Why this design:** It centralises the mapping between **domain profile** and **security model** in one place, so controllers and services can just inspect authorities.
+**Why this design:** It centralises the mapping between **domain profile** and **security model** in one place, so controllers and services can just inspect authorities. All conversion from database user data (roles, privileges) to Spring Security authorities happens in one class (DatabaseUserDetailsService).
 
 **Alternatives:** Using only roles would make fine‑grained checks difficult. Using only privileges would make common `@PreAuthorize("hasRole('TRADER')")` brittle. I keep both.
 

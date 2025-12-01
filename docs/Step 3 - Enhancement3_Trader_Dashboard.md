@@ -35,7 +35,7 @@ I model outputs explicitly in `TradeSummaryDTO` and `DailySummaryDTO` so fields 
 ### 3.2 DailySummaryDTO
 
 - `todaysTradeCount`, `todaysNotionalByCurrency` – the core “what happened today” signal.
-- `userPerformanceMetrics` – flexible bag for extra KPIs without schema churn.
+- `userPerformanceMetrics` – flexible bag for extra Key Performance Indicator without schema churn.
 - `bookActivitySummaries` – map keyed by book id to per‑book trade counts and notional totals.
 - `historicalComparisons` – list of daily snapshots for yesterday or a rolling sequence when needed.
 
@@ -51,7 +51,7 @@ I load the trader’s trades using a `Specification` on `traderUser.loginId` and
 
 ### 4.2 Risk placeholder
 
-For now I calculate a **simple delta proxy** by summing `notional * rate` across legs when rate is present. I keep the shape as a `Map<String, BigDecimal>` so I can swap in proper risk once a PnL/risk service exists.
+For now I calculate a **simple delta proxy** by summing `notional * rate` across legs when rate is present. I keep the shape as a `Map<String, BigDecimal>` so I can swap in proper risk once a Profit and Loss/risk service exists.
 
 ### 4.3 Daily view
 

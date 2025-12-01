@@ -36,13 +36,6 @@ public class ApiExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex,
             HttpServletRequest request) {
-        // Refactored::
-        // Centralized handling of AccessDeniedException was added to ensure
-        // the UI receives a short, business-friendly message instead of a
-        // verbose Spring Security stack/trace. Previously callers saw long
-        // exception payloads which confused end users and revealed internal
-        // details that are unnecessary for the frontend.
-        //
         // Business intent: present clear guidance to the user (e.g., "You do
         // not have permission to create trades") while keeping server logs
         // unchanged. Authorization rules remain enforced by @PreAuthorize

@@ -69,7 +69,7 @@ I followed a stepwise checklist that I use for money maths defects:
    - Schedule strings should be parsed robustly (`"3M"`, `"quarterly"`, `"12m"`).
 
 5. **Reproduction**  
-   I built a minimal reproduction (mirroring your `CashflowServiceTest#testGenerateQuarterlyCashflow`) and captured the saved `Cashflow` via `ArgumentCaptor` to assert the exact value persisted.
+   I built a minimal reproduction (mirroring `CashflowServiceTest#testGenerateQuarterlyCashflow`) and captured the saved `Cashflow` via `ArgumentCaptor` to assert the exact value persisted.
 
 ## 5. Root Cause: The Two Defects in Detail
 

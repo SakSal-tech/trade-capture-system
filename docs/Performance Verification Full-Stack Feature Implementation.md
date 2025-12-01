@@ -12,7 +12,7 @@ I kept the settlement instruction field optional but ensured that when it is pro
 
 ### Summary of Performance Enhancements
 
-**Database Queries** Moved from `findAll().stream().filter(...)` to focused SQL queries using `@Query` in the repository Avoids loading entire tables into memory; allows the database to filter results efficiently using indexes. Reduces time complexity from O(n) to approximately O(log n).
+**Database Queries** Moved from `findAll().stream().filter(...)` to focused SQL queries using `@Query` in the repository. Avoids loading entire tables into memory; allows the database to filter results efficiently using indexes. Reduces time complexity from O(n) to approximately O(log n).
 **Indexes** Added a compound index on `(entity_type, field_name, entity_id)` and a single index on `field_value` Enables the database to locate relevant rows quickly without scanning the entire table. Particularly improves keyword-based searches in settlement instructions.
 
 ### Production index guidance functional lower() index (detailed)
@@ -20,7 +20,7 @@ I kept the settlement instruction field optional but ensured that when it is pro
 Context:
 
 - The previous index on `field_value` improves equality and prefix searches, but does not help searches that use a leading wildcard (for example `LIKE '%term%'`).
-- For case-insensitive searches where the repository query uses `LOWER(field_value)` or the application uses `ILIKE`, a functional index on `lower(field_value)` in Postgres can make equality and prefix queries much faster and is simple to add.
+- For case-insensitive searches where the repository query uses `LOWER(field_value)` or the application uses `LIKE`, a functional index on `lower(field_value)` in Postgres can make equality and prefix queries much faster and is simple to add.
 
 Recommendation:
 

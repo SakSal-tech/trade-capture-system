@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import Layout from "../components/Layout";
 import { useNavigate } from "react-router-dom";
 import userStore from "../stores/userStore";
+import { AxiosError } from "axios";
 import {
   getDashboardMyTrades,
   getDashboardSummary,
@@ -74,6 +75,7 @@ type DashboardSummary = {
   riskExposureSummary?: { delta?: number | string };
   todaysTradeCount?: number;
   tradesByTypeAndCounterparty?: Record<string, number | string>;
+  totalActiveBooks?: number;
 };
 type DailySummary = {
   todaysTradeCount?: number;
@@ -128,11 +130,21 @@ function TradeDashboard() {
           getDashboardMyTrades(loginId!),
         ]);
         if (!mounted) return;
+
+        // DEBUG: Log the actual response data to understand the structure
+        console.debug("Dashboard summary response:", summaryRes.data);
+        console.debug("Dashboard trades response:", tradesRes.data);
+
         setSummary(summaryRes.data);
         setMyTrades(Array.isArray(tradesRes.data) ? tradesRes.data : []);
       } catch (e) {
-        // keep existing sample data if request fails; show console for debug
-        console.debug("Failed to load dashboard data:", e);
+        // ENHANCED: Show more detailed error information
+        console.error("Failed to load dashboard data:", e);
+        if (e && typeof e === "object" && "response" in e) {
+          const axiosError = e as AxiosError;
+          console.error("API Error Status:", axiosError.response?.status);
+          console.error("API Error Data:", axiosError.response?.data);
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -308,11 +320,35 @@ function TradeDashboard() {
           />
           <SummaryCard
             title="Active Books"
-            value={
-              summary?.bookActivitySummaries
-                ? String(Object.keys(summary.bookActivitySummaries).length)
-                : "-"
-            }
+            value={(() => {
+              // FIXED: More robust Active Books count with better error handling
+              if (!summary) {
+                return loading ? "Loading..." : "0";
+              }
+
+              // Check if bookActivitySummaries exists and is an object
+              if (
+                summary.bookActivitySummaries &&
+                typeof summary.bookActivitySummaries === "object"
+              ) {
+                const count = Object.keys(summary.bookActivitySummaries).length;
+                console.debug(
+                  "Active Books count:",
+                  count,
+                  "from:",
+                  summary.bookActivitySummaries
+                );
+                return String(count);
+              }
+
+              // Fallback: check other possible fields for book count
+              if (summary.totalActiveBooks !== undefined) {
+                return String(summary.totalActiveBooks);
+              }
+
+              console.warn("No book activity data found in summary:", summary);
+              return "0";
+            })()}
           />
           <SummaryCard
             title="Risk Net Exposure"

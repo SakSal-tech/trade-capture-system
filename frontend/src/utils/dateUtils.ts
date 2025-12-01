@@ -22,7 +22,7 @@ export const getOneYearFromToday = (): string => {
 };
 
 /**
- * Format a date for backend API (ISO8601 with time)
+ * Format a date for backend API (LocalDate fields - date only)
  * @param d - Date to format
  * @returns {string|null} Formatted date string or null
  */
@@ -30,31 +30,62 @@ export const formatDateForBackend = (
   d: string | Date | undefined | null
 ): string | null => {
   if (!d) return null;
-  // Normalize to ISO-like string truncated to minute precision (YYYY-MM-DDTHH:MM)
-  // This avoids sending seconds/milliseconds which are noisy for trade dates
-  // while preserving a time component when the UI provides one.
+
   if (typeof d === "string") {
     if (d.includes("T")) {
-      // Truncate any seconds and fractional seconds: keep up to minutes
+      // Extract just the date part for LocalDate fields
+      return d.split("T")[0];
+    }
+    return d; // Already in YYYY-MM-DD format
+  }
+
+  if (d instanceof Date) {
+    // Format as date-only for LocalDate fields
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const year = d.getFullYear();
+    const month = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    return `${year}-${month}-${day}`;
+  }
+
+  return null;
+};
+
+/**
+ * Format a datetime for backend API (LocalDateTime fields - full datetime)
+ * @param d - Date to format
+ * @returns {string|null} Formatted datetime string or null
+ */
+export const formatDateTimeForBackend = (
+  d: string | Date | undefined | null
+): string | null => {
+  if (!d) return null;
+
+  if (typeof d === "string") {
+    if (d.includes("T")) {
+      // Ensure seconds are included for LocalDateTime fields
       const [datePart, timePart] = d.split("T");
       const time = timePart
-        ? timePart.split(":").slice(0, 2).join(":")
-        : "00:00";
+        ? timePart.split(":").slice(0, 2).join(":") + ":00"
+        : "00:00:00";
       return `${datePart}T${time}`;
     }
-    // Date-only string -> attach midnight time at minute precision
-    return `${d}T00:00`;
+    // Convert date-only string to datetime with midnight time
+    return `${d}T00:00:00`;
   }
+
   if (d instanceof Date) {
-    // Build YYYY-MM-DDTHH:MM (local time)
+    // Include seconds for complete LocalDateTime compatibility
     const pad = (n: number) => String(n).padStart(2, "0");
     const year = d.getFullYear();
     const month = pad(d.getMonth() + 1);
     const day = pad(d.getDate());
     const hours = pad(d.getHours());
     const minutes = pad(d.getMinutes());
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+    const seconds = pad(d.getSeconds());
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
   }
+
   return null;
 };
 

@@ -167,6 +167,7 @@ public class TradeService {
         } catch (Exception e) {
             logger.debug("Fallback active-filter failed: {}", e.getMessage());
         }
+        // Fallback: rely on the repository method if active-filter didn't work
         if (opt.isEmpty()) {
             opt = tradeRepository.findByTradeIdAndActiveTrue(tradeId);
         }

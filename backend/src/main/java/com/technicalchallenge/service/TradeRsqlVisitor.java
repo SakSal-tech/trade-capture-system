@@ -33,7 +33,8 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
 
     // visit(AndNode...), combines child specs with AND
     @Override
-    public Specification<Trade> visit(AndNode node, Void param) { // empty list to hold child spec
+    public Specification<Trade> visit(AndNode node, Void param) {
+        // empty list to hold child spec
         List<Specification<Trade>> childSpecs = new ArrayList<>();
         // get all children each could be ComparisonNode or another And/Or node
         List<Node> children = node.getChildren();
@@ -119,13 +120,14 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
         for (int i = 0; i < fieldParts.length; i++) {
             String part = fieldParts[i];
             java.lang.reflect.Field f = null;
-            Class<?> searchClass = currentClass;
+            Class<?> searchClass = currentClass;// find the field part in the class examining e.g. Trade.
             while (searchClass != null) {
                 try {
                     f = searchClass.getDeclaredField(part);
                     break;
                 } catch (NoSuchFieldException ex) {
-                    searchClass = searchClass.getSuperclass();
+                    searchClass = searchClass.getSuperclass();// If not found the field in the class, check its
+                                                              // superclass.
                 }
             }
             if (f == null) {
@@ -133,9 +135,10 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
             }
             // For nested fields, ensure the type is not a JPA proxy or collection
             if (i < fieldParts.length - 1) {
-                Class<?> type = f.getType();
+                Class<?> type = f.getType();// Retrieve field type. e.g. Counterparty.class
                 if (type.isPrimitive() || type == String.class || Number.class.isAssignableFrom(type)
                         || type.isEnum()) {
+                    // Reject traversing into primitives or simple fields
                     throw new IllegalArgumentException(
                             "Cannot traverse into non-entity field: " + part + " in query: " + field);
                 }
@@ -154,9 +157,9 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
                     @org.springframework.lang.NonNull CriteriaBuilder criteriaBuilder) {
 
                 // Now traverse the path as before
-                Path<?> path = root;
+                Path<?> path = root;// start at the root
                 for (String part : fieldParts) {
-                    path = path.get(part);
+                    path = path.get(part);// e.g. path = path.get("tradeDate")tradeDate==2023-01-01
                 }
                 Class<?> fieldType;
                 try {

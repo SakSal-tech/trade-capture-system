@@ -75,7 +75,7 @@ public class AdditionalInfoService {
 
     /**
      * Refactor after tests failed, I added extra parameter
-     * ApplicationEventPublisher t later after
+     * ApplicationEventPublisher later after
      * tests writing. Backwards-compatible constructor used by older tests
      * and callers that do
      * not provide an ApplicationEventPublisher. Delegates to the full

@@ -42,4 +42,8 @@ public class TradeSummaryDTO {
     private Map<String, Long> weeklyTradesByTypeAndCounterparty;
     private Map<String, BigDecimal> weeklyRiskExposureSummary;
 
+    // Book-level activity summaries (bookId -> trade count, notional, etc.)
+    // Added to support dashboard Active Books count display
+    private Map<Long, DailySummaryDTO.BookActivitySummary> bookActivitySummaries;
+
 }

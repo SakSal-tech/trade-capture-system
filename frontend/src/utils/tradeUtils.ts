@@ -1,6 +1,7 @@
-import { Trade } from "./tradeTypes";
+import { Trade, TradeLeg } from "./tradeTypes";
 import {
   formatDateForBackend,
+  formatDateTimeForBackend,
   getOneYearFromToday,
   getToday,
 } from "./dateUtils";
@@ -65,11 +66,11 @@ export const formatTradeForBackend = (
 ): Record<string, unknown> => {
   return {
     ...trade,
+    // LocalDate fields - use date-only format (YYYY-MM-DD)
     tradeDate: formatDateForBackend(trade.tradeDate),
     startDate: formatDateForBackend(trade.startDate),
     maturityDate: formatDateForBackend(trade.maturityDate),
     executionDate: formatDateForBackend(trade.executionDate),
-    lastTouchTimestamp: formatDateForBackend(trade.lastTouchTimestamp),
     validityStartDate: formatDateForBackend(trade.validityStartDate),
     validityEndDate: formatDateForBackend(
       (
@@ -78,22 +79,26 @@ export const formatTradeForBackend = (
         }
       ).validityEndDate
     ),
-    tradeLegs: trade.tradeLegs.map((leg) => ({
-      ...leg,
-    })),
+    // LocalDateTime fields - use full datetime format (YYYY-MM-DDTHH:MM:SS)
+    lastTouchTimestamp: formatDateTimeForBackend(trade.lastTouchTimestamp),
+    // FIXED: Format individual leg dates properly for backend validation
+    // Each leg needs its tradeMaturityDate formatted as LocalDate (YYYY-MM-DD)
+    tradeLegs: trade.tradeLegs.map((leg) => {
+      const typedLeg = leg as TradeLeg & { tradeMaturityDate?: string };
+      return {
+        ...leg,
+        // Format tradeMaturityDate in leg if it exists (LocalDate field)
+        // This ensures backend validation "Both legs must have a maturity date defined" passes
+        tradeMaturityDate: typedLeg.tradeMaturityDate
+          ? formatDateForBackend(typedLeg.tradeMaturityDate)
+          : undefined,
+      };
+    }),
   };
 };
 
 // DEMO / TEST FALLBACK RATE
-// A realistic demo rate used only for local testing and demos when a
-// floating leg is left without an explicit rate. This should be adjusted
-// or removed when a MarketData/RateProvider is integrated.
 export const DEFAULT_FALLBACK_FLOATING_RATE = 0.03; // 3% p.a. (demo-only)
-// DEMO / TEST FALLBACK RATE FOR FIXED LEGS
-// When a Fixed leg rate is left empty in the UI during demos/tests, use
-// this default so cashflow generation and save flows produce numeric values.
-// This is demo-only and should be removed or replaced by a proper
-// MarketData/RateProvider in production.
 export const DEFAULT_FALLBACK_FIXED_RATE = 0.03; // 3% p.a. (demo-only)
 
 /**
@@ -102,16 +107,9 @@ export const DEFAULT_FALLBACK_FIXED_RATE = 0.03; // 3% p.a. (demo-only)
  * @returns {string|null} Error message or null if valid
  */
 export const validateTrade = (trade: Trade): string | null => {
-  // Propagate top-level maturity into legs
-  // Rationale: backend validators require per-leg maturities. For convenience
-  // when the user sets the top-level maturity, copy it into any leg that
-  // lacks a maturity. If legs differ among themselves and the top-level
-  // maturity is present but doesn't match them, return a clear error so the
-  // caller can show a 400-like validation message.
   const propagationError = propagateTopLevelMaturityToLegs(trade);
   if (propagationError) return propagationError;
 
-  // Backend-required fields (tradeStatus is NOT required)
   if (!trade.tradeDate) return "Trade date is required.";
   if (!trade.bookName) return "Book is required.";
   if (!trade.counterpartyName) return "Counterparty is required.";
@@ -122,7 +120,6 @@ export const validateTrade = (trade: Trade): string | null => {
   )
     return "At least one trade leg is required.";
 
-  // Validate all trade legs (basic presence)
   for (let i = 0; i < trade.tradeLegs.length; i++) {
     const leg = trade.tradeLegs[i];
     if (!leg.legType) return `Leg ${i + 1}: Leg Type is required.`;
@@ -147,22 +144,13 @@ export const validateTrade = (trade: Trade): string | null => {
 /**
  * If trade.maturityDate exists, copy it into any leg that lacks a
  * `tradeMaturityDate`. If legs contain differing maturity dates and the
- * top-level maturity is present but does not match them, return an error
- * message describing the conflict. Otherwise return null. This keeps the
- * front-end convenience behaviour local and predictable for validators.
+ * top-level maturity is present but does not match them, return an error.
  */
 function propagateTopLevelMaturityToLegs(trade: Trade): string | null {
-  // `topLevelMaturity` is the trade-level maturity date. When present we
-  // use it as the source of truth to populate any per-leg `tradeMaturityDate`
-  // values that are missing. We keep per-leg values if they already exist.
   const topLevelMaturity = trade.maturityDate;
-  if (!topLevelMaturity) {
-    // nothing to propagate
-    return null;
-  }
+  if (!topLevelMaturity) return null;
   if (!trade.tradeLegs || trade.tradeLegs.length === 0) return null;
 
-  // collect non-null leg maturities
   const nonNullLegDates: string[] = [];
   for (const leg of trade.tradeLegs) {
     const typedLeg = leg as import("./tradeTypes").TradeLeg & {
@@ -172,11 +160,8 @@ function propagateTopLevelMaturityToLegs(trade: Trade): string | null {
     if (legDate) nonNullLegDates.push(legDate);
   }
 
-  // If legs have differing maturities among themselves and top-level present
-  // but does not match them, treat as conflict and fail early.
   const uniqueLegDates = Array.from(new Set(nonNullLegDates));
   if (uniqueLegDates.length > 1) {
-    // legs differ check if top matches all existing leg dates
     const allMatchTop = uniqueLegDates.every((d) => d === topLevelMaturity);
     if (!allMatchTop) {
       return (
@@ -186,13 +171,11 @@ function propagateTopLevelMaturityToLegs(trade: Trade): string | null {
     }
   }
 
-  // Propagate top-level maturity into any leg missing it (keep existing ones)
   for (const leg of trade.tradeLegs) {
     const typedLeg = leg as import("./tradeTypes").TradeLeg & {
       tradeMaturityDate?: string;
     };
     if (!typedLeg.tradeMaturityDate) {
-      // Add per-leg maturity for backend DTO compatibility
       typedLeg.tradeMaturityDate = topLevelMaturity;
     }
   }
@@ -214,17 +197,7 @@ export function convertEmptyStringsToNull(
     for (const key in obj as Record<string, unknown>) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
         const value = (obj as Record<string, unknown>)[key];
-        // DEV: Convert empty strings for `utiCode`, settlement and user id/name
-        // fields to null here so the backend can auto-generate UTI and
-        // receive nulls instead of empty strings. See docs/DeveloperLog-30-10-2025-detailed.md
-        // CHANGED: This list was expanded to include a number of date/user
-        // fields during the settlement integration work. Beware: this
-        // conversion is broad and can convert required fields to `null` if
-        // fields (e.g. tradeDate, tradeLegs[].notional) are not nulled.
-        // List of fields that should be null if empty string (including enums)
-        // include UTI, settlement and common user/id fields so the
-        // backend receives `null` (allowing auto-generation) rather than
-        // an empty string which some endpoints treat as a value.
+
         const keysToNullIfEmpty = [
           "tradeId",
           "version",
@@ -245,16 +218,19 @@ export function convertEmptyStringsToNull(
           "index",
           "tradeType",
           "tradeSubType",
-          // Added fields to ensure empty strings are converted to null
-          "utiCode", // CHANGED: ensure empty UTI becomes null for backend auto-gen
-          "settlementInstructions", // CHANGED: added settlement field to null-conversion
-          "traderUserId", // CHANGED: include trader id so empty string -> null
-          "tradeInputterUserId", // CHANGED: include inputter id so empty string -> null
-          "traderUserName",
-          "inputterUserName",
+
+          // CHANGED: keep settlement + UTI + user fields null when empty
+          "utiCode",
+          "settlementInstructions",
+          "traderUserId",
+          "tradeInputterUserId",
+
+          // CHANGED: removed unsafe nulling of traderUserName/inputterUserName
+          // because empty strings should remain empty strings (backend expects names as text)
         ];
+
         if (keysToNullIfEmpty.includes(key) && value === "") {
-          newObj[key] = null;
+          newObj[key] = null; // CHANGED: ensure correct type for backend
         } else {
           newObj[key] = convertEmptyStringsToNull(value);
         }

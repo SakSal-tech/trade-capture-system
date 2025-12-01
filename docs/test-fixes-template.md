@@ -74,7 +74,7 @@ The code generated cashflows for each month from January to December, but the en
 
 ### Solution to the new problem
 
-I had to change maturity date instead of 31 December to 1 JAN 2026.LocalDate `java maturityDate = LocalDate.of(2026, 1, 1);` This works for now but I believe I need to think about Febraury Month and next month to it, especially if start date and maturity dates are both middle of the month.
+I had to change maturity date instead of 31 December to 1 JAN 2026.LocalDate `java maturityDate = LocalDate.of(2026, 1, 1);` This works for now but I believe I need to think about February Month and next month to it, especially if start date and maturity dates are both middle of the month.
 
 ### Impact Verification: How I confirmed the fix works:
 
@@ -341,7 +341,7 @@ Improves test reliability and stability across the service layer.
 ## Overview
 
 Several of the failing tests were not due to logic errors, but because of **Mockito’s strict stubbing mode**.
-Mockito requires that every stubbed method (`when(...).thenReturn(...)`) is invoked during a test run. for example i stubbed this when in the setup, but not all tests use this. `java when(bookRepository.findByBookName("TestBook")).thenReturn(Optional.of(new Book()));`
+Mockito requires that every stubbed method (`when(...).thenReturn(...)`) is invoked during a test run. for example I stubbed this when in the setup, but not all tests use this. `java when(bookRepository.findByBookName("TestBook")).thenReturn(Optional.of(new Book()));`
 If a test does not reach the code that calls those stubs (e.g., it fails early in validation), Mockito throws an `UnnecessaryStubbingException`.
 
 ## Tests Affected by Unnecessary Stubbing

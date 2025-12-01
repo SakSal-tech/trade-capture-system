@@ -50,7 +50,7 @@ public class ValidationExceptionHandler {
             var fieldError = ex.getBindingResult().getFieldError();
             String fieldErrorMessage = (fieldError != null) ? fieldError.getDefaultMessage() : null;// Added validation
                                                                                                     // to check in null
-                                                                                                    // to aviod possible
+                                                                                                    // to avoid possible
                                                                                                     // null.
             message = (fieldErrorMessage != null) ? fieldErrorMessage : message;
         }

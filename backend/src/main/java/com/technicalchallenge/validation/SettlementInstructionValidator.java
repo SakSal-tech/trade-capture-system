@@ -23,7 +23,6 @@ public class SettlementInstructionValidator {
          * it is perfectly fine to skip further checks.
          */
         // Presence Check. Validate fieldName (required)
-
         if (result == null)
             throw new IllegalArgumentException("TradeValidationResult required");
         if (text == null || text.trim().isEmpty())

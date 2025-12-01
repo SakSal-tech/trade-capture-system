@@ -26,13 +26,15 @@ public class TradeLegValidator {
             return false;
         }
 
-        // Refactored: Instead of checking both isBefore and isAfter, I changed to
-        // avoids unnecessary comparisons.
-        // checking for equalityCompare maturity dates
         if (leg1.getTradeMaturityDate().isBefore(leg2.getTradeMaturityDate())) {
             result.setError("Both legs must have identical maturity dates");
             return false;
         }
+        // Refactored: Instead of checking both isBefore and isAfter, I changed to
+        // equals
+        // avoids unnecessary comparisons.
+        // checking for equalityCompare maturity dates
+
         if (!leg1.getTradeMaturityDate().equals(leg2.getTradeMaturityDate())) {
             result.setError("Both legs must have identical maturity dates");
             return false;
@@ -51,30 +53,21 @@ public class TradeLegValidator {
         }
 
         // Extract legs
-        // Extract legs
         TradeLegDTO leg1 = tradeLegs.get(0);
         TradeLegDTO leg2 = tradeLegs.get(1);
 
-        leg1 = tradeLegs.get(0);
-        leg2 = tradeLegs.get(1);
-
-        // Fix: Null check before calling .equals() in the validation method as test
-        // was failing
+        // Fix: Null check before calling .equals() in the validation method as test was
+        // failing
         if (leg1.getPayReceiveFlag() == null || leg2.getPayReceiveFlag() == null) {
             result.setError("Both legs must have a pay/receive flag defined");
             return false;
         }
-        if (leg1.getPayReceiveFlag().equals(leg2.getPayReceiveFlag())) {
-            if (leg1.getPayReceiveFlag() == null || leg2.getPayReceiveFlag() == null) {
-                result.setError("Both legs must have a pay/receive flag defined");
-                return false;
-            }
-            if (leg1.getPayReceiveFlag().equals(leg2.getPayReceiveFlag())) {
-                result.setError("Legs must have opposite pay/receive flags");
-                return false;
-            }
 
+        if (leg1.getPayReceiveFlag().equals(leg2.getPayReceiveFlag())) {
+            result.setError("Legs must have opposite pay/receive flags");
+            return false;
         }
+
         return true;// Always return true if no error was found
 
     }
@@ -90,8 +83,6 @@ public class TradeLegValidator {
             return false;
         /*
          * Trade Business Rules:
-         * FIXED leg: Pays a fixed interest rate. FLOATING leg: Pays a variable interest
-         * rate, which changes over time. Index: For a floating leg, the interest rate
          * is not fixed, it's based on a financial index (like LIBOR, EURIBOR,
          * SONIA,etc.Cannot have a floating leg without specifying which index it uses
          */
