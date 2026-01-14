@@ -345,3 +345,11 @@ https://www.geeksforgeeks.org/devops/docker-compose-for-java-applications-simpli
 https://www.geeksforgeeks.org/devops/docker-compose-for-java-applications-simplifying-deployment/
 
 https://www.baeldung.com/docker-maven-build-multi-module-projects
+
+## Links used to learn more about how to design the cloud architecture
+
+https://learn.microsoft.com/en-us/azure/well-architected/architect-role/architecture-design-specification
+
+https://learn.microsoft.com/en-us/azure/well-architected/architect-role/design-diagrams
+
+https://learn.microsoft.com/en-us/azure/architecture/icons/

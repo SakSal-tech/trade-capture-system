@@ -11,7 +11,8 @@ This project demonstrates my ability to work productively in a **large
 legacy codebase**, diagnose and fix **critical business defects**, and
 deliver **production-grade full‑stack features**.
 
----
+This project extends beyond application development to include **cloud architecture and deployment design**.
+Alongside building and stabilising the system, I documented an **Azure cloud architecture** applying concepts learned from **Azure AZ-900 and AWS cloud fundamentals**, translating theory into hands-on architectural decisions.
 
 ## Tech Stack
 
@@ -23,8 +24,6 @@ Pagination - ApplicationEventPublisher
 
 **Testing** - JUnit 5, Mockito - Spring Boot integration tests -
 Dedicated security test configuration
-
----
 
 ## My Core Backend Contributions
 
@@ -41,8 +40,6 @@ Dedicated security test configuration
 - Verified through **unit and integration tests**.
 - Restored financial correctness for notional‑based quarterly
   cashflows.
-
----
 
 ### 2. Enterprise Business Validation Engine
 
@@ -65,8 +62,6 @@ Implemented a full, centralised validation framework including:
 All orchestration is handled through centralised `TradeValidationEngine` with
 structured validation results.
 
----
-
 ### 3. Settlement Instructions with Event Publishing
 
 - Extended `AdditionalInfoService` to **publish immutable application
@@ -78,8 +73,6 @@ structured validation results.
   - WebSocket / SSE notifications
   - Operational audit pipelines
 - Preserved backwards compatibility with existing unit tests.
-
----
 
 ### 4. Security & Role‑Based Access Control
 
@@ -96,8 +89,6 @@ structured validation results.
 - Added dedicated **test security configuration** for integration
   tests.
 
----
-
 ### 5. Advanced Trade Search with RSQL
 
 - Implemented:
@@ -109,8 +100,6 @@ structured validation results.
   - Settlements
   - Reporting and exports
 
----
-
 ### 6. Test Stabilisation & Reliability
 
 - Diagnosed and fixed **multiple failing unit and integration tests**.
@@ -118,8 +107,6 @@ structured validation results.
   - Defensive construction around event publishers.
   - Mock‑based strategies for Spring event testing.
 - Improved overall backend stability and regression safety.
-
----
 
 ## My Core Frontend Contributions
 
@@ -129,8 +116,6 @@ structured validation results.
 - Integrated daily and weekly trade summaries.
 - Connected frontend views to backend aggregation services.
 - Enabled CSV export directly from the dashboard.
-
----
 
 ### 2. Full Settlement Instructions UI Integration
 
@@ -143,8 +128,6 @@ structured validation results.
 - Audit‑safe save flow.
 - CSV export compatibility.
 
----
-
 ### 3. Enterprise Navigation Redesign
 
 - Added **vertical sidebar navigation**.
@@ -156,8 +139,6 @@ structured validation results.
   - History
   - Admin tools
 
----
-
 ### 4. Snackbar (Toast) System Redesign
 
 - Moved to top‑left to avoid modal collisions.
@@ -165,8 +146,6 @@ structured validation results.
 - Added retry support.
 - Added accessibility support using `aria-live`.
 - Prevented hidden critical errors.
-
----
 
 ### 5. Robust CSV Export for Non‑Standard Settlements
 
@@ -176,15 +155,11 @@ structured validation results.
   - Loading state and duplicate‑click prevention.
 - Eliminated corrupted exports and silent failures.
 
----
-
 ### 6. Trade Form UX Improvements
 
 - Added contextual maturity‑date helper text.
 - Clarified trade‑leg behaviour.
 - Improved field rendering consistency across forms.
-
----
 
 ### 7. Frontend Test Coverage
 
@@ -193,8 +168,6 @@ structured validation results.
   - Protected routing
   - AG Grid table
   - Loading spinner
-
----
 
 ## What This Project Demonstrates
 
@@ -208,7 +181,31 @@ structured validation results.
 - Production‑grade **trading UX improvements**.
 - Diagnostic debugging and test stabilisation in a legacy system.
 
----
+## Cloud Architecture & Azure Design
+
+As part of extending this project beyond application development, I designed and documented a **theoretical Azure cloud architecture** aligned with enterprise and regulated financial environments.
+
+The focus was on applying **Azure Fundamentals (AZ-900)** concepts in practice, including compute selection, container strategy, CI/CD, monitoring, security, cost awareness, and governance.
+
+### Key artefacts
+
+- **Azure Cloud Architecture Design**
+
+  - [`docs/Azure-Cloud-Architecture-Design-Documentation.md`](docs/Azure-Cloud-Architecture-Design-Documentation.md)
+
+- **Architecture Diagrams**
+
+  - End-to-end Azure architecture:
+    - [`docs/diagrams/Azure Architecture.drawio.png`](docs/diagrams/Azure-Architecture.drawio.png)
+  - Editable source:
+    - [`docs/diagrams/Azure end-to-end architecture.drawio`](docs/diagrams/Azure-end-to-end-architecture.png)
+
+- **Supporting Design & Learning Notes**
+  - [`docs/design.md`](docs/design.md)
+  - [`docs/docker-Explanations.md`](docs/docker-Explanations.md)
+  - [`docs/LearningLinksUsed.md`](docs/LearningLinksUsed.md)
+
+This work demonstrates how cloud fundamentals can be applied to a real system through **architecture reasoning and documentation**, without requiring live cloud deployment.
 
 ## Running the System
 
@@ -228,8 +225,6 @@ pnpm install
 pnpm dev
 ```
 
----
-
 ## Deep Technical Documentation
 
 All detailed engineering artefacts, debugging logs, diagrams, and
@@ -243,8 +238,6 @@ architectural notes live under `/docs`:
 
 These files document the **actual investigations, fixes, and design
 decisions** applied during development.
-
----
 
 ## Status
 
