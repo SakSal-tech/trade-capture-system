@@ -123,12 +123,20 @@ Virtual Machines were considered but rejected due to:
 
 ### Why SQL Database
 
-Azure SQL Database is used as the primary data store. It provides a fully managed relational database service with strong transactional consistency, high availability, and enterprise-grade security features suitable for financial data.
+Azure SQL Database is selected as the primary data store for the Trade Capture System. Core trading data such as trades, trade legs, counterparties, books, and settlement instructions require strong transactional consistency and well-defined relationships. These characteristics align well with a relational database model.
+It works well with other Azure services used for reporting and data analysis services such as PowerBi and Analysis Servcies which are needed for this Trade system.
+
+### Hybrid Data Considerations (NoSQL)
+
+A hybrid data approach is realistic for an enterprise trading system. While Azure SQL is used as the system of record for core trading data, NoSQL databases such as Azure Cosmos DB could be used for supporting data that is semi-structured or high-volume.
+
+Examples include trade event history documents, operational notifications, and workflow state snapshots. These data types do not require foreign key relationships and benefit from flexible schemas and low-latency access. Cosmos DB was not selected as the primary database, as core trade data requires strict relational consistency.
 
 ### ### Alternative Considered
 
-- Azure Database for PostgreSQL offers open-source compatibility and flexibility.
-- Azure Cosmos DB provides global distribution and low-latency access for multi-model data.
+Azure Database for PostgreSQL was considered as an alternative. While PostgreSQL is a capable relational database, Azure SQL is commonly used in enterprise financial environments and integrates closely with Microsoft-based platforms. For this system, Azure SQL provides a familiar and robust foundation for structured trading data.
+
+Azure Cosmos DB provides global distribution and low-latency access for multi-model data.
 
 These alternatives were not selected because the Trade Capture System primarily requires structured relational data, strong consistency, and compliance-aligned data management rather than global multi-model distribution.
 
@@ -138,18 +146,75 @@ Azure Front Door provides a secure public entry point and helps reduce direct ex
 
 Access to Azure resources is conceptually controlled through role-based access control. Network design is intentionally high level, as detailed subnetting and firewall configuration would be determined during implementation.
 
-### Why I have chosen Azure Front Door instead of Load Balancer
+### Why I Chose Azure Front Door Instead of Azure Load Balancer
 
-Azure Front Door is used as the global entry point for the application. It provides:
+I use Azure Front Door as the global entry point for the Trade Capture System. This decision is driven by the need to support a secure, highly available, internet-facing trading application used by traders and internal users across multiple geographic regions.
 
-- Secure internet-facing access
-- Traffic distribution
-- High availability for users across multiple geographic regions
-- This aligns with the requirement for 24/7 global trading operations.
+Azure Front Door operates at the application layer (Layer 7) and handles HTTP and HTTPS traffic. It provides:
 
-### Alternative Considered
+- Secure internet-facing access over HTTPS
+- Global traffic routing at the Microsoft edge
+- Application-layer request handling and routing
+- High availability and resilience across regions
+- A single public entry point for all users
 
-Azure Load Balancer was considered as a simpler, regional alternative. However, it does not provide global routing or application-layer capabilities, making it less suitable for a global enterprise-facing web application.
+For a trading system, this ensures that traders can reliably access the platform during critical market windows while backend services remain protected behind managed entry points. This aligns with the requirement for 24/7 global trading operations and predictable access patterns.
+
+### Alternative Considered: Azure Load Balancer
+
+I considered Azure Load Balancer as a simpler alternative. Azure Load Balancer operates at the transport layer (Layer 4) and distributes TCP and UDP traffic across backend instances.
+
+While this approach works well for VM-based workloads and internal service-to-service traffic, it does not provide application-layer capabilities such as HTTP routing, request inspection, or global traffic distribution. Azure Load Balancer is also regional, which makes it less suitable as the primary entry point for a globally accessed trading application.
+
+For these reasons, Azure Load Balancer was not selected as the main entry service for the Trade Capture API.
+
+### Related Entry Options in a Large-Scale Banking Environment (Application Gateway)
+
+In large banking environments such as UBS, multiple traffic management components are often combined depending on system scale and security requirements.
+
+Azure Application Gateway operates at the application layer (Layer 7) within a Virtual Network and supports HTTP and HTTPS traffic with advanced routing and Web Application Firewall capabilities. It is commonly used when backend services must remain on private IP addresses and traffic inspection is required before requests reach internal applications.
+
+In a VM-based or highly segmented network design, Azure Load Balancer is commonly used for internal traffic distribution between private backend services. In this model, Azure Load Balancer operates on private IP addresses inside a Virtual Network and is not exposed to the internet. Public access is instead handled by application-layer services such as Azure Front Door or Azure Application Gateway. For this project, I did not select Azure Load Balancer because the Trade Capture System is hosted on managed PaaS services and does not require internal VM-to-VM traffic distribution.
+
+For this project, I chose Azure Front Door as the primary public entry point to keep the architecture simple while still aligning with enterprise patterns. If the Trade Capture System evolved to require stricter network isolation or deeper inspection within a Virtual Network, Application Gateway could be introduced behind Front Door to protect internal application endpoints.
+
+### Public and Internal IP Considerations
+
+In this architecture, Azure Front Door exposes a single public endpoint to traders and internal users. Backend services, including the Trade Capture API and databases, are not directly exposed to the internet.
+
+In larger enterprise deployments, backend services typically use internal IP addresses and are accessed through private endpoints or internal load balancers. This separation ensures that sensitive trade and settlement services remain isolated while still being reachable through approved, controlled entry points.
+
+### Virtual Machines as an Enterprise Alternative
+
+I selected Azure App Service as the primary compute platform for this Trade Capture System, but I also considered Virtual Machines because they are commonly used in large trading environments such as UBS when additional control or isolation is required.
+
+For a trade capture and settlement platform, I would choose Virtual Machines if backend components required operating system-level access. For example, proprietary risk engines, trade surveillance tools, or compliance and audit agents often need to be installed directly on the host operating system. These types of components are frequently used to monitor trading activity, enforce regulatory controls, or integrate with legacy reporting systems, and they cannot run within managed PaaS environments.
+
+If I hosted the Trade Capture API on Virtual Machines, I would design the network to enforce strict separation between system layers. I would place any internet-facing entry components in a DMZ subnet, deploy the trade processing API into a private application subnet behind an internal load balancer, and restrict database access to a dedicated data subnet. I would apply Network Security Groups to each subnet to ensure that only approved traffic paths can access sensitive trade, settlement, and reference data.
+
+I would also use Azure Bastion to manage administrative access to the Virtual Machines. This would allow engineers or operations teams to access trade system hosts securely without exposing public IP addresses, which is important in environments handling sensitive financial data.
+
+For this project, I did not choose Virtual Machines because the Trade Capture API is a stateless, containerised Spring Boot service that does not require operating system customisation or proprietary host-level software. Using Azure App Service allows me to reduce operational overhead while still meeting the security, scalability, and availability requirements of a trading application.
+
+### DDoS Protection, Firewall, and Network Isolation
+
+Because this Trade Capture System exposes an internet-facing API used by traders and internal users, I considered how to protect it against external attacks while limiting access to sensitive backend resources.
+
+For denial-of-service protection, I rely on Azure’s built-in DDoS protection for public-facing endpoints. This protects the Trade Capture API from large-scale traffic floods that could prevent traders from submitting or amending trades during active trading windows. Using a managed service avoids the need to implement custom DDoS mitigation logic at the application level.
+
+I also considered the use of Azure Firewall in scenarios where stricter network control is required. For example, if the trading system needed to tightly restrict outbound traffic or inspect traffic between application components, Azure Firewall would allow centralized control, logging, and enforcement of security policies. In this model, backend services such as the Trade Capture API and settlement-related components would remain on private IP addresses and be accessible only through approved entry points.
+
+For this project, I did not make Azure Firewall a mandatory component because the primary API is hosted on managed PaaS services that already reduce the attack surface. Instead, I focused on keeping backend services private and exposing only a controlled application entry point for trader access. This layered approach balances security with operational simplicity while still supporting the access control and isolation expected in a trading environment.
+
+### Content Delivery Network (CDN) Considerations
+
+At the current stage of this project, the Trade Capture System focuses primarily on the backend API and its integration with cloud services. The API serves dynamic trade, settlement, and validation data, which is not suitable for CDN caching. For this reason, a CDN is not required for the backend API itself.
+
+I considered CDN usage primarily in the context of the frontend application. If the React-based trading UI is deployed as a cloud-hosted web application, a CDN becomes beneficial for serving static assets such as HTML, JavaScript, CSS, and images. These assets change infrequently and are accessed by all users, making them ideal candidates for edge caching.
+
+In a trading environment where users may access the system from different geographic regions, a CDN can reduce latency and improve initial page load times for the frontend. The CDN would cache static frontend assets at edge locations, while all dynamic trade operations would continue to be handled directly by the Trade Capture API.
+
+For this project, I have not made CDN a mandatory component because the primary focus is backend architecture and API design. However, if the frontend is deployed as part of the system, I would integrate a CDN in front of the static web assets while keeping the API endpoints uncached to ensure data accuracy and consistency.
 
 ## 2.5 Assumptions and Constraints for UBS Trading Cloud
 
@@ -162,6 +227,38 @@ This architecture is based on the following assumptions and constraints:
 - Designed for horizontal scalability rather than fixed sizing
 
 Exact sizing would be determined during implementation based on observed workloads, performance testing, and compliance requirements. This design prioritises scalability over fixed capacity to support variable trading demand.
+
+## 2.6
+
+### Azure Blob Storage for Unstructured Trade Data
+
+In this Trade Capture System, I use Azure Blob Storage for unstructured data that is generated as part of trading and settlement workflows but does not belong in the core relational trade model. Examples include settlement instruction exports, regulatory reports, audit files, and document attachments linked to trades.
+
+These data types differ from core trade records because they do not require relational structure, foreign keys, or transactional guarantees. Storing them in the primary relational database would increase complexity and cost without providing additional value for query or integrity requirements.
+
+By using Azure Blob Storage, I separate large, unstructured artefacts from the trade and settlement tables stored in Azure SQL Database. This allows the Trade Capture API to keep its relational database focused on high-value transactional data, while still providing durable, scalable storage for operational and compliance-driven files.
+
+For this project, Azure Blob Storage is the most appropriate choice for handling settlement and reporting artefacts because it aligns with how these files are accessed, retained, and audited in a trading environment.
+
+### Messaging and Asynchronous Processing Considerations
+
+I considered Azure Queue Storage for asynchronous messaging within the Trade Capture System. Queue Storage is suitable for simple background processing scenarios where tasks can be handled independently and eventual consistency is acceptable.
+
+In this project, trade validation, booking, and settlement workflows are handled synchronously within the API. Event-driven behaviour is currently implemented at the application level, and no external background worker or distributed processing layer is required. I am planning to change this to use Kafka.
+
+As a result, Azure Queue Storage was not selected for the current architecture. It remains a viable option if the system evolves to include asynchronous settlement processing, export generation, or notification workflows.
+
+As part of ongoing development and learning, I am evolving the architecture to introduce Kafka-based event streaming. This allows trade lifecycle events to be processed asynchronously and prepares the system for future background processing, integration with downstream systems, and more scalable event-driven workflows.
+
+### Azure File Storage (Considered but Not Selected)
+
+I considered Azure File Storage, which provides shared file system access and can be mounted by applications or user machines. This approach is commonly used for legacy systems or lift-and-shift workloads that rely on shared network drives.
+
+For the Trade Capture System, files such as settlement exports and regulatory reports are generated and consumed programmatically through the API rather than accessed through a shared file system. Introducing Azure File Storage would increase operational complexity without aligning with how the system produces and uses these artefacts.
+
+For this reason, Azure File Storage was not selected for the current architecture.
+
+## 2.7
 
 # Section 3: Deployment Strategy
 
@@ -208,3 +305,63 @@ These services provide application and infrastructure observability, security po
 Operational alerts support timely investigation and remediation by engineering and operations teams, reducing operational risk and potential business disruption. Deployment pipelines provide a controlled rollback mechanism if a release introduces issues during trading hours.
 
 The use of managed platform services and database backup capabilities supports business continuity and recovery objectives, helping ensure system availability and data protection in line with financial services operational and regulatory expectations.
+
+## How Kafka fits with Azure-hosted trading app (section not complete)
+
+[ React UI ]
+|
+[ Trade Capture API (App Service / AKS / VM) ]
+|
+[ Kafka Cluster ]
+|
+[ Risk / Settlement / Reporting Systems ]
+
+Produces events such as :
+
+- TradeCreated
+- TradeAmended
+- SettlementInstructionsUpdated
+
+Listen for:
+
+- settlement confirmations
+
+- risk alerts
+
+-menrichment events
+
+### Why Kafka?
+
+In a larger enterprise trading environment, event streaming platforms such as Kafka are commonly used to distribute trade lifecycle events to downstream systems such as risk, settlement, and reporting. The Trade Capture API would act as a Kafka producer, publishing events after persisting trade state in the relational database.
+
+Kafka is treated as an external event streaming platform and is not hosted within Azure App Service itself. It integrates with the Azure-hosted application through secure network connectivity and is used to decouple trading workflows rather than as a system of record.
+
+When a trader books a trade, the Trade Capture API persists the trade in the relational database and then publishes a TradeCreated event to Kafka. Downstream systems such as risk, settlement, and reporting consume this event independently. Kafka retains the event for a configured period to allow replay, but it is not used as the system of record.
+
+### Trade Lifecycle Event Streaming with Kafka
+
+In this project, I use Kafka to model trade lifecycle event streaming in a development environment. After the Trade Capture API persists trade state in the relational database, it publishes events such as TradeCreated, TradeAmended, and SettlementInstructionsUpdated. These events represent business facts that downstream systems could consume independently.
+
+Kafka is run locally using Docker to support hands-on learning and development. This setup mirrors how the Trade Capture API would interact with an enterprise Kafka platform, without requiring cloud-managed Kafka infrastructure. The application code produces and consumes Kafka events in the same way it would against a managed or on-premises Kafka cluster.
+
+I run Kafka locally using Docker for development and learning. My Azure-hosted Trade Capture API produces and consumes Kafka events exactly as it would against a managed or enterprise Kafka cluster.
+
+### Options Considered for Kafka Deployment
+
+#### Kafka on Azure Virtual Machines
+
+I considered running Kafka on Azure Virtual Machines, which is a common approach in large enterprises. In this model, Kafka brokers run on Linux VMs within a Virtual Network, with persistent disks and controlled network access. This approach provides full control over configuration and security.
+
+For this project, I did not choose this option because Kafka requires multiple brokers and additional operational management, which would significantly increase cost and complexity without adding learning value for the core trade capture use case.
+
+#### Kafka on Azure Kubernetes Service (AKS)
+
+I also considered deploying Kafka on Azure Kubernetes Service using operators such as Strimzi. This approach is typically used by platform engineering teams to run Kafka at scale with automated orchestration.
+
+I did not select this option because running Kafka on Kubernetes introduces substantial platform complexity and operational overhead. For a trade capture application focused on demonstrating event-driven design rather than platform engineering, this approach would be disproportionate.
+
+#### Managed Kafka Services
+
+Managed Kafka services, such as Confluent Cloud, were also considered. These services remove operational responsibility and provide a fully managed Kafka platform.
+
+This option was not selected due to cost considerations and because the primary objective of this project is to demonstrate understanding of Kafka integration and event-driven architecture rather than managed service consumption.
