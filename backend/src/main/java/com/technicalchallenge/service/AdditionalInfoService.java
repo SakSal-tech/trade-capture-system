@@ -1,5 +1,9 @@
 package com.technicalchallenge.service;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+
 import com.technicalchallenge.dto.AdditionalInfoDTO;
 import com.technicalchallenge.dto.AdditionalInfoRequestDTO;
 import com.technicalchallenge.mapper.AdditionalInfoMapper;
@@ -23,6 +27,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
+
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
@@ -288,35 +294,6 @@ public class AdditionalInfoService {
         }
 
         return additionalInfoMapper.toDto(updatedInfo);
-    }
-
-    /**
-     * Searches for AdditionalInfo records containing the provided keyword.
-     * Case-insensitive search on fieldValue.
-     */
-    public List<AdditionalInfoDTO> searchByKey(String keyword) {
-        if (keyword == null || keyword.trim().isEmpty()) {
-            throw new IllegalArgumentException("Search keyword cannot be empty.");
-        }
-
-        String lowerKeyword = keyword.trim().toLowerCase();
-
-        List<AdditionalInfo> allRecords = additionalInfoRepository.findAll();
-        List<AdditionalInfo> matchingRecords = new ArrayList<>();
-        for (AdditionalInfo record : allRecords) {
-            if (record.getFieldValue() != null) {
-                String fieldValue = record.getFieldValue().toLowerCase();
-                if (fieldValue.contains(lowerKeyword)) {
-                    matchingRecords.add(record);
-                }
-            }
-        }
-
-        List<AdditionalInfoDTO> result = new ArrayList<>();
-        for (AdditionalInfo record : matchingRecords) {
-            result.add(additionalInfoMapper.toDto(record));
-        }
-        return result;
     }
 
     // Refactoring and added dedicated service methods to efficiently manage,
@@ -602,32 +579,6 @@ public class AdditionalInfoService {
         return additionalInfoMapper.toDto(target);
     }
 
-    // Refactored ADDED:
-    // Supports business requirement “Search capability for finding trades with
-    // specific settlement requirements.”
-    public List<AdditionalInfoDTO> searchTradesBySettlementText(String keyword) {
-
-        // Defensive check: keyword must not be empty or null
-        if (keyword == null || keyword.trim().isEmpty()) {
-            throw new IllegalArgumentException("Search keyword cannot be empty.");
-        }
-
-        // Trim user input to avoid issues with extra spaces
-        String trimmedKeyword = keyword.trim();
-
-        // Uses repository-level query that performs case-insensitive partial search
-        // This query runs directly in the database using LIKE %keyword%
-        List<AdditionalInfo> matches = additionalInfoRepository.searchTradeSettlementByKeyword(trimmedKeyword);
-
-        // Convert entities to DTOs for controller-safe output
-        List<AdditionalInfoDTO> results = new ArrayList<>();
-        for (AdditionalInfo match : matches) {
-            results.add(additionalInfoMapper.toDto(match));
-        }
-
-        return results;
-    }
-
     public Optional<AdditionalInfoDTO> getTradeSettlementInstructions(Long tradeId) {
         return additionalInfoRepository
                 .findActiveOne("TRADE", tradeId, "SETTLEMENT_INSTRUCTIONS")
@@ -894,5 +845,26 @@ public class AdditionalInfoService {
      * the actor who performed the deletion. This keeps the audit trail intact
      * and allows recovery/analysis after cleanup.
      */
+
+    public Page<AdditionalInfoDTO> searchByKey(
+            String keyword,
+            int page,
+            int size) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            throw new IllegalArgumentException("Search keyword cannot be empty.");
+        }
+
+        int safeSize = Math.min(size, 100); // hard cap
+        Pageable pageable = PageRequest.of(
+                page,
+                safeSize,
+                Sort.by("additionalInfoId").descending());
+
+        Page<AdditionalInfo> results = additionalInfoRepository.searchByFieldValueContainingIgnoreCase(
+                keyword.trim(),
+                pageable);
+
+        return results.map(additionalInfoMapper::toDto);
+    }
 
 }

@@ -114,7 +114,7 @@ public class TradeSettlementController {
         // Refactored: Instead of calling searchByKey() (which loads all records),
         // now call a dedicated service method that performs a focused database
         // query.
-        List<AdditionalInfoDTO> matchingInfos = additionalInfoService.searchTradesBySettlementText(trimmedInput);
+        List<AdditionalInfoDTO> matchingInfos = additionalInfoService.searchTradesBySettlementKeyword(trimmedInput);
 
         // Use a Set to ensure unique trade IDs (avoid duplicates)
         Set<Long> tradeIdSet = new HashSet<>();
