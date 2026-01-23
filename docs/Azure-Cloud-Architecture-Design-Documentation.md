@@ -123,7 +123,7 @@ Virtual Machines were considered but rejected due to:
 ### Why SQL Database
 
 Azure SQL Database is selected as the primary data store for the Trade Capture System. Core trading data such as trades, trade legs, counterparties, books, and settlement instructions require strong transactional consistency and well-defined relationships. These characteristics align well with a relational database model.
-It works well with other Azure services used for reporting and data analysis services such as PowerBi and Analysis Servcies which are needed for this Trade system.
+It works well with other Azure services used for reporting and data analysis services such as PowerBi and Analysis Services which are needed for this Trade system.
 
 ### Hybrid Data Considerations (NoSQL)
 
@@ -131,7 +131,7 @@ A hybrid data approach is realistic for an enterprise trading system. While Azur
 
 Examples include trade event history documents, operational notifications, and workflow state snapshots. These data types do not require foreign key relationships and benefit from flexible schemas and low-latency access. Cosmos DB was not selected as the primary database, as core trade data requires strict relational consistency.
 
-### ### Alternative Considered
+### Alternative Considered
 
 Azure Database for PostgreSQL was considered as an alternative. While PostgreSQL is a capable relational database, Azure SQL is commonly used in enterprise financial environments and integrates closely with Microsoft-based platforms. For this system, Azure SQL provides a familiar and robust foundation for structured trading data.
 
@@ -227,7 +227,7 @@ This architecture is based on the following assumptions and constraints:
 
 Exact sizing would be determined during implementation based on observed workloads, performance testing, and compliance requirements. This design prioritises scalability over fixed capacity to support variable trading demand.
 
-## 2.6
+## 2.6 Storage and Messaging Services
 
 ### Azure Blob Storage for Unstructured Trade Data
 
@@ -256,8 +256,6 @@ I considered Azure File Storage, which provides shared file system access and ca
 For the Trade Capture System, files such as settlement exports and regulatory reports are generated and consumed programmatically through the API rather than accessed through a shared file system. Introducing Azure File Storage would increase operational complexity without aligning with how the system produces and uses these artefacts.
 
 For this reason, Azure File Storage was not selected for the current architecture.
-
-## 2.7
 
 # Section 3: Deployment Strategy
 
@@ -364,6 +362,12 @@ I did not select this option because running Kafka on Kubernetes introduces subs
 Managed Kafka services, such as Confluent Cloud, were also considered. These services remove operational responsibility and provide a fully managed Kafka platform.
 
 This option was not selected due to cost considerations and because the primary objective of this project is to demonstrate understanding of Kafka integration and event-driven architecture rather than managed service consumption.
+
+## Disaster Recovery and Business Continuity
+
+The Trade Capture System is designed with resilience and recovery in mind to support continuous trading operations. Managed Azure services such as Azure App Service and Azure SQL Database provide built-in redundancy, automated backups, and high availability within a region.
+
+In the event of a failure, recovery procedures would prioritise restoring API availability and data integrity to minimise trader disruption. Recovery objectives would be defined during implementation based on regulatory requirements and business impact analysis.
 
 # Section 5: Cost Management, Governance, and Compliance
 
