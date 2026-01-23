@@ -86,7 +86,6 @@ Users are shown outside the Azure boundary to clearly indicate the trust and res
 ### Architecture Diagrams
 
 - End-to-end Azure architecture
-
   - [`docs/diagrams/Azure-Architecture.drawio.png`](docs/diagrams/Azure-Architecture.drawio.png)
 
 - Editable source
@@ -365,3 +364,55 @@ I did not select this option because running Kafka on Kubernetes introduces subs
 Managed Kafka services, such as Confluent Cloud, were also considered. These services remove operational responsibility and provide a fully managed Kafka platform.
 
 This option was not selected due to cost considerations and because the primary objective of this project is to demonstrate understanding of Kafka integration and event-driven architecture rather than managed service consumption.
+
+# Section 5: Cost Management, Governance, and Compliance
+
+This section describes how I apply Azure cost management and governance principles to the Trade Capture System in a banking context. The focus is on cost visibility, controlled usage, security, and compliance rather than exact pricing or deployment sizing. All decisions are aligned with enterprise practices commonly found in large financial institutions.
+
+## 5.1 Cost Management Strategy for the Trade Capture System
+
+The Trade Capture System is designed using a consumption-based cloud model. Azure services are selected to scale horizontally based on demand rather than relying on fixed capacity. This approach supports variable trading volumes, particularly during market open and close windows, while avoiding unnecessary idle infrastructure costs.
+
+I prioritise Platform as a Service offerings such as Azure App Service and Azure SQL Database because they reduce operational overhead and include built-in availability and scaling. This shifts cost management away from infrastructure maintenance and toward actual application usage, which is more predictable and easier to control in a trading environment.
+
+Azure Cost Management is used conceptually to monitor resource consumption, track spending trends, and set budgets. Alerts can be configured to notify teams when costs exceed expected thresholds, helping prevent unexpected overspend during periods of increased trading activity or development experimentation.
+
+## 5.2 Resource Organisation and Governance Model
+
+To support enterprise governance, Azure resources are organised using subscriptions and resource groups. Separate environments such as development, test, and production would be isolated at subscription or resource group level to reduce risk and enforce separation of concerns.
+
+Resource groups are structured around the Trade Capture System components, including application services, data stores, and monitoring resources. This organisation supports lifecycle management, access control, and cost attribution at the system level.
+
+Tags are applied to all resources to identify environment, application name, and ownership. This enables cost tracking by system and simplifies reporting for finance and governance teams.
+
+## 5.3 Access Control and Identity Management
+
+Access to Azure resources is controlled using Role-Based Access Control. Permissions are assigned based on job function rather than individual users, aligning with least-privilege principles commonly required in banking environments.
+
+For example, developers may have permissions to deploy application code and view logs, while operations teams manage infrastructure configuration and monitoring. Sensitive resources such as databases and secrets are restricted to a minimal set of trusted roles.
+
+Azure Active Directory provides centralised identity management and authentication, ensuring that access to cloud resources aligns with enterprise identity standards.
+
+## 5.4 Policy Enforcement and Protection Controls
+
+Azure Policy is used to enforce organisational standards across the Trade Capture System. Policies can restrict which resource types are allowed, enforce security configurations, and prevent the deployment of non-compliant services.
+
+Resource locks can be applied to critical production resources such as databases to prevent accidental deletion or modification. This protects core trading data and supports operational stability.
+
+Azure Key Vault is used conceptually to manage secrets, connection strings, and certificates. This ensures sensitive information is not stored directly in application code or configuration files.
+
+## 5.5 Security, Privacy, and Compliance Considerations
+
+The Trade Capture System handles sensitive financial data and must comply with strict security and privacy requirements. Azure’s shared responsibility model is applied, where Microsoft secures the underlying platform and I am responsible for securing application logic, access controls, and data usage.
+
+Microsoft Defender for Cloud provides visibility into security posture and configuration risks. This supports proactive identification of vulnerabilities and misconfigurations that could impact traders or downstream settlement processes.
+
+Data retention and access patterns are designed to align with financial services compliance requirements, ensuring that trade and settlement data remains protected and auditable.
+
+## 5.6 Availability, SLAs, and Service Lifecycle Awareness
+
+Azure services used in the Trade Capture System provide defined Service Level Agreements that support high availability and reliability expectations in trading systems. These SLAs inform architectural decisions and guide the selection of managed services.
+
+The design acknowledges the Azure service lifecycle, ensuring that only supported and stable services are used for core trading functionality. This reduces long-term risk and supports maintainability as the platform evolves.
+
+Overall, this governance and cost management approach ensures that the Trade Capture System remains scalable, secure, compliant, and financially controlled while supporting the operational demands of a banking trading environment.
