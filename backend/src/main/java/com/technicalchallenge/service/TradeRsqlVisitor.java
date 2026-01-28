@@ -40,9 +40,6 @@ public class TradeRsqlVisitor implements RSQLVisitor<Specification<Trade>, Void>
         List<Node> children = node.getChildren();
 
         for (Node child : children) {
-            // this output is for debugging/testing reasons before building the spec
-            // System.out.println("Visiting child of AND node: " + child.toString());
-            // recursively visit each child node
             Specification<Trade> childSpec = child.accept(this);// tells child node, to call the right visit method on
                                                                 // itself using this same visitor class.”
             if (childSpec != null) {

@@ -101,12 +101,10 @@ public class TradeRsqlVisitorTest {
     })
 
     void testVisitComparisonNodeCombinations(String field, String operator, String value) {
-        System.out.println("Testing: field=" + field + ", operator=" + operator + ", value=" + value);
 
         ComparisonNode node = new ComparisonNode(new ComparisonOperator(operator), field, Arrays.asList(value));
         TradeRsqlVisitor visitor = new TradeRsqlVisitor();
         Specification<Trade> spec = visitor.visit(node, null);
-        System.out.println("Specification result: " + spec);
 
         assertNotNull(spec, "Specification should not be null");
 
@@ -142,17 +140,12 @@ public class TradeRsqlVisitorTest {
         ComparisonNode node = new ComparisonNode(new ComparisonOperator("=invalid="), "counterparty.name",
                 Arrays.asList("BigBank"));
         TradeRsqlVisitor visitor = new TradeRsqlVisitor();
+        // Refactored: removed try and catch block, letting JUnit to handle this
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> visitor.visit(node, null));
 
-        try {
-            visitor.visit(node, null);
-            // Call toPredicate to trigger the exception
-
-            fail("Expected IllegalArgumentException to be thrown for invalid operator");
-        } catch (IllegalArgumentException e) {
-            System.out.println("Test passes, exception was thrown as expected");
-
-        }
-
+        assertTrue(ex.getMessage().contains("operator"));
     }
 
     /*

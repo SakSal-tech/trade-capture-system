@@ -395,8 +395,6 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
         @Test
         @WithMockUser(username = "supportUser", roles = { "SUPPORT" })
         void testSupportRoleDeniedPatchTrade() throws Exception {
-                // DEBUG: Print the trade ID being used. For debugging reasons
-                System.out.println("DEBUG: Testing PATCH with trade ID: " + savedTradeBusinessId);
                 // using string template and format function to fix date and string
                 // interpolation error
                 String validPatchJson = String.format(
@@ -418,9 +416,6 @@ public class UserPrivilegeIntegrationTest extends BaseIntegrationTest {
                                 LocalDate.now().plusYears(1),
                                 LocalDate.now().plusYears(1),
                                 LocalDate.now().plusYears(1));
-
-                // DEBUG: Print the JSON payload
-                System.out.println("DEBUG: PATCH JSON payload: " + validPatchJson);
 
                 // This test intentionally hits a trade id that does not belong to
                 // the caller (supportUser) the controller/service should return 403.

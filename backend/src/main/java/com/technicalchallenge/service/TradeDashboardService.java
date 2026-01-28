@@ -38,6 +38,8 @@ import cz.jirutka.rsql.parser.RSQLParser;
 import cz.jirutka.rsql.parser.ast.ComparisonOperator;
 import cz.jirutka.rsql.parser.ast.Node;
 import cz.jirutka.rsql.parser.ast.RSQLOperators;
+
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.slf4j.Logger;
@@ -529,56 +531,73 @@ public class TradeDashboardService {
      * privileges were checked earlier.
      */
     private List<TradeDTO> fetchTradesForTraderWithoutPrivilegeCheck(String traderId) {
-        // Defensive authorization: although this helper is intended to be called
-        // only after the caller has already validated privileges, add an extra
-        // safeguard so lower-level callers (or future callers) cannot bypass
-        // authorization by calling this method directly with another traderId.
+
+        // Resolve authentication and caller identity
         Authentication auth = SecurityContextHolder.getContext() != null
                 ? SecurityContextHolder.getContext().getAuthentication()
                 : null;
-        String caller = (auth == null || auth.getName() == null) ? "__UNKNOWN_TRADER__" : auth.getName();
 
-        boolean canViewOthers = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
-                .anyMatch(a -> {
+        String caller = (auth == null || auth.getName() == null)
+                ? "__UNKNOWN_TRADER__"
+                : auth.getName();
+
+        // Check whether the caller has authority to view other traders
+        boolean canViewOthers = auth != null
+                && auth.getAuthorities() != null
+                && auth.getAuthorities().stream().anyMatch(a -> {
                     String ga = a.getAuthority();
-                    return "ROLE_MIDDLE_OFFICE".equals(ga) || "ROLE_SUPERUSER".equals(ga)
+                    return "ROLE_MIDDLE_OFFICE".equals(ga)
+                            || "ROLE_SUPERUSER".equals(ga)
                             || "TRADE_VIEW_ALL".equals(ga);
                 });
 
-        // If the caller requests another trader's data and lacks elevated
-        // authority, deny the request here to prevent accidental data leaks.
-        if (traderId != null && !traderId.isBlank() && !traderId.equalsIgnoreCase(caller) && !canViewOthers) {
-            throw new org.springframework.security.access.AccessDeniedException(
+        // Defensive authorization check
+        if (traderId != null
+                && !traderId.isBlank()
+                && !traderId.equalsIgnoreCase(caller)
+                && !canViewOthers) {
+            throw new AccessDeniedException(
                     "Insufficient privileges to view another trader's data (defensive check)");
         }
 
-        String traderFilter = (traderId == null || traderId.isBlank()) ? resolveCurrentTraderId() : traderId;
-        Specification<Trade> spec = (root, query, criteriaBuilder) -> criteriaBuilder.equal(
-                criteriaBuilder.lower(root.get("traderUser").get("loginId")), traderFilter.toLowerCase());
+        // Resolve effective trader filter
+        String traderFilter = (traderId == null || traderId.isBlank())
+                ? resolveCurrentTraderId()
+                : traderId;
 
+        // Build query specification
+        Specification<Trade> spec = (root, query, cb) -> cb.equal(
+                cb.lower(root.get("traderUser").get("loginId")),
+                traderFilter.toLowerCase());
+
+        // Fetch trades
         List<Trade> tradeEntities = tradeRepository.findAll(spec);
-        // Diagnostic logging to aid integration-test debugging when counts are
-        // unexpectedly zero. Logs the number of entities and their DB ids.
-        try {
-            logger.info("fetchTradesForTraderWithoutPrivilegeCheck: traderFilter='{}' fetched={}",
-                    traderFilter, tradeEntities == null ? 0 : tradeEntities.size());
-            if (tradeEntities != null) {
-                String ids = tradeEntities.stream().map(t -> t.getId() == null ? "null" : t.getId().toString())
-                        .collect(Collectors.joining(","));
-                logger.info("fetchTradesForTraderWithoutPrivilegeCheck: ids=[{}]", ids);
-                // Also print to stdout to ensure visibility in test output
-                System.out.println("DBG: fetchTradesForTraderWithoutPrivilegeCheck - traderFilter='" + traderFilter
-                        + "' fetched=" + (tradeEntities == null ? 0 : tradeEntities.size()) + " ids=[" + ids + "]");
-            }
-        } catch (Exception e) {
-            logger.info("Error while logging fetched trades: {}", e.getMessage());
-            System.out.println("DBG: Error while logging fetched trades: " + e.getMessage());
+
+        // Info-level summary logging
+        logger.info(
+                "fetchTradesForTraderWithoutPrivilegeCheck: traderFilter='{}' fetched={}",
+                traderFilter,
+                tradeEntities == null ? 0 : tradeEntities.size());
+
+        // Debug-level detailed logging
+        if (tradeEntities != null && logger.isDebugEnabled()) {
+            String ids = tradeEntities.stream()
+                    .map(t -> t.getId() == null ? "null" : t.getId().toString())
+                    .collect(Collectors.joining(","));
+
+            logger.debug(
+                    "fetchTradesForTraderWithoutPrivilegeCheck: traderFilter='{}', fetched={}, ids=[{}]",
+                    traderFilter,
+                    tradeEntities.size(),
+                    ids);
         }
 
         // Map entities to DTOs
-        List<TradeDTO> dtos = tradeEntities.stream().map(tradeMapper::toDto).toList();
+        List<TradeDTO> dtos = tradeEntities.stream()
+                .map(tradeMapper::toDto)
+                .toList();
 
-        // Batch-enrich DTOs with settlement instructions (avoids N+1)
+        // Enrich DTOs with settlement instructions in batch
         enrichSettlementInstructionsForTrades(tradeEntities, dtos);
 
         return dtos;

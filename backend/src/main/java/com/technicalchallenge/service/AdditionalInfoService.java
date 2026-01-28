@@ -3,7 +3,6 @@ package com.technicalchallenge.service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-
 import com.technicalchallenge.dto.AdditionalInfoDTO;
 import com.technicalchallenge.dto.AdditionalInfoRequestDTO;
 import com.technicalchallenge.mapper.AdditionalInfoMapper;
@@ -35,6 +34,8 @@ import java.util.Map;
 import com.technicalchallenge.repository.TradeRepository;
 import com.technicalchallenge.security.UserPrivilegeValidator;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Service layer for managing AdditionalInfo records (free-form fields tied to
@@ -87,6 +88,8 @@ public class AdditionalInfoService {
      * not provide an ApplicationEventPublisher. Delegates to the full
      * constructor with a null publisher.
      */
+    private static final Logger log = LoggerFactory.getLogger(AdditionalInfoService.class);
+
     public AdditionalInfoService(AdditionalInfoRepository additionalInfoRepository,
             AdditionalInfoMapper additionalInfoMapper,
             AdditionalInfoAuditRepository additionalInfoAuditRepository,
@@ -570,9 +573,11 @@ public class AdditionalInfoService {
             // Ensure publishing failures do not break the primary DB transaction.Publishing
             // should happen synchronously in this method and occurs after the DB save/audit
             // Log and continue (listeners should be resilient).
-            // Using System.err here to avoid adding a logger to this large service
-            // class; in future I can use a dedicated logger or metrics.
-            System.err.println("Failed to publish SettlementInstructionsUpdatedEvent: " + ex.getMessage());
+            log.warn(
+                    "Failed to publish SettlementInstructionsUpdatedEvent for tradeId {}: {}",
+                    tradeId,
+                    ex.getMessage(),
+                    ex);
         }
 
         // Convert to DTO and return
@@ -717,23 +722,12 @@ public class AdditionalInfoService {
                             Instant.now().truncatedTo(ChronoUnit.MILLIS),
                             Map.of("oldValue", existing.getFieldValue(), "newValue", null)));
         } catch (Exception ex) {
-            System.err.println("Failed to publish SettlementInstructionsUpdatedEvent (delete): " + ex.getMessage());// Publish
-                                                                                                                    // a
-                                                                                                                    // event
-                                                                                                                    // SettlementInstructionsUpdatedEvent
-                                                                                                                    // so
-                                                                                                                    // other
-                                                                                                                    // components
-                                                                                                                    // (notifications,
-                                                                                                                    // metrics,
-                                                                                                                    // SSE,
-                                                                                                                    // etc.)
-                                                                                                                    // can
-                                                                                                                    // react
-                                                                                                                    // to
-                                                                                                                    // settlement
-                                                                                                                    // instruction
-                                                                                                                    // changes.
+            log.warn(
+                    "\"Failed to publish SettlementInstructionsUpdatedEvent (delete):",
+                    tradeId,
+                    ex.getMessage(),
+                    ex);
+
         }
 
         return true;
