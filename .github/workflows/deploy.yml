@@ -1,7 +1,7 @@
 # Name shown in the GitHub Actions UI
 # CI/CD deployment workflow
 
-name: Trigger CI/CD deployment
+name: Build and Deploy to Azure Container Apps
 
 # WHEN this workflow runs:
 # Every time code is pushed to the main branch
