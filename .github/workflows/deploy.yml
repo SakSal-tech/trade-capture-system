@@ -32,9 +32,13 @@ jobs:
         run: az acr login --name tradeacr12345
 
       # Step 4: Build the Docker image from your Dockerfile
+      # Dockerfile lives in backend/, so we must specify it explicitly
       - name: Build Docker image
         run: |
-          docker build -t tradeacr12345.azurecr.io/trade-backend:latest .
+          docker build \
+            -t tradeacr12345.azurecr.io/trade-backend:latest \
+            -f backend/Dockerfile \
+            backend
 
       # Step 5: Push the Docker image to ACR
       - name: Push Docker image to ACR
