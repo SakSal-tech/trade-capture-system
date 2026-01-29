@@ -1,10 +1,5 @@
-# Name shown in the GitHub Actions UI
-# CI/CD deployment workflow
+name: Deploy to Azure Container Apps
 
-name: Build and Deploy to Azure Container Apps
-
-# WHEN this workflow runs:
-# Every time code is pushed to the main branch
 on:
   push:
     branches:
@@ -12,27 +7,20 @@ on:
 
 jobs:
   deploy:
-    # Type of machine GitHub runs this on
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Download your repository into the runner
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      # Step 2: Authenticate GitHub Actions with Azure
-      # Uses a Service Principal stored as a GitHub secret
       - name: Log in to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Step 3: Log in to Azure Container Registry (ACR)
       - name: Log in to Azure Container Registry
         run: az acr login --name tradeacr12345
 
-      # Step 4: Build the Docker image from your Dockerfile
-      # Dockerfile lives in backend/, so we must specify it explicitly
       - name: Build Docker image
         run: |
           docker build \
@@ -40,15 +28,13 @@ jobs:
             -f backend/Dockerfile \
             backend
 
-      # Step 5: Push the Docker image to ACR
-      - name: Push Docker image to ACR
-        run: |
-          docker push tradeacr12345.azurecr.io/trade-backend:latest
+      - name: Push Docker image
+        run: docker push tradeacr12345.azurecr.io/trade-backend:latest
 
-      # Step 6: Deploy the new image to Azure Container Apps
-      - name: Deploy to Azure Container App
+      - name: Deploy container
         run: |
           az containerapp update \
             --name trade-backend \
             --resource-group trade-rg \
-            --image tradeacr12345.azurecr.io/trade-backend:latest
+            --image tradeacr12345.azurecr.io/trade-backend:latest \
+            --set-env-vars SPRING_PROFILES_ACTIVE=prod
