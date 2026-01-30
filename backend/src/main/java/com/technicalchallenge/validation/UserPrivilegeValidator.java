@@ -220,4 +220,18 @@ public class UserPrivilegeValidator {
                                                                           // the trade
     }
 
+    // ADDED to improve centralsing authentication which was duplicated in different
+    // classes
+    public boolean hasElevatedTradeView(Authentication auth) {
+        return auth != null
+                && auth.getAuthorities() != null
+                && auth.getAuthorities().stream().anyMatch(a -> {
+                    String ga = a.getAuthority();
+                    return "ROLE_MIDDLE_OFFICE".equalsIgnoreCase(ga)
+                            || "ROLE_SUPPORT".equalsIgnoreCase(ga)
+                            || "ROLE_SUPERUSER".equalsIgnoreCase(ga)
+                            || "TRADE_VIEW_ALL".equalsIgnoreCase(ga);
+                });
+    }
+
 }

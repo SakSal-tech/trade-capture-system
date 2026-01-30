@@ -22,8 +22,9 @@ import java.util.Optional;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.access.AccessDeniedException;
-import com.technicalchallenge.security.UserPrivilegeValidator;
 import com.technicalchallenge.validation.TradeValidationEngine;
+import com.technicalchallenge.validation.UserPrivilegeValidator;
+
 import com.technicalchallenge.validation.TradeValidationResult;
 import com.technicalchallenge.mapper.TradeMapper;
 import org.springframework.web.server.ResponseStatusException;
@@ -104,44 +105,31 @@ public class TradeService {
 
     public List<Trade> getAllTrades() {
         logger.info("Retrieving all trades");
-        // Refactor: apply server-side scoping for read-list.
-        // If the caller is a TRADER without elevated view privileges, return
-        // only trades owned by that trader. This defends against a client
-        // supplying arbitrary criteria to view others' trades.
-        // Otherwise (MIDDLE_OFFICE, SUPPORT, admins) return all trades.
-        // Determine caller and apply server-side scoping:
-        // - If caller is a TRADER (and does not have elevated view privileges),
-        // return only trades owned by that trader.
-        // - Otherwise (MIDDLE_OFFICE, SUPPORT, admins), return all trades.
+
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String currentUser = (auth != null && auth.getName() != null) ? auth.getName() : null;
 
-        boolean isTrader = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_TRADER".equalsIgnoreCase(a.getAuthority()));
+        boolean isTrader = auth != null
+                && auth.getAuthorities() != null
+                && auth.getAuthorities().stream()
+                        .anyMatch(a -> "ROLE_TRADER".equalsIgnoreCase(a.getAuthority()));
 
-        boolean hasElevatedView = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
-                .anyMatch(a -> {
-                    String ga = a.getAuthority();
-                    return "ROLE_MIDDLE_OFFICE".equalsIgnoreCase(ga) || "ROLE_SUPPORT".equalsIgnoreCase(ga)
-                            || "ROLE_SUPERUSER".equalsIgnoreCase(ga) || "TRADE_VIEW_ALL".equalsIgnoreCase(ga);
-                });
+        // IMROVED centralised privilege check
+        boolean hasElevatedView = userPrivilegeValidator != null
+                && userPrivilegeValidator.hasElevatedTradeView(auth);
 
         if (isTrader && !hasElevatedView && currentUser != null) {
-            // Scoped fetch for trader users: use the derived repository method
-            // to efficiently return only this trader's active trades.
-            return tradeRepository.findAllByTraderUser_LoginIdAndActiveTrueOrderByTradeIdDesc(currentUser);
+            return tradeRepository
+                    .findAllByTraderUser_LoginIdAndActiveTrueOrderByTradeIdDesc(currentUser);
         }
 
-        // Non-trader callers or elevated users see the full list.
         return tradeRepository.findAll();
     }
 
     // Fetch a single trade
     public Optional<Trade> getTradeById(Long tradeId) {
         logger.debug("Retrieving trade by id: {}", tradeId);
-        // Debug: also query all trades with the business tradeId so can see if
-        // rows exist but are not active. This helps diagnose integration-test
-        // visibility issues where a trade may be present but flagged inactive.
+
         try {
             var allMatches = tradeRepository.findByTradeId(tradeId);
             logger.debug("Found {} trades with tradeId={}", allMatches == null ? 0 : allMatches.size(), tradeId);
@@ -154,50 +142,39 @@ public class TradeService {
             logger.warn("Error while debugging trade lookup: {}", e.getMessage());
         }
 
-        // Try to pick an active trade from the list already fetched. This
-        // works around cases where the derived query with a boolean predicate
-        // may not match due to subtle dialect/nullable-boolean handling in
-        // the test environment.
         Optional<Trade> opt = java.util.Optional.empty();
         try {
             var allMatches = tradeRepository.findByTradeId(tradeId);
             if (allMatches != null) {
-                opt = allMatches.stream().filter(t -> Boolean.TRUE.equals(t.getActive())).findFirst();
+                opt = allMatches.stream()
+                        .filter(t -> Boolean.TRUE.equals(t.getActive()))
+                        .findFirst();
             }
         } catch (Exception e) {
             logger.debug("Fallback active-filter failed: {}", e.getMessage());
         }
-        // Fallback: rely on the repository method if active-filter didn't work
+
         if (opt.isEmpty()) {
             opt = tradeRepository.findByTradeIdAndActiveTrue(tradeId);
         }
 
-        // Enforce server-side ownership checks: a TRADER should only be able to
-        // access their own trade unless they hold elevated privileges.
         if (opt.isPresent()) {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             String currentUser = (auth != null && auth.getName() != null) ? auth.getName() : null;
 
-            boolean hasElevatedView = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
-                    .anyMatch(a -> {
-                        String ga = a.getAuthority();
-                        return "ROLE_MIDDLE_OFFICE".equalsIgnoreCase(ga) || "ROLE_SUPPORT".equalsIgnoreCase(ga)
-                                || "ROLE_SUPERUSER".equalsIgnoreCase(ga) || "TRADE_VIEW_ALL".equalsIgnoreCase(ga);
-                    });
+            // ADDED: centralised privilege check
+            boolean hasElevatedView = userPrivilegeValidator != null
+                    && userPrivilegeValidator.hasElevatedTradeView(auth);
 
-            // If caller is not allowed to view others and is not the owner, deny
             if (!hasElevatedView && currentUser != null) {
                 Trade t = opt.get();
                 String ownerLogin = (t.getTraderUser() != null && t.getTraderUser().getLoginId() != null)
                         ? t.getTraderUser().getLoginId()
                         : null;
 
-                // Added ownership enforcement: deny access if the caller is not
-                // the trade owner and lacks elevated privileges. This is a
-                // lightweight, defensible service-layer guard (complements
-                // controller-level @PreAuthorize annotations).
                 if (ownerLogin != null && !ownerLogin.equalsIgnoreCase(currentUser)) {
-                    throw new AccessDeniedException("Insufficient privileges to view trade " + tradeId);
+                    throw new AccessDeniedException(
+                            "Insufficient privileges to view trade " + tradeId);
                 }
             }
         }

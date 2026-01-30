@@ -18,10 +18,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -37,6 +35,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 
 /**
  * Handles Settlement Instructions integration for trades.
@@ -94,59 +95,63 @@ public class TradeSettlementController {
      */
     @GetMapping("/search/settlement-instructions")
     @PreAuthorize("hasAnyRole('TRADER','MIDDLE_OFFICE','SUPPORT')")
-    // OpenAPI: @Operation provides a short summary and description displayed
-    // in Swagger UI. @ApiResponses lists common HTTP responses for the endpoint.
-    @Operation(summary = "Search trades by settlement instruction text", description = "Performs a case-insensitive partial match across settlement instructions and returns matching trades as trade DTOs.")
+    @Operation(summary = "Search trades by settlement instruction text (paginated)", description = "Case-insensitive partial match across settlement instructions. Returns paginated TradeDTO results.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "List of trades matching the search"),
+            @ApiResponse(responseCode = "200", description = "Page of trades matching the search"),
             @ApiResponse(responseCode = "400", description = "Invalid or empty search text provided")
     })
-    public ResponseEntity<?> searchBySettlementInstructions(@RequestParam String instructions) {
-
-        // If user provides nothing or only spaces, return HTTP 400
+    public ResponseEntity<?> searchBySettlementInstructions(
+            @RequestParam String instructions,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "25") int size) {
         if (instructions == null || instructions.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Search text cannot be empty.");
         }
 
-        // Trim removes any extra spaces from both ends of user input.
-        String trimmedInput = instructions.trim();
+        // Safety: prevent negative + hard-cap size
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 100);
 
-        // Refactored: Instead of calling searchByKey() (which loads all records),
-        // now call a dedicated service method that performs a focused database
-        // query.
-        List<AdditionalInfoDTO> matchingInfos = additionalInfoService.searchTradesBySettlementKeyword(trimmedInput);
+        String trimmed = instructions.trim();
 
-        // Use a Set to ensure unique trade IDs (avoid duplicates)
-        Set<Long> tradeIdSet = new HashSet<>();
+        // Page of matching AdditionalInfo rows (already filtered to TRADE +
+        // SETTLEMENT_INSTRUCTIONS)
+        Page<AdditionalInfoDTO> infoPage = additionalInfoService.searchSettlementInstructions(trimmed, safePage,
+                safeSize);
 
-        // Loop through each matching record
-        // Keep only records that belong to the "TRADE" entity type
-        for (AdditionalInfoDTO info : matchingInfos) {
-            if (info.getEntityType() != null && info.getEntityType().equalsIgnoreCase("TRADE")) {
-                tradeIdSet.add(info.getEntityId());
-            }
+        if (infoPage.isEmpty()) {
+            // Return an empty page-shaped response (keeps client happy)
+            return ResponseEntity.ok(Page.empty(infoPage.getPageable()));
         }
 
-        // Convert the Set to a List to pass into the service method
-        List<Long> tradeIds = new ArrayList<>(tradeIdSet);
+        // Extract unique tradeIds from THIS page only
+        // (keeps pagination consistent with DB page)
+        List<Long> tradeIds = infoPage.getContent().stream()
+                .filter(ai -> ai.getEntityType() != null && "TRADE".equalsIgnoreCase(ai.getEntityType()))
+                .map(AdditionalInfoDTO::getEntityId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
 
-        // If no matches were found, return an empty list (not an error)
         if (tradeIds.isEmpty()) {
-            return ResponseEntity.ok(new ArrayList<TradeDTO>());
+            return ResponseEntity.ok(Page.empty(infoPage.getPageable()));
         }
 
-        // Retrieve the trade entities using their IDs
+        // Fetch trades for those ids
         List<Trade> trades = tradeService.getTradesByIds(tradeIds);
 
-        // Convert the trade entities to DTOs for safe frontend use
-        List<TradeDTO> tradeDTOs = new ArrayList<>();
-        for (Trade trade : trades) {
-            TradeDTO tradeDTO = tradeMapper.toDto(trade);
-            tradeDTOs.add(tradeDTO);
-        }
+        // Map to DTOs
+        List<TradeDTO> tradeDTOs = trades.stream()
+                .map(tradeMapper::toDto)
+                .toList();
 
-        // Return matching trades as JSON
-        return ResponseEntity.ok(tradeDTOs);
+        // Wrap TradeDTO list in a Page with the SAME pageable + total from info search.
+        // Note: totalElements refers to matching AdditionalInfo rows, not necessarily
+        // unique trades.
+        // If require "true total trades", I will need a different query strategy.
+        Page<TradeDTO> tradePage = new PageImpl<>(tradeDTOs, infoPage.getPageable(), infoPage.getTotalElements());
+
+        return ResponseEntity.ok(tradePage);
     }
 
     /**
@@ -187,10 +192,10 @@ public class TradeSettlementController {
          * -Moved logic into AdditionalInfoService so authorization,
          * validation, audit and persistence are handled in one place (cleaner
          * code, easier tests, stronger security).
-         * 200 = record exists and you can view it.
+         * 200 = record exists and can view it.
          * 404 = no settlement instructions saved for that trade (not a
          * permission issue).
-         * 403 = you are not the trade owner and lack privileges.
+         * 403 = are not the trade owner and lack privileges.
          * - Rows disappearing after restart? That's caused by
          * spring.jpa.hibernate.ddl-auto=create-drop. Change to 'update' or
          */
@@ -449,7 +454,7 @@ public class TradeSettlementController {
         // call service method to detect nonstandard keyword in the settlement
         String keyword = additionalInfoService.alertNonStandardSettlementKeyword(id);
         // Create a response map to return small JSON. Spring (via Jackson) will
-        // automatically convert a Java Map into a small JSON object without you having
+        // automatically convert a Java Map into a small JSON object without having
         // to create a new DTO class
         Map<String, Object> resp = new HashMap<>();
 

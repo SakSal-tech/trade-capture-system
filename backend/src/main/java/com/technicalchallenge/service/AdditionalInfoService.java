@@ -861,4 +861,28 @@ public class AdditionalInfoService {
         return results.map(additionalInfoMapper::toDto);
     }
 
+    // ADDED IMPROVEMENT: To deal with issues with loading everything, filtered in
+    // memory which was risky on large tradedatasets
+    public Page<AdditionalInfoDTO> searchSettlementInstructions(
+            String keyword,
+            int page,
+            int size) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            throw new IllegalArgumentException("Search keyword cannot be empty.");
+        }
+
+        int safeSize = Math.min(size, 100);
+
+        Pageable pageable = PageRequest.of(
+                page,
+                safeSize,
+                Sort.by("additionalInfoId").descending());
+
+        Page<AdditionalInfo> results = additionalInfoRepository.searchSettlementInstructions(
+                keyword.trim(),
+                pageable);
+
+        return results.map(additionalInfoMapper::toDto);
+    }
+
 }
